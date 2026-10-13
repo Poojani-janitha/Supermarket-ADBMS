@@ -1,12 +1,13 @@
 import { Component, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { ProductService } from '../../core/services/product.service';
 import { CartService } from '../../core/services/cart.service';
 import { CustomerService } from '../../core/services/customer.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ReceiptModalComponent } from '../../shared/components/receipt-modal/receipt-modal.component';
-import { Customer, Product } from '../../core/models';
+import { Customer, Product, SalesOrder } from '../../core/models';
 
 @Component({
   selector: 'app-pos',
@@ -1678,6 +1679,7 @@ import { Customer, Product } from '../../core/models';
   `]
 })
 export class PosComponent {
+  private readonly http = inject(HttpClient);
   readonly productService = inject(ProductService);
   readonly cartService = inject(CartService);
   readonly customerService = inject(CustomerService);
@@ -1702,18 +1704,35 @@ export class PosComponent {
 
   searchOrder(): void {
     if (!this.lookupOrderId) return;
-    // Simulate finding order
-    this.foundOrder.set({
-      id: this.lookupOrderId,
-      customer: 'Devon Lane',
-      amount: 48.90,
-      status: 'COMPLETED'
+    this.http.get<SalesOrder>(`/api/orders/${this.lookupOrderId}`).subscribe({
+      next: (order) => {
+        this.foundOrder.set({
+          id: order.orderId,
+          customer: order.customerName || 'Walk-in Shopper',
+          amount: order.totalAmount,
+          status: order.status
+        });
+      },
+      error: () => {
+        alert(`Order #${this.lookupOrderId} not found.`);
+        this.foundOrder.set(null);
+      }
     });
   }
 
   cancelFoundOrder(): void {
-    if (!this.foundOrder()) return;
-    this.foundOrder.update(o => o ? { ...o, status: 'CANCELLED' } : null);
+    if (!this.foundOrder() || !this.lookupOrderId) return;
+    this.http.post<SalesOrder>(`/api/orders/${this.lookupOrderId}/cancel`, {}).subscribe({
+      next: (updatedOrder) => {
+        this.foundOrder.update(o => o ? { ...o, status: 'CANCELLED' } : null);
+        alert(`Order #${this.lookupOrderId} cancelled successfully. Stock restored.`);
+        this.productService.loadProducts();
+      },
+      error: (err) => {
+        const msg = err?.error?.message || err?.error?.error || 'Cancellation failed';
+        alert(`Cancellation failed: ${msg}`);
+      }
+    });
   }
 
   openCustomerModal(): void {
