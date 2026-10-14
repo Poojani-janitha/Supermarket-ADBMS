@@ -107,4 +107,30 @@ SELECT log_id, branch_id, product_id, change_qty, reason, ref_order_id
 FROM stock_audit_log 
 WHERE ref_order_id = @new_order_id AND reason = 'CANCEL';
 
+-- ----------------------------------------------------------------------------
+-- TEST 4: Test Member 1 Sales Views & Scheduled Events
+-- ----------------------------------------------------------------------------
+SELECT '=== STARTING TEST 4: MEMBER 1 SALES VIEWS & EVENT VERIFICATION ===' AS test_banner;
+
+-- Test v_sales_order_summary
+SELECT order_id, branch_name, customer_name, cashier_name, total_items_count, total_amount, payment_method
+FROM v_sales_order_summary
+LIMIT 5;
+
+-- Test v_daily_sales
+SELECT branch_id, branch_name, sale_date, total_orders, net_revenue
+FROM v_daily_sales
+LIMIT 5;
+
+-- Test v_order_items_detailed
+SELECT order_id, sku, product_name, category_name, quantity, line_total
+FROM v_order_items_detailed
+LIMIT 5;
+
+-- Verify Member 1 Scheduled Event exists
+SELECT event_name, event_schema, interval_value, interval_field, status 
+FROM information_schema.events
+WHERE event_name IN ('ev_sales_daily_reconciliation', 'ev_sales_audit_cleanup');
+
 SELECT '=== ALL MEMBER 1 TESTS COMPLETED SUCCESSFULLY ===' AS final_status;
+

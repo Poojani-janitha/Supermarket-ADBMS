@@ -5,12 +5,13 @@
 -- ============================================================================
 
 SOURCE 01_schema.sql;
-SOURCE 03_indexes.sql;
-SOURCE 04_functions.sql;
+SOURCE 02_indexes.sql;
+SOURCE 03_functions_sale.sql;
+SOURCE 04_procedures_sales.sql;
 SOURCE 05_procedures_products.sql;
-SOURCE 05_procedures_sales.sql;
-SOURCE 06_triggers.sql;
-SOURCE 07_views.sql;
+SOURCE 05_triggers_sales.sql;
+SOURCE 06_views_sales.sql;
+SOURCE 07_events_sales.sql;
 SOURCE 10_seed_reference.sql;
 
 SELECT 'Database supermarket_db initialized and seeded successfully!' AS status;
