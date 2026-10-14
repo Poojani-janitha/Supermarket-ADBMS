@@ -941,7 +941,7 @@ export class AdminDashboardComponent {
 
   openRoleModal(emp: Employee): void {
     this.selectedEmployeeForRole.set(emp);
-    this.newRoleSelection = emp.role;
+    this.newRoleSelection = emp.role === 'SUPPLIER' ? 'CASHIER' : emp.role;
   }
 
   confirmRoleChange(): void {

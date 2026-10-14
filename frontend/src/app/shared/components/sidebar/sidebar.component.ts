@@ -22,40 +22,60 @@ import { AuthService } from '../../../core/services/auth.service';
 
       <!-- Navigation Menu -->
       <nav class="nav-menu">
-        <a routerLink="/pos" routerLinkActive="active" class="nav-item">
-          <span class="material-symbols-outlined nav-icon">point_of_sale</span>
-          <span class="nav-label">POS / Checkout</span>
-        </a>
+        @if (authService.isSupplier()) {
+          <!-- Supplier Dedicated Links -->
+          <a routerLink="/supplier-portal" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">local_shipping</span>
+            <span class="nav-label">Vendor Portal</span>
+          </a>
+          <a routerLink="/products" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">inventory_2</span>
+            <span class="nav-label">Product Catalog</span>
+          </a>
+        } @else {
+          <!-- Internal Supermarket Staff Links -->
+          <a routerLink="/pos" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">point_of_sale</span>
+            <span class="nav-label">POS / Checkout</span>
+          </a>
 
-        <a routerLink="/products" routerLinkActive="active" class="nav-item">
-          <span class="material-symbols-outlined nav-icon">inventory_2</span>
-          <span class="nav-label">Product Catalog</span>
-        </a>
+          <a routerLink="/products" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">inventory_2</span>
+            <span class="nav-label">Product Catalog</span>
+          </a>
 
-        <a routerLink="/inventory" routerLinkActive="active" class="nav-item">
-          <span class="material-symbols-outlined nav-icon">warehouse</span>
-          <span class="nav-label">Branch Inventory</span>
-        </a>
+          <a routerLink="/inventory" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">warehouse</span>
+            <span class="nav-label">Branch Inventory</span>
+          </a>
 
-        <a routerLink="/customers" routerLinkActive="active" class="nav-item">
-          <span class="material-symbols-outlined nav-icon">groups</span>
-          <span class="nav-label">Customer Loyalty</span>
-        </a>
+          <a routerLink="/purchase-orders" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">local_shipping</span>
+            <span class="nav-label">Purchase Orders</span>
+          </a>
 
-        <a routerLink="/discounts" routerLinkActive="active" class="nav-item">
-          <span class="material-symbols-outlined nav-icon">percent</span>
-          <span class="nav-label">Discount Engine</span>
-        </a>
+          <a routerLink="/customers" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">groups</span>
+            <span class="nav-label">Customer Loyalty</span>
+          </a>
 
-        <a routerLink="/reports" routerLinkActive="active" class="nav-item">
-          <span class="material-symbols-outlined nav-icon">analytics</span>
-          <span class="nav-label">Reports & Analytics</span>
-        </a>
+          <a routerLink="/discounts" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">percent</span>
+            <span class="nav-label">Discount Engine</span>
+          </a>
 
-        <a routerLink="/admin" routerLinkActive="active" class="nav-item">
-          <span class="material-symbols-outlined nav-icon">admin_panel_settings</span>
-          <span class="nav-label">Security & RBAC</span>
-        </a>
+          <a routerLink="/reports" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">analytics</span>
+            <span class="nav-label">Reports & Analytics</span>
+          </a>
+
+          @if (authService.isAdmin()) {
+            <a routerLink="/admin" routerLinkActive="active" class="nav-item">
+              <span class="material-symbols-outlined nav-icon">admin_panel_settings</span>
+              <span class="nav-label">Security & RBAC</span>
+            </a>
+          }
+        }
       </nav>
 
       <!-- Bottom Staff & Role Switcher -->
@@ -301,7 +321,7 @@ import { AuthService } from '../../../core/services/auth.service';
 export class SidebarComponent {
   readonly authService = inject(AuthService);
 
-  switchUser(role: 'CASHIER' | 'MANAGER' | 'ADMIN'): void {
+  switchUser(role: 'CASHIER' | 'MANAGER' | 'ADMIN' | 'SUPPLIER'): void {
     this.authService.switchUser(role);
   }
 
@@ -309,6 +329,7 @@ export class SidebarComponent {
     const current = this.authService.currentUser().role;
     if (current === 'CASHIER') this.switchUser('MANAGER');
     else if (current === 'MANAGER') this.switchUser('ADMIN');
+    else if (current === 'ADMIN') this.switchUser('SUPPLIER');
     else this.switchUser('CASHIER');
   }
 }

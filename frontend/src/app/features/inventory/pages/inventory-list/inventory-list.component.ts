@@ -1,247 +1,265 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { RouterModule } from '@angular/router';
 import { InventoryService } from '../../../../core/services/inventory.service';
 import { InventoryItem } from '../../../../core/models';
-
-interface PurchaseOrderView {
-  poId: number;
-  supplierName: string;
-  branchName: string;
-  orderDate: string;
-  status: 'PENDING' | 'RECEIVED' | 'CANCELLED';
-  itemsSummary: string;
-  totalCost: number;
-}
 
 @Component({
   selector: 'app-inventory-list',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterModule],
   template: `
     <div class="page-container">
+      <!-- Header -->
       <div class="page-header">
         <div>
-          <h1 class="page-title">Branch Inventory & Supply Chain</h1>
-          <p class="page-subtitle">Managed by Member 2 | Procedures: sp_add_stock, sp_transfer_stock, sp_receive_purchase | Triggers: trg_inventory_low_stock</p>
+          <h1 class="page-title">Branch Stock & Inventory Control</h1>
+          <p class="page-subtitle">
+            ADBMS Module 2 &bull; Optimistic Locking (<code>version</code>) &bull; Inter-Branch Transfers (<code>sp_transfer_stock</code>)
+          </p>
         </div>
 
         <div class="header-actions">
           <button class="btn-pill btn-secondary" (click)="openTransferModal()">
             <span class="material-symbols-outlined">swap_horiz</span> Inter-Branch Transfer
           </button>
-          <button class="btn-pill btn-primary" (click)="openRestockModal()">
-            <span class="material-symbols-outlined">add_box</span> Direct Restock (sp_add_stock)
-          </button>
+          <a routerLink="/purchase-orders" class="btn-pill btn-primary">
+            <span class="material-symbols-outlined">add_shopping_cart</span> Order from Supplier
+          </a>
         </div>
       </div>
 
-      <!-- Tab Switcher -->
-      <div class="nav-tabs-bar">
-        <button
-          class="tab-btn"
-          [class.active]="activeTab() === 'STOCK'"
-          (click)="activeTab.set('STOCK')"
-        >
-          <span class="material-symbols-outlined">inventory_2</span>
-          Branch Stock Levels (inventory)
-        </button>
-        <button
-          class="tab-btn"
-          [class.active]="activeTab() === 'PURCHASE'"
-          (click)="activeTab.set('PURCHASE')"
-        >
-          <span class="material-symbols-outlined">local_shipping</span>
-          Purchase Orders & Receiving (sp_receive_purchase)
-        </button>
+      <!-- Branch Filter & Search Bar -->
+      <div class="filter-bar-card">
+        <div class="branch-select-group">
+          <span class="material-symbols-outlined">warehouse</span>
+          <label>Filter by Branch Outlet:</label>
+          <select [ngModel]="selectedBranchFilter()" (ngModelChange)="selectedBranchFilter.set($event)">
+            <option [value]="0">All Supermarket Branches</option>
+            @for (branch of inventoryService.branches; track branch.id) {
+              <option [value]="branch.id">{{ branch.name }}</option>
+            }
+          </select>
+        </div>
+
+        <div class="search-input-box">
+          <span class="material-symbols-outlined">search</span>
+          <input
+            type="text"
+            placeholder="Search SKU or product name..."
+            [(ngModel)]="searchQuery"
+          />
+        </div>
       </div>
 
-      <!-- Low Stock Alerts Box (Only when on STOCK tab) -->
-      @if (activeTab() === 'STOCK' && inventoryService.lowStockAlerts().length > 0) {
+      <!-- Low Stock Alerts Box (Member 2: trg_inventory_low_stock / v_low_stock) -->
+      @if (inventoryService.lowStockAlerts().length > 0) {
         <div class="alert-box">
           <div class="alert-title-row">
             <span class="material-symbols-outlined alert-icon">warning</span>
-            <strong>Active Low-Stock Alerts (v_low_stock / trg_inventory_low_stock)</strong>
+            <div>
+              <strong>Active Low-Stock Alerts (v_low_stock &bull; trg_inventory_low_stock)</strong>
+              <p class="alert-sub">Stock below configured safety threshold. Use Purchase Orders to restock from authorized suppliers.</p>
+            </div>
           </div>
           <div class="alert-items-list">
             @for (alert of inventoryService.lowStockAlerts(); track alert.alertId) {
               <div class="alert-pill">
-                <span>{{ alert.branchName }}: <strong>{{ alert.productName }}</strong> ({{ alert.quantity }} left)</span>
+                <span>{{ alert.branchName }}: <strong>{{ alert.productName }}</strong></span>
+                <span class="alert-qty">{{ alert.quantity }} {{ alert.unitOfMeasure || 'Units' }} remaining</span>
+                <a routerLink="/purchase-orders" class="alert-reorder-link">
+                  Reorder &rarr;
+                </a>
               </div>
             }
           </div>
         </div>
       }
 
-      <!-- TAB 1: STOCK LEVELS -->
-      @if (activeTab() === 'STOCK') {
-        <div class="table-card">
-          <table class="data-table">
-            <thead>
+      <!-- Inventory Table -->
+      <div class="table-card">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>BRANCH</th>
+              <th>SKU</th>
+              <th>PRODUCT NAME</th>
+              <th>QUANTITY ON HAND</th>
+              <th>REORDER LEVEL</th>
+              <th>UNIT (UoM)</th>
+              <th>VERSION (LOCK)</th>
+              <th>STOCK STATUS</th>
+              <th style="text-align: right;">PROCUREMENT / ACTIONS</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of filteredInventory(); track item.productId + '-' + item.branchId) {
               <tr>
-                <th>BRANCH</th>
-                <th>SKU</th>
-                <th>PRODUCT NAME</th>
-                <th>QUANTITY ON HAND</th>
-                <th>REORDER LEVEL</th>
-                <th>LOCK VERSION</th>
-                <th>STATUS</th>
-                <th style="text-align: right;">QUICK ACTION</th>
+                <td><strong>{{ item.branchName }}</strong></td>
+                <td><span class="code-sku">{{ item.sku }}</span></td>
+                <td>{{ item.productName }}</td>
+                <td>
+                  <span class="qty-badge" [class.danger]="item.isLowStock">
+                    {{ item.quantity.toFixed(item.unitOfMeasure === 'KG' || item.unitOfMeasure === 'L' ? 2 : 0) }} {{ item.unitOfMeasure }}
+                  </span>
+                </td>
+                <td>{{ item.reorderLevel }} {{ item.unitOfMeasure }}</td>
+                <td><span class="unit-pill">{{ item.unitOfMeasure }}</span></td>
+                <td>
+                  <span class="version-badge" title="Optimistic Locking Version">v{{ item.version }}</span>
+                </td>
+                <td>
+                  @if (item.isLowStock) {
+                    <span class="badge-pill badge-danger">REORDER NEEDED</span>
+                  } @else {
+                    <span class="badge-pill badge-optimal">OPTIMAL</span>
+                  }
+                </td>
+                <td style="text-align: right;">
+                  <a routerLink="/purchase-orders" class="btn-pill btn-outline btn-sm">
+                    <span class="material-symbols-outlined">local_shipping</span>
+                    Order Stock (PO)
+                  </a>
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              @for (item of inventoryService.inventory(); track item.productId + '-' + item.branchId) {
-                <tr>
-                  <td><strong>{{ item.branchName }}</strong></td>
-                  <td><span class="code-sku">{{ item.sku }}</span></td>
-                  <td>{{ item.productName }}</td>
-                  <td>
-                    <span class="qty-badge" [class.danger]="item.isLowStock">
-                      {{ item.quantity }} Units
-                    </span>
-                  </td>
-                  <td>{{ item.reorderLevel }} Units</td>
-                  <td><span class="version-badge">v{{ item.version }}</span></td>
-                  <td>
-                    @if (item.isLowStock) {
-                      <span class="badge-pill badge-nonveg">REORDER NEEDED</span>
-                    } @else {
-                      <span class="badge-pill badge-veg">OPTIMAL</span>
-                    }
-                  </td>
-                  <td style="text-align: right;">
-                    <button class="btn-pill btn-outline btn-sm" (click)="quickRestock(item)">
-                      + Restock 10 (sp_add_stock)
-                    </button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
-
-      <!-- TAB 2: PURCHASE ORDERS & RECEIVING (sp_receive_purchase) -->
-      @if (activeTab() === 'PURCHASE') {
-        <div class="table-card">
-          <table class="data-table">
-            <thead>
+            }
+            @if (filteredInventory().length === 0) {
               <tr>
-                <th>PO #</th>
-                <th>SUPPLIER</th>
-                <th>DESTINATION BRANCH</th>
-                <th>ORDER DATE</th>
-                <th>ITEMS ORDERED</th>
-                <th>TOTAL COST</th>
-                <th>STATUS</th>
-                <th style="text-align: right;">ACTION</th>
+                <td colspan="9" style="text-align: center; padding: 36px; color: #64748b;">
+                  No inventory records match the selected branch and search query.
+                </td>
               </tr>
-            </thead>
-            <tbody>
-              @for (po of purchaseOrders(); track po.poId) {
-                <tr>
-                  <td><span class="code-sku">#PO-{{ po.poId }}</span></td>
-                  <td><strong>{{ po.supplierName }}</strong></td>
-                  <td>{{ po.branchName }}</td>
-                  <td>{{ po.orderDate }}</td>
-                  <td>{{ po.itemsSummary }}</td>
-                  <td><strong>\${{ po.totalCost.toFixed(2) }}</strong></td>
-                  <td>
-                    @if (po.status === 'RECEIVED') {
-                      <span class="badge-pill badge-veg">RECEIVED & IN STOCK</span>
-                    } @else {
-                      <span class="badge-pill badge-discount">PENDING ARRIVAL</span>
-                    }
-                  </td>
-                  <td style="text-align: right;">
-                    @if (po.status === 'PENDING') {
-                      <button class="btn-pill btn-primary btn-sm" (click)="receivePurchaseOrder(po)">
-                        <span class="material-symbols-outlined" style="font-size: 16px;">download_done</span>
-                        Receive (sp_receive_purchase)
-                      </button>
-                    } @else {
-                      <span style="color: var(--primary-green); font-size: 0.78rem; font-weight: 700;">Stock Incremented</span>
-                    }
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
-        </div>
-      }
+            }
+          </tbody>
+        </table>
+      </div>
 
-      <!-- Inter-Branch Transfer Modal (sp_transfer_stock) -->
-      @if (isTransferOpen()) {
-        <div class="modal-backdrop" (click)="isTransferOpen.set(false)">
-          <div class="modal-dialog" (click)="$event.stopPropagation()">
-            <div class="modal-header">
-              <h3 class="modal-title">Inter-Branch Stock Transfer (ACID Procedure)</h3>
-              <button class="close-btn" (click)="isTransferOpen.set(false)">&times;</button>
+      <!-- Architecture Explainer Card -->
+      <div class="db-explainer-card">
+        <div class="explainer-icon">
+          <span class="material-symbols-outlined">storage</span>
+        </div>
+        <div class="explainer-content">
+          <h4>ADBMS Architecture: Verified Stock Auditing</h4>
+          <p>
+            Stock is never arbitrarily increased. To prevent inventory manipulation and comply with course audit rules, all stock increases are routed through 
+            <code>sp_receive_purchase</code> (Goods Receipt Notes) or <code>sp_transfer_stock</code> (Inter-Branch Transfers). Every inventory movement writes directly to the partitioned <code>stock_audit_log</code> table.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- MODAL: INTER-BRANCH STOCK TRANSFER (sp_transfer_stock) -->
+    @if (showTransferModal()) {
+      <div class="modal-backdrop" (click)="closeTransferModal()">
+        <div class="modal-dialog" (click)="$event.stopPropagation()">
+          <div class="modal-header">
+            <div>
+              <h2 class="modal-title">Inter-Branch Stock Transfer</h2>
+              <p class="modal-subtitle">Procedure: <code>sp_transfer_stock</code> &bull; ACID Atomic Movement</p>
             </div>
+            <button class="btn-close" (click)="closeTransferModal()">&times;</button>
+          </div>
 
-            <p class="procedure-note">
-              Calls <strong>sp_transfer_stock</strong> inside a single transaction with row-level locks on both inventory rows. Rolls back atomically if source branch has insufficient stock.
-            </p>
+          <div class="modal-body">
+            @if (transferError()) {
+              <div class="error-banner">
+                <span class="material-symbols-outlined">error</span>
+                <span>{{ transferError() }}</span>
+              </div>
+            }
 
             <div class="form-group">
-              <label>Source Branch (Stock Deducted)</label>
-              <select [(ngModel)]="transferFromBranch" class="form-control">
-                @for (b of inventoryService.branches; track b.id) {
-                  <option [value]="b.id">{{ b.name }}</option>
+              <label>Select Product to Transfer</label>
+              <select [(ngModel)]="transferProductId">
+                @for (prod of availableTransferProducts(); track prod.productId) {
+                  <option [value]="prod.productId">
+                    {{ prod.productName }} ({{ prod.sku }}) - {{ prod.quantity }} {{ prod.unitOfMeasure }} in stock
+                  </option>
                 }
               </select>
             </div>
 
-            <div class="form-group">
-              <label>Destination Branch (Stock Added)</label>
-              <select [(ngModel)]="transferToBranch" class="form-control">
-                @for (b of inventoryService.branches; track b.id) {
-                  <option [value]="b.id">{{ b.name }}</option>
-                }
-              </select>
+            <div class="form-grid">
+              <div class="form-group">
+                <label>From Source Branch</label>
+                <select [(ngModel)]="transferFromBranchId">
+                  @for (branch of inventoryService.branches; track branch.id) {
+                    <option [value]="branch.id">{{ branch.name }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>To Destination Branch</label>
+                <select [(ngModel)]="transferToBranchId">
+                  @for (branch of inventoryService.branches; track branch.id) {
+                    @if (branch.id !== transferFromBranchId) {
+                      <option [value]="branch.id">{{ branch.name }}</option>
+                    }
+                  }
+                </select>
+              </div>
             </div>
 
             <div class="form-group">
               <label>Transfer Quantity</label>
-              <input type="number" [(ngModel)]="transferQty" min="1" class="form-control" />
-            </div>
-
-            <div class="modal-actions">
-              <button class="btn-pill btn-outline" (click)="isTransferOpen.set(false)">Cancel</button>
-              <button class="btn-pill btn-primary" (click)="executeTransfer()">Execute Transfer (sp_transfer_stock)</button>
+              <input
+                type="number"
+                [(ngModel)]="transferQuantity"
+                min="1"
+                step="1"
+                class="input-text"
+              />
             </div>
           </div>
+
+          <div class="modal-footer">
+            <button class="btn-pill btn-secondary" (click)="closeTransferModal()">Cancel</button>
+            <button class="btn-pill btn-primary" (click)="submitTransfer()">
+              <span class="material-symbols-outlined">swap_horiz</span>
+              Execute Transfer
+            </button>
+          </div>
         </div>
-      }
-    </div>
+      </div>
+    }
   `,
   styles: [`
     .page-container {
-      padding: 24px 30px;
+      padding: 24px 32px;
       display: flex;
       flex-direction: column;
-      gap: 18px;
-      height: 100vh;
-      overflow-y: auto;
+      gap: 20px;
     }
 
     .page-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
     }
 
     .page-title {
-      font-size: 1.5rem;
+      font-size: 1.55rem;
       font-weight: 800;
-      color: var(--text-main);
+      color: #0f172a;
+      letter-spacing: -0.4px;
       margin: 0;
     }
 
     .page-subtitle {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      margin: 2px 0 0 0;
+      font-size: 0.85rem;
+      color: #64748b;
+      margin-top: 4px;
+
+      code {
+        background: #f1f5f9;
+        color: #065f46;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-weight: 700;
+      }
     }
 
     .header-actions {
@@ -249,276 +267,399 @@ interface PurchaseOrderView {
       gap: 10px;
     }
 
-    .nav-tabs-bar {
+    .filter-bar-card {
+      background: #ffffff;
+      padding: 14px 20px;
+      border-radius: 14px;
+      border: 1px solid #e2e8f0;
       display: flex;
-      gap: 10px;
-      border-bottom: 2px solid var(--border-light);
-      padding-bottom: 2px;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
     }
 
-    .nav-tabs-bar .tab-btn {
+    .branch-select-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: #334155;
+      font-weight: 700;
+      font-size: 0.85rem;
+
+      select {
+        padding: 8px 12px;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 8px;
+        outline: none;
+        font-size: 0.85rem;
+        color: #0f172a;
+      }
+    }
+
+    .search-input-box {
       display: flex;
       align-items: center;
       gap: 8px;
-      background: transparent;
-      border: none;
-      padding: 10px 18px;
-      border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-      color: var(--text-secondary);
-      font-weight: 600;
-      font-size: 0.9rem;
-      cursor: pointer;
-      border-bottom: 2px solid transparent;
-      margin-bottom: -4px;
-      transition: all 0.2s ease;
-    }
+      width: 320px;
 
-    .nav-tabs-bar .tab-btn.active {
-      color: var(--primary-green-dark);
-      border-bottom: 3px solid var(--primary-green);
-      font-weight: 700;
-      background: #ffffff;
+      span { color: #94a3b8; }
+
+      input {
+        width: 100%;
+        border: none;
+        outline: none;
+        font-size: 0.88rem;
+      }
     }
 
     .alert-box {
-      background: #fef2f2;
-      border: 1.5px solid #fecaca;
-      border-radius: var(--radius-md);
-      padding: 14px 18px;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 14px;
+      padding: 16px 20px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 12px;
     }
 
     .alert-title-row {
       display: flex;
       align-items: center;
-      gap: 8px;
-      color: #991b1b;
-      font-size: 0.88rem;
-    }
+      gap: 12px;
 
-    .alert-icon {
-      color: #dc2626;
-      font-size: 20px;
+      .alert-icon { font-size: 26px; color: #d97706; }
+      strong { font-size: 0.95rem; color: #92400e; }
+      .alert-sub { font-size: 0.78rem; color: #b45309; margin: 2px 0 0 0; }
     }
 
     .alert-items-list {
       display: flex;
-      gap: 8px;
       flex-wrap: wrap;
+      gap: 10px;
     }
 
     .alert-pill {
       background: #ffffff;
-      border: 1px solid #fca5a5;
-      padding: 4px 10px;
-      border-radius: var(--radius-pill);
+      border: 1px solid #fcd34d;
+      padding: 6px 12px;
+      border-radius: 10px;
       font-size: 0.8rem;
-      color: #7f1d1d;
+      color: #78350f;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      .alert-qty {
+        background: #fef2f2;
+        color: #b91c1c;
+        font-weight: 700;
+        padding: 2px 6px;
+        border-radius: 4px;
+      }
+
+      .alert-reorder-link {
+        color: #065f46;
+        font-weight: 800;
+        text-decoration: none;
+        &:hover { text-decoration: underline; }
+      }
     }
 
     .table-card {
       background: #ffffff;
-      border-radius: var(--radius-lg);
-      border: 1px solid var(--border-subtle);
-      box-shadow: var(--shadow-card);
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
       overflow: hidden;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
     }
 
     .data-table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.88rem;
-    }
-
-    .data-table th {
-      background: #f8fafc;
-      padding: 12px 16px;
       text-align: left;
-      font-size: 0.75rem;
-      font-weight: 700;
-      color: #64748b;
-      border-bottom: 1px solid var(--border-light);
-    }
 
-    .data-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid #f1f5f9;
-      vertical-align: middle;
+      th {
+        background: #f8fafc;
+        padding: 12px 16px;
+        font-size: 0.72rem;
+        font-weight: 800;
+        color: #475569;
+        letter-spacing: 0.5px;
+        border-bottom: 1px solid #e2e8f0;
+      }
+
+      td {
+        padding: 14px 16px;
+        font-size: 0.88rem;
+        color: #1e293b;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+      }
+
+      tr:hover td { background: #f8fafc; }
     }
 
     .code-sku {
       font-family: monospace;
       font-size: 0.8rem;
       background: #f1f5f9;
-      padding: 3px 6px;
-      border-radius: 4px;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-weight: 700;
+      color: #334155;
     }
 
     .qty-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      background: #f1f5f9;
+      border-radius: 6px;
       font-weight: 700;
-      color: var(--text-main);
+      font-size: 0.85rem;
+
+      &.danger {
+        background: #fef2f2;
+        color: #dc2626;
+        border: 1px solid #fecaca;
+      }
     }
 
-    .qty-badge.danger {
-      color: #dc2626;
+    .unit-pill {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: #475569;
     }
 
     .version-badge {
       font-family: monospace;
       font-size: 0.75rem;
-      color: #64748b;
-      background: #f1f5f9;
+      background: #eff6ff;
+      color: #2563eb;
       padding: 2px 6px;
       border-radius: 4px;
+      font-weight: 700;
     }
 
-    .btn-sm {
-      padding: 5px 12px;
-      font-size: 0.78rem;
+    .badge-pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.72rem;
+      font-weight: 800;
+
+      &.badge-danger { background: #fef2f2; color: #dc2626; }
+      &.badge-optimal { background: #f0fdf4; color: #16a34a; }
     }
 
-    /* Modal */
+    .btn-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: all 0.2s;
+
+      &.btn-primary {
+        background: #065f46;
+        color: #ffffff;
+        &:hover { background: #064e3b; }
+      }
+
+      &.btn-secondary {
+        background: #f1f5f9;
+        color: #475569;
+        &:hover { background: #e2e8f0; }
+      }
+
+      &.btn-outline {
+        background: transparent;
+        border: 1px solid #cbd5e1;
+        color: #065f46;
+        &:hover { background: #f0fdf4; border-color: #065f46; }
+      }
+
+      &.btn-sm { padding: 6px 12px; font-size: 0.78rem; }
+    }
+
+    .db-explainer-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 14px;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+
+      .explainer-icon {
+        background: #e2e8f0;
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #475569;
+
+        span { font-size: 24px; }
+      }
+
+      .explainer-content {
+        h4 { margin: 0 0 4px 0; font-size: 0.92rem; color: #0f172a; }
+        p { margin: 0; font-size: 0.8rem; color: #64748b; line-height: 1.4; }
+      }
+    }
+
+    /* Modal Styles */
     .modal-backdrop {
       position: fixed;
-      top: 0; left: 0; width: 100vw; height: 100vh;
-      background: rgba(15, 23, 42, 0.4);
-      backdrop-filter: blur(3px);
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background: rgba(15, 23, 42, 0.6);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 1000;
+      backdrop-filter: blur(4px);
     }
 
     .modal-dialog {
       background: #ffffff;
-      border-radius: var(--radius-lg);
-      padding: 24px;
-      width: 480px;
-      box-shadow: 0 20px 50px rgba(0,0,0,0.2);
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
+      width: 100%;
+      max-width: 520px;
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
     }
 
     .modal-header {
+      padding: 20px 24px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
+
+      .modal-title { font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0; }
+      .modal-subtitle { font-size: 0.8rem; color: #64748b; margin: 4px 0 0 0; }
+      .btn-close { background: none; border: none; font-size: 26px; cursor: pointer; color: #64748b; }
     }
 
-    .modal-title {
-      font-size: 1.15rem;
-      font-weight: 800;
-      margin: 0;
+    .modal-body {
+      padding: 22px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
-    .close-btn {
-      background: transparent;
-      border: none;
-      font-size: 1.5rem;
-      cursor: pointer;
-      color: #9ca3af;
-    }
-
-    .procedure-note {
-      background: #ecfdf5;
-      border: 1px solid #a7f3d0;
-      border-radius: 8px;
-      padding: 10px;
-      font-size: 0.78rem;
-      color: var(--primary-green-dark);
-      line-height: 1.4;
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
     }
 
     .form-group {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 6px;
+
+      label { font-size: 0.78rem; font-weight: 700; color: #334155; }
+      select, .input-text {
+        padding: 10px 12px;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 10px;
+        font-size: 0.88rem;
+        outline: none;
+      }
     }
 
-    .form-group label {
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: #475569;
+    .error-banner {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #b91c1c;
+      padding: 10px 14px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
     }
 
-    .form-control {
-      padding: 9px 12px;
-      border-radius: 8px;
-      border: 1px solid #cbd5e1;
-      font-family: inherit;
-      font-size: 0.9rem;
-    }
-
-    .modal-actions {
+    .modal-footer {
+      padding: 16px 24px;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
       display: flex;
       justify-content: flex-end;
       gap: 10px;
-      margin-top: 8px;
     }
   `]
 })
 export class InventoryListComponent {
   readonly inventoryService = inject(InventoryService);
 
-  readonly activeTab = signal<'STOCK' | 'PURCHASE'>('STOCK');
-  readonly isTransferOpen = signal<boolean>(false);
-  transferFromBranch = 1;
-  transferToBranch = 2;
-  transferQty = 5;
+  selectedBranchFilter = signal<number>(0);
+  searchQuery = '';
 
-  readonly purchaseOrders = signal<PurchaseOrderView[]>([
-    {
-      poId: 501,
-      supplierName: 'Ceylon Agro Farms Ltd',
-      branchName: 'Colombo Central Flagship',
-      orderDate: '2026-10-09',
-      status: 'PENDING',
-      itemsSummary: 'Sri Lankan Keeri Samba Rice 5kg (100 bags)',
-      totalCost: 980.00
-    },
-    {
-      poId: 502,
-      supplierName: 'Highland Dairy Products',
-      branchName: 'Colombo Central Flagship',
-      orderDate: '2026-10-07',
-      status: 'RECEIVED',
-      itemsSummary: 'Farm Fresh Full Cream Milk 1L (150 bottles)',
-      totalCost: 285.00
-    }
-  ]);
+  // Inter-branch transfer modal state
+  showTransferModal = signal(false);
+  transferProductId = 2;
+  transferFromBranchId = 1;
+  transferToBranchId = 2;
+  transferQuantity = 5;
+  transferError = signal<string | null>(null);
 
-  quickRestock(item: InventoryItem): void {
-    this.inventoryService.addStock(item.branchId, item.productId, 10);
-  }
+  filteredInventory = computed(() => {
+    const branchFilter = Number(this.selectedBranchFilter());
+    const query = this.searchQuery.toLowerCase().trim();
 
-  openRestockModal(): void {
-    const item = this.inventoryService.inventory()[0];
-    this.quickRestock(item);
-    alert(`Restocked 10 units for ${item.productName} via sp_add_stock.`);
-  }
+    return this.inventoryService.inventory().filter(item => {
+      const matchBranch = branchFilter === 0 || item.branchId === branchFilter;
+      const matchQuery = !query ||
+        item.productName.toLowerCase().includes(query) ||
+        item.sku.toLowerCase().includes(query) ||
+        item.branchName.toLowerCase().includes(query);
+      return matchBranch && matchQuery;
+    });
+  });
+
+  availableTransferProducts = computed(() => {
+    return this.inventoryService.inventory().filter(i => i.branchId === this.transferFromBranchId);
+  });
 
   openTransferModal(): void {
-    this.isTransferOpen.set(true);
+    this.transferError.set(null);
+    this.showTransferModal.set(true);
   }
 
-  executeTransfer(): void {
-    const ok = this.inventoryService.transferStock(this.transferFromBranch, this.transferToBranch, 2, this.transferQty);
-    if (ok) {
-      this.isTransferOpen.set(false);
-      alert('Transfer successful! Both branch inventory records and stock_audit_log updated via sp_transfer_stock.');
-    } else {
-      alert('Transfer failed: Insufficient stock at source branch.');
-    }
+  closeTransferModal(): void {
+    this.showTransferModal.set(false);
   }
 
-  receivePurchaseOrder(po: PurchaseOrderView): void {
-    this.purchaseOrders.update(list =>
-      list.map(p => p.poId === po.poId ? { ...p, status: 'RECEIVED' } : p)
+  submitTransfer(): void {
+    this.transferError.set(null);
+    const ok = this.inventoryService.transferStock(
+      this.transferFromBranchId,
+      this.transferToBranchId,
+      Number(this.transferProductId),
+      Number(this.transferQuantity)
     );
-    this.inventoryService.addStock(1, 2, 100);
-    alert(`sp_receive_purchase executed for #PO-${po.poId}! Stock of 100 units added to branch inventory, and PO status marked RECEIVED.`);
+
+    if (ok) {
+      this.closeTransferModal();
+    } else {
+      this.transferError.set('Transfer failed: Source branch does not have enough stock.');
+    }
   }
 }

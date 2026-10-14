@@ -19,6 +19,14 @@ export const routes: Routes = [
     loadComponent: () => import('./features/inventory/pages/inventory-list/inventory-list.component').then(m => m.InventoryListComponent)
   },
   {
+    path: 'purchase-orders',
+    loadComponent: () => import('./features/purchase-orders/pages/purchase-orders/purchase-orders.component').then(m => m.PurchaseOrdersComponent)
+  },
+  {
+    path: 'supplier-portal',
+    loadComponent: () => import('./features/supplier-portal/pages/supplier-portal/supplier-portal.component').then(m => m.SupplierPortalComponent)
+  },
+  {
     path: 'customers',
     loadComponent: () => import('./features/customers/pages/customer-list/customer-list.component').then(m => m.CustomerListComponent)
   },
