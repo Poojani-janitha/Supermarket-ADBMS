@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../../core/services/auth.service';
@@ -929,7 +929,7 @@ import { Employee } from '../../../../core/models';
     }
   `]
 })
-export class AdminDashboardComponent {
+export class AdminDashboardComponent implements OnInit {
   readonly authService = inject(AuthService);
   readonly customerService = inject(CustomerService);
 
@@ -938,6 +938,12 @@ export class AdminDashboardComponent {
 
   selectedEmployeeForRole = signal<Employee | null>(null);
   newRoleSelection: 'ADMIN' | 'MANAGER' | 'CASHIER' = 'CASHIER';
+
+  ngOnInit(): void {
+    this.authService.fetchEmployeesHttp().subscribe();
+    this.authService.fetchAuditLogsHttp().subscribe();
+    this.authService.fetchSecurityLogsHttp().subscribe();
+  }
 
   openRoleModal(emp: Employee): void {
     this.selectedEmployeeForRole.set(emp);
@@ -948,20 +954,44 @@ export class AdminDashboardComponent {
     const emp = this.selectedEmployeeForRole();
     if (!emp) return;
 
-    const res = this.authService.changeUserRole(emp.employeeId, this.newRoleSelection);
-    this.actionFeedback.set(res);
-    this.selectedEmployeeForRole.set(null);
+    this.authService.changeRoleHttp(emp.employeeId, this.newRoleSelection).subscribe({
+      next: (res: any) => {
+        this.actionFeedback.set({ success: true, message: res?.message || 'Role updated via sp_change_user_role' });
+        this.selectedEmployeeForRole.set(null);
+        this.authService.fetchEmployeesHttp().subscribe();
+        this.authService.fetchAuditLogsHttp().subscribe();
+      },
+      error: () => {
+        // Fallback for standalone demo
+        const res = this.authService.changeUserRole(emp.employeeId, this.newRoleSelection);
+        this.actionFeedback.set(res);
+        this.selectedEmployeeForRole.set(null);
+      }
+    });
   }
 
   handleDeactivate(empId: number): void {
-    const res = this.authService.deactivateEmployee(empId);
-    this.actionFeedback.set(res);
+    this.authService.deactivateEmployeeHttp(empId).subscribe({
+      next: (res: any) => {
+        this.actionFeedback.set({ success: true, message: res?.message || 'Employee deactivated via sp_deactivate_employee' });
+        this.authService.fetchEmployeesHttp().subscribe();
+        this.authService.fetchAuditLogsHttp().subscribe();
+      },
+      error: (err: any) => {
+        if (err?.status === 403) {
+          this.actionFeedback.set({ success: false, message: err?.error?.message || 'Security Violation: Administrator cannot deactivate own account' });
+        } else {
+          // Fallback for standalone demo
+          const res = this.authService.deactivateEmployee(empId);
+          this.actionFeedback.set(res);
+        }
+      }
+    });
   }
 
   testSelfLockout(): void {
     const myId = this.authService.currentUser().employeeId;
-    const res = this.authService.deactivateEmployee(myId);
-    this.actionFeedback.set(res);
+    this.handleDeactivate(myId);
   }
 
   // Register Employee state
@@ -988,18 +1018,32 @@ export class AdminDashboardComponent {
       3: 'Galle Fort Supermarket'
     };
 
-    const res = this.authService.registerEmployee({
+    const payload = {
       fullName: this.newEmpName,
       branchId: this.newEmpBranchId,
-      branchName: branchNames[this.newEmpBranchId] || 'Colombo Central Flagship',
       role: this.newEmpRole,
       username: this.newEmpUsername,
       password: this.newEmpPassword
-    });
+    };
 
-    this.actionFeedback.set(res);
-    if (res.success) {
-      this.isRegisterModalOpen.set(false);
-    }
+    this.authService.registerEmployeeHttp(payload).subscribe({
+      next: (res: any) => {
+        this.actionFeedback.set({ success: true, message: res?.message || 'Employee registered successfully!' });
+        this.isRegisterModalOpen.set(false);
+        this.authService.fetchEmployeesHttp().subscribe();
+        this.authService.fetchAuditLogsHttp().subscribe();
+      },
+      error: (err: any) => {
+        // Fallback for standalone demo
+        const res = this.authService.registerEmployee({
+          ...payload,
+          branchName: branchNames[this.newEmpBranchId] || 'Colombo Central Flagship'
+        });
+        this.actionFeedback.set(res);
+        if (res.success) {
+          this.isRegisterModalOpen.set(false);
+        }
+      }
+    });
   }
 }

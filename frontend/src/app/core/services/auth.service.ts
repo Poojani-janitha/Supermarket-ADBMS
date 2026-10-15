@@ -1,10 +1,17 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, tap, catchError, of, map } from 'rxjs';
 import { Employee, EmployeeAuditLog, SecurityEventLog } from '../models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
+  private readonly http = inject(HttpClient);
+
+  // JWT Token Signal
+  readonly token = signal<string | null>(typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null);
+
   // Staff directory simulating employee table
   readonly employees = signal<Employee[]>([
     {
@@ -351,5 +358,122 @@ export class AuthService {
       return true;
     }
     return false;
+  }
+
+  // Token Management (Member 5)
+  getToken(): string | null {
+    return this.token() || (typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null);
+  }
+
+  setToken(token: string): void {
+    this.token.set(token);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('token', token);
+    }
+  }
+
+  clearToken(): void {
+    this.token.set(null);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('token');
+    }
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.token() || !!this.currentUser();
+  }
+
+  // Real REST API integration connecting to Spring Boot backend
+  loginApi(username: string, password: string): Observable<any> {
+    return this.http.post<any>('/api/auth/login', { username, password }).pipe(
+      tap(res => {
+        if (res && res.token) {
+          this.setToken(res.token);
+          if (res.user) {
+            this.currentUser.set({
+              employeeId: res.user.employeeId,
+              branchId: res.user.branchId,
+              branchName: 'Branch #' + res.user.branchId,
+              fullName: res.user.fullName,
+              role: res.user.role,
+              username: res.user.username,
+              hireDate: new Date().toISOString().split('T')[0],
+              isActive: res.user.isActive
+            });
+          }
+        }
+      })
+    );
+  }
+
+  fetchEmployeesHttp(): Observable<Employee[]> {
+    return this.http.get<Employee[]>('/api/admin/employees').pipe(
+      tap(data => {
+        if (data && data.length > 0) {
+          this.employees.set(data);
+        }
+      }),
+      catchError(() => of(this.employees()))
+    );
+  }
+
+  fetchAuditLogsHttp(): Observable<EmployeeAuditLog[]> {
+    return this.http.get<any[]>('/api/admin/audit-logs').pipe(
+      map(logs => (logs || []).map((l: any) => ({
+        logId: l.logId,
+        employeeId: l.employeeId,
+        employeeName: l.employeeName,
+        action: (l.action || (l.isActiveChanged ? 'DEACTIVATE' : (l.oldRole !== l.newRole ? 'ROLE_CHANGE' : (l.oldBranchName !== l.newBranchName ? 'BRANCH_TRANSFER' : 'REGISTER')))) as any,
+        oldValue: l.oldValue || l.oldRole || l.oldBranchName || 'ACTIVE',
+        newValue: l.newValue || l.newRole || l.newBranchName || 'DEACTIVATED',
+        modifiedBy: l.modifiedBy || l.changedBy || 'SYSTEM',
+        modifiedAt: l.modifiedAt || l.changedAt || ''
+      }))),
+      tap(logs => {
+        if (logs && logs.length > 0) {
+          this.employeeAuditLogs.set(logs);
+        }
+      }),
+      catchError(() => of(this.employeeAuditLogs()))
+    );
+  }
+
+  fetchSecurityLogsHttp(): Observable<SecurityEventLog[]> {
+    return this.http.get<any[]>('/api/admin/security-logs').pipe(
+      map(logs => (logs || []).map((s: any) => ({
+        logId: s.logId,
+        eventType: s.eventType,
+        description: s.description || s.details || '',
+        username: s.username || s.performedBy || '',
+        ipAddress: s.ipAddress || '127.0.0.1',
+        createdAt: s.createdAt || s.loggedAt || ''
+      }))),
+      tap(logs => {
+        if (logs && logs.length > 0) {
+          this.securityLogs.set(logs);
+        }
+      }),
+      catchError(() => of(this.securityLogs()))
+    );
+  }
+
+  fetchMaskedCustomersHttp(): Observable<any[]> {
+    return this.http.get<any[]>('/api/admin/masked-customers');
+  }
+
+  changeRoleHttp(employeeId: number, role: string): Observable<any> {
+    return this.http.put(`/api/admin/employees/${employeeId}/role`, { role });
+  }
+
+  deactivateEmployeeHttp(employeeId: number): Observable<any> {
+    return this.http.delete(`/api/admin/employees/${employeeId}`);
+  }
+
+  reactivateEmployeeHttp(employeeId: number): Observable<any> {
+    return this.http.put(`/api/admin/employees/${employeeId}/reactivate`, {});
+  }
+
+  registerEmployeeHttp(payload: any): Observable<any> {
+    return this.http.post('/api/admin/employees', payload);
   }
 }

@@ -717,26 +717,43 @@ export class LoginComponent {
     this.successMessage.set(null);
     this.isLoading.set(true);
 
-    setTimeout(() => {
-      this.isLoading.set(false);
-      const ok = this.authService.login(this.username);
-      if (ok) {
+    this.authService.loginApi(this.username, this.password).subscribe({
+      next: (res) => {
+        this.isLoading.set(false);
         const user = this.authService.currentUser();
-        if (user.role === 'SUPPLIER') {
-          this.successMessage.set(`Welcome ${user.fullName}! Vendor Portal session established.`);
-          setTimeout(() => {
+        this.successMessage.set(`Welcome ${user.fullName}! Authenticated via sp_get_login with role: ${user.role}_role`);
+        setTimeout(() => {
+          if (user.role === 'ADMIN') {
+            this.router.navigate(['/admin']);
+          } else if (user.role === 'SUPPLIER') {
             this.router.navigate(['/supplier-portal']);
+          } else {
+            this.router.navigate(['/pos']);
+          }
+        }, 500);
+      },
+      error: (err) => {
+        // Fallback for standalone / offline demo mode
+        const ok = this.authService.login(this.username);
+        this.isLoading.set(false);
+        if (ok) {
+          const user = this.authService.currentUser();
+          this.successMessage.set(`Welcome ${user.fullName}! (Demo Session) Role: ${user.role}_role`);
+          setTimeout(() => {
+            if (user.role === 'ADMIN') {
+              this.router.navigate(['/admin']);
+            } else if (user.role === 'SUPPLIER') {
+              this.router.navigate(['/supplier-portal']);
+            } else {
+              this.router.navigate(['/pos']);
+            }
           }, 500);
         } else {
-          this.successMessage.set(`Welcome ${user.fullName}! MySQL 8 session established with role: ${user.role}_role`);
-          setTimeout(() => {
-            this.router.navigate(['/pos']);
-          }, 500);
+          const msg = err?.error?.message || 'Authentication failed: Invalid credentials or inactive account.';
+          this.errorMessage.set(msg);
         }
-      } else {
-        this.errorMessage.set('Authentication failed: Invalid credentials or inactive account.');
       }
-    }, 400);
+    });
   }
 
   handleSupplierSignUp(): void {
