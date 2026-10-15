@@ -58,8 +58,12 @@ CREATE TABLE supplier (
   contact_person VARCHAR(100) NULL,
   phone VARCHAR(20) NOT NULL,
   email VARCHAR(100) NULL,
+  username VARCHAR(50) NULL UNIQUE,
+  password_hash VARCHAR(255) NULL,
   city VARCHAR(50) NOT NULL,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE
+  tax_number VARCHAR(50) NULL,
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  status ENUM('PENDING_APPROVAL', 'ACTIVE', 'SUSPENDED') NOT NULL DEFAULT 'ACTIVE'
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
@@ -105,6 +109,8 @@ CREATE TABLE product (
   cost_price DECIMAL(10,2) NOT NULL CHECK (cost_price >= 0),
   image_url VARCHAR(255) NULL,
   diet_type ENUM('VEG', 'NON_VEG') NULL DEFAULT 'VEG',
+  unit_of_measure ENUM('KG', 'G', 'L', 'ML', 'PACKET', 'PIECE', 'CAN', 'BOTTLE') NOT NULL DEFAULT 'PIECE',
+  min_order_qty DECIMAL(10,2) NOT NULL DEFAULT 1.00 CHECK (min_order_qty > 0),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   FOREIGN KEY (category_id) REFERENCES category(category_id),
   FOREIGN KEY (supplier_id) REFERENCES supplier(supplier_id)
@@ -114,13 +120,13 @@ CREATE TABLE product (
 -- 7. INVENTORY
 -- Per-branch physical stock levels.
 -- Clustered composite PK (branch_id, product_id) stores branch items contiguously.
--- Version column supports optimistic locking.
+-- Version column supports optimistic locking. Quantity supports UoM decimals.
 -- ----------------------------------------------------------------------------
 CREATE TABLE inventory (
   branch_id INT NOT NULL,
   product_id INT NOT NULL,
-  quantity INT NOT NULL DEFAULT 0 CHECK (quantity >= 0),
-  reorder_level INT NOT NULL DEFAULT 10 CHECK (reorder_level >= 0),
+  quantity DECIMAL(10,2) NOT NULL DEFAULT 0.00 CHECK (quantity >= 0),
+  reorder_level DECIMAL(10,2) NOT NULL DEFAULT 10.00 CHECK (reorder_level >= 0),
   version INT NOT NULL DEFAULT 0,
   PRIMARY KEY (branch_id, product_id),
   FOREIGN KEY (branch_id) REFERENCES branch(branch_id),
@@ -185,23 +191,33 @@ CREATE TABLE purchase_order (
   po_id INT AUTO_INCREMENT PRIMARY KEY,
   supplier_id INT NOT NULL,
   branch_id INT NOT NULL,
+  requested_by INT NULL,
+  received_by INT NULL,
   order_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  status ENUM('PENDING', 'RECEIVED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
+  confirmed_at DATETIME NULL,
+  received_at DATETIME NULL,
+  status ENUM('REQUESTED', 'CONFIRMED', 'RECEIVED', 'CANCELLED') NOT NULL DEFAULT 'REQUESTED',
   total_cost DECIMAL(12,2) NOT NULL DEFAULT 0.00 CHECK (total_cost >= 0),
+  supplier_notes TEXT NULL,
+  receiving_notes TEXT NULL,
   FOREIGN KEY (supplier_id) REFERENCES supplier(supplier_id),
-  FOREIGN KEY (branch_id) REFERENCES branch(branch_id)
+  FOREIGN KEY (branch_id) REFERENCES branch(branch_id),
+  FOREIGN KEY (requested_by) REFERENCES employee(employee_id),
+  FOREIGN KEY (received_by) REFERENCES employee(employee_id)
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
 -- 12. PURCHASE_ORDER_ITEM
--- Items requested in a purchase order.
+-- Items requested in a purchase order with 3-way quantity matching.
 -- ----------------------------------------------------------------------------
 CREATE TABLE purchase_order_item (
   po_id INT NOT NULL,
   product_id INT NOT NULL,
-  quantity INT NOT NULL CHECK (quantity > 0),
+  requested_qty DECIMAL(10,2) NOT NULL CHECK (requested_qty > 0),
+  confirmed_qty DECIMAL(10,2) NULL CHECK (confirmed_qty IS NULL OR confirmed_qty >= 0),
+  received_qty DECIMAL(10,2) NULL CHECK (received_qty IS NULL OR received_qty >= 0),
   unit_cost DECIMAL(10,2) NOT NULL CHECK (unit_cost >= 0),
-  line_cost DECIMAL(12,2) AS (quantity * unit_cost) STORED,
+  line_cost DECIMAL(12,2) AS (COALESCE(received_qty, confirmed_qty, requested_qty) * unit_cost) STORED,
   PRIMARY KEY (po_id, product_id),
   FOREIGN KEY (po_id) REFERENCES purchase_order(po_id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES product(product_id)

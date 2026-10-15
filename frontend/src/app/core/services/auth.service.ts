@@ -56,6 +56,28 @@ export class AuthService {
       username: 'manager_nimal',
       hireDate: '2022-11-05',
       isActive: true
+    },
+    {
+      employeeId: 201,
+      branchId: 1,
+      branchName: 'Headquarters Vendor Network',
+      fullName: 'Sunil Bandara (Lanka Fresh Organics)',
+      role: 'SUPPLIER',
+      username: 'supplier_organics',
+      hireDate: '2023-01-15',
+      isActive: true,
+      supplierId: 1
+    },
+    {
+      employeeId: 202,
+      branchId: 1,
+      branchName: 'Headquarters Vendor Network',
+      fullName: 'Anura Jayasuriya (Ceylon Agro Mills)',
+      role: 'SUPPLIER',
+      username: 'supplier_agro',
+      hireDate: '2023-04-10',
+      isActive: true,
+      supplierId: 2
     }
   ]);
 
@@ -115,7 +137,7 @@ export class AuthService {
   ]);
 
   // Switch between demo accounts during viva presentation
-  switchUser(role: 'CASHIER' | 'MANAGER' | 'ADMIN'): void {
+  switchUser(role: 'CASHIER' | 'MANAGER' | 'ADMIN' | 'SUPPLIER'): void {
     const user = this.employees().find(u => u.role === role);
     if (user) {
       this.currentUser.set(user);
@@ -132,6 +154,10 @@ export class AuthService {
 
   isAdmin(): boolean {
     return this.currentUser().role === 'ADMIN';
+  }
+
+  isSupplier(): boolean {
+    return this.currentUser().role === 'SUPPLIER';
   }
 
   // Member 5: sp_change_user_role simulation with trg_employee_audit firing
@@ -257,7 +283,7 @@ export class AuthService {
     fullName: string;
     branchId: number;
     branchName: string;
-    role: 'ADMIN' | 'MANAGER' | 'CASHIER';
+    role: 'ADMIN' | 'MANAGER' | 'CASHIER' | 'SUPPLIER';
     username: string;
     password: string;
   }): { success: boolean; message: string } {

@@ -18,6 +18,8 @@ export interface Product {
   isActive: boolean;
   imageUrl: string;
   dietType?: 'VEG' | 'NON_VEG';
+  unitOfMeasure?: 'KG' | 'G' | 'L' | 'ML' | 'PACKET' | 'PIECE' | 'CAN' | 'BOTTLE';
+  minOrderQty?: number;
   discountBadge?: string;
   stockQty: number;
 }
@@ -82,6 +84,7 @@ export interface InventoryItem {
   sku: string;
   quantity: number;
   reorderLevel: number;
+  unitOfMeasure: 'KG' | 'G' | 'L' | 'ML' | 'PACKET' | 'PIECE' | 'CAN' | 'BOTTLE';
   version: number;
   isLowStock: boolean;
 }
@@ -93,8 +96,47 @@ export interface LowStockAlert {
   productId: number;
   productName: string;
   quantity: number;
+  unitOfMeasure?: string;
   createdAt: string;
   resolved: boolean;
+}
+
+export interface Supplier {
+  supplierId: number;
+  name: string;
+  contactPerson?: string;
+  phone: string;
+  email?: string;
+  username?: string;
+  city: string;
+  taxNumber?: string;
+  isActive: boolean;
+  status: 'PENDING_APPROVAL' | 'ACTIVE' | 'SUSPENDED';
+}
+
+export interface PurchaseOrder {
+  poId: number;
+  supplierId: number;
+  supplierName: string;
+  branchId: number;
+  branchName: string;
+  productId: number;
+  productName: string;
+  sku: string;
+  unitOfMeasure: string;
+  requestedQty: number;
+  confirmedQty?: number;
+  receivedQty?: number;
+  unitCost: number;
+  totalCost: number;
+  status: 'REQUESTED' | 'CONFIRMED' | 'RECEIVED' | 'CANCELLED';
+  orderDate: string;
+  confirmedAt?: string;
+  receivedAt?: string;
+  supplierNotes?: string;
+  receivingNotes?: string;
+  requestedBy?: string;
+  receivedBy?: string;
 }
 
 
@@ -103,10 +145,11 @@ export interface Employee {
   branchId: number;
   branchName: string;
   fullName: string;
-  role: 'ADMIN' | 'MANAGER' | 'CASHIER';
+  role: 'ADMIN' | 'MANAGER' | 'CASHIER' | 'SUPPLIER';
   username: string;
   hireDate: string;
   isActive: boolean;
+  supplierId?: number;
 }
 
 export interface EmployeeAuditLog {

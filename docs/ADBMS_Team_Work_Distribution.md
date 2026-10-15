@@ -39,23 +39,28 @@
 ---
 
 ### Member 2: Inventory, Supply Chain & Stock Flow
-* **Theme**: Branch inventory management, purchase orders, and stock reordering.
-* **Database Tables**: `inventory`, `supplier`, `purchase_order`, `purchase_order_item`, `low_stock_alert`
+* **Theme**: Branch inventory management, units of measure (UoM), 3-way purchase orders, and supplier portal fulfillment.
+* **Database Tables**: `inventory` (with DECIMAL qty & UoM), `supplier` (with vendor portal credentials), `purchase_order` (REQUESTED -> CONFIRMED -> RECEIVED), `purchase_order_item` (requested/confirmed/received quantities), `low_stock_alert`
 * **Database Programming Objects**:
   * **Procedures**:
-    * `sp_add_stock`: Upsert on inventory with `ON DUPLICATE KEY UPDATE` and audit logging.
-    * `sp_receive_purchase`: Marks a PO as received and automatically increments branch inventory for every line item.
+    * `sp_create_purchase_order`: Creates a branch restock request to a supplier.
+    * `sp_supplier_confirm_order`: Vendor portal procedure allowing suppliers to amend quantities, add notes, and confirm dispatch.
+    * `sp_receive_purchase`: Physical goods receipt note (GRN) verification procedure that checks physically delivered quantities and atomically increments branch inventory.
     * `sp_transfer_stock`: Atomic stock transfer from Branch A to Branch B inside a transaction.
   * **Trigger**: `trg_inventory_low_stock` (AFTER UPDATE): Automatically inserts an alert into `low_stock_alert` when quantity falls below `reorder_level`.
-  * **Function**: `fn_stock_level(branch_id, product_id)`: Scalar query returning current stock.
+  * **Function**: `fn_stock_level(branch_id, product_id)`: Scalar query returning current stock with unit of measure.
   * **View & Event**:
     * `v_low_stock`: Multi-table join showing branch products needing reorder.
     * `ev_weekly_low_stock_scan`: Scheduled event sweeping for low-stock items missed during offline updates.
 * **Backend (Spring Boot)**: `lk.supermarket.inventory` package (`InventoryController`, `PurchaseOrderController`, `InventoryDao`, `SupplierDao`).
-* **Frontend (Angular)**: `features/inventory/` (Stock per branch table, Restock modal, Purchase Orders management, Low stock alert notifications).
+* **Frontend (Angular)**: 
+  * `features/inventory/`: Dedicated branch stock levels, reorder alerts, and inter-branch transfers (arbitrary "+10" increments removed).
+  * `features/purchase-orders/`: Product-centric reorder table, quick order modal, and physical goods receipt confirmation tab.
+  * `features/supplier-portal/`: B2B vendor portal for incoming purchase orders, quantity amendments, notes, and dispatch confirmation.
 * **Extra Features for Top Marks**:
-  1. Optimistic locking with a `version` column on `inventory` to prevent lost updates.
-  2. Inter-branch stock transfer procedure with rollback validation.
+  1. Optimistic locking with a `version` column on `inventory` to prevent lost updates during concurrent restocks.
+  2. Complete 3-way purchase order reconciliation (Requested vs Confirmed vs Physically Received).
+  3. Support for multiple Units of Measure (kg, packets, liters, pieces) with decimal precision.
 * **Report Sections**: Section 7 (Tools & Technologies), Section 8 (Hosting & Infrastructure Justification), Section 15 (NoSQL Replacement Analysis).
 
 ---

@@ -115,12 +115,14 @@ supermarket-adbms/
         ├── shared/                     # Navbar, dialogs, pipes, models (Member 1)
         └── features/
             ├── pos/                    # Member 1: POS screen, live cart, receipt
-            ├── inventory/              # Member 2: Stock tables, restock, transfer, POs
+            ├── inventory/              # Member 2: Dedicated branch stock levels, transfer, alerts
+            ├── purchase-orders/        # Member 2: Product reorder table, order modal, GRN receiving
+            ├── supplier-portal/        # Member 2: Vendor B2B portal for PO review & dispatch
             ├── products/               # Member 3: Catalog CRUD, search, category filter
             ├── customers/              # Member 3: Customer registration, tier display
             ├── discounts/              # Member 3: Discount rules, coupons, holiday calendar
             ├── reports/                # Member 4: Charts, monthly sales, top ranking
-            ├── auth/login/             # Member 5: Login view
+            ├── auth/login/             # Member 5: Login view (Employee & Supplier Portal)
             └── admin/                  # Member 5: Employee admin, security logs, data masking
 ```
 
@@ -131,7 +133,7 @@ supermarket-adbms/
 | # | Module | What it does | Key DB Objects | Primary Owner |
 | --- | --- | --- | --- | --- |
 | M1 | POS & Sales | Atomic checkout, inventory deduction, order receipt, cancellation | `sp_place_order`, `sp_cancel_order`, `trg_orderitem_check_stock`, `trg_orderitem_reduce_stock` | **Member 1** |
-| M2 | Inventory & Supply | Stock levels, purchase orders, restock, branch-to-branch transfer | `inventory`, `sp_add_stock`, `sp_receive_purchase`, `sp_transfer_stock`, `trg_inventory_low_stock`, `v_low_stock` | **Member 2** |
+| M2 | Inventory & Supply | Stock levels, UoM, 3-way POs, GRN receiving, branch transfer, supplier portal | `inventory`, `supplier`, `purchase_order`, `sp_create_purchase_order`, `sp_supplier_confirm_order`, `sp_receive_purchase`, `sp_transfer_stock`, `trg_inventory_low_stock` | **Member 2** |
 | M3 | Catalog & Pricing | Product catalog, supplier mapping, price change audit | `product`, `category`, `sp_save_product`, `trg_product_price_audit`, `FULLTEXT` index | **Member 3** |
 | M4 | Customer & Loyalty | Customer registration, phone index, tier classification | `customer`, `sp_register_customer`, `fn_customer_tier`, `v_customer_orders` | **Member 3** |
 | M5 | Discounts & Rules | First-purchase, holiday, tier, and coupon rules evaluated via Cursor | `discount_rule`, `coupon`, `sp_apply_discounts`, `trg_rule_check`, `trg_rule_audit`, `ev_expire_discount_rules` | **Member 3** |
@@ -455,28 +457,69 @@ BEGIN
   COMMIT;
 END$$
 
--- Member 2: Receive Purchase Order
-CREATE PROCEDURE sp_receive_purchase(IN p_po_id INT)
+-- Member 2: Create Purchase Order Request
+CREATE PROCEDURE sp_create_purchase_order(
+  IN p_supplier_id INT, IN p_branch_id INT, IN p_employee_id INT,
+  IN p_product_id INT, IN p_qty DECIMAL(10,2), OUT p_po_id INT)
 BEGIN
-  DECLARE done INT DEFAULT 0;
-  DECLARE v_branch INT; DECLARE v_prod INT; DECLARE v_qty INT;
-  DECLARE cur CURSOR FOR
-    SELECT po.branch_id, poi.product_id, poi.quantity
-    FROM purchase_order_item poi
-    JOIN purchase_order po ON po.po_id = poi.po_id
-    WHERE poi.po_id = p_po_id;
-  DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = 1;
+  DECLARE v_unit_cost DECIMAL(10,2);
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
+
+  SELECT cost_price INTO v_unit_cost FROM product WHERE product_id = p_product_id;
 
   START TRANSACTION;
-  UPDATE purchase_order SET status = 'RECEIVED' WHERE po_id = p_po_id;
+  INSERT INTO purchase_order (supplier_id, branch_id, requested_by, status, total_cost)
+  VALUES (p_supplier_id, p_branch_id, p_employee_id, 'REQUESTED', (v_unit_cost * p_qty));
+  SET p_po_id = LAST_INSERT_ID();
 
-  OPEN cur;
-  item_loop: LOOP
-    FETCH cur INTO v_branch, v_prod, v_qty;
-    IF done THEN LEAVE item_loop; END IF;
-    CALL sp_add_stock(v_branch, v_prod, v_qty);
-  END LOOP;
-  CLOSE cur;
+  INSERT INTO purchase_order_item (po_id, product_id, requested_qty, confirmed_qty, unit_cost)
+  VALUES (p_po_id, p_product_id, p_qty, p_qty, v_unit_cost);
+  COMMIT;
+END$$
+
+-- Member 2: Supplier Portal - Order Confirmation & Quantity Amendment
+CREATE PROCEDURE sp_supplier_confirm_order(
+  IN p_po_id INT, IN p_supplier_id INT, IN p_confirmed_qty DECIMAL(10,2), IN p_notes TEXT)
+BEGIN
+  DECLARE v_unit_cost DECIMAL(10,2);
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
+
+  START TRANSACTION;
+  UPDATE purchase_order_item SET confirmed_qty = p_confirmed_qty WHERE po_id = p_po_id;
+  SELECT unit_cost INTO v_unit_cost FROM purchase_order_item WHERE po_id = p_po_id LIMIT 1;
+  UPDATE purchase_order 
+  SET status = 'CONFIRMED', supplier_notes = p_notes, 
+      total_cost = (v_unit_cost * p_confirmed_qty), confirmed_at = CURRENT_TIMESTAMP
+  WHERE po_id = p_po_id AND supplier_id = p_supplier_id;
+  COMMIT;
+END$$
+
+-- Member 2: Goods Receipt Note (GRN) - Physically Receive Purchase Order & Restock Branch
+CREATE PROCEDURE sp_receive_purchase(
+  IN p_po_id INT, IN p_employee_id INT, IN p_received_qty DECIMAL(10,2), IN p_notes TEXT)
+BEGIN
+  DECLARE v_branch INT; DECLARE v_prod INT;
+  DECLARE EXIT HANDLER FOR SQLEXCEPTION BEGIN ROLLBACK; RESIGNAL; END;
+
+  SELECT branch_id INTO v_branch FROM purchase_order WHERE po_id = p_po_id FOR UPDATE;
+  SELECT product_id INTO v_prod FROM purchase_order_item WHERE po_id = p_po_id LIMIT 1;
+
+  START TRANSACTION;
+  UPDATE purchase_order_item SET received_qty = p_received_qty WHERE po_id = p_po_id;
+
+  -- Atomic stock increment with optimistic locking version update
+  INSERT INTO inventory (branch_id, product_id, quantity, version)
+  VALUES (v_branch, v_prod, p_received_qty, 0)
+  ON DUPLICATE KEY UPDATE quantity = quantity + p_received_qty, version = version + 1;
+
+  UPDATE low_stock_alert SET resolved = TRUE WHERE branch_id = v_branch AND product_id = v_prod;
+
+  INSERT INTO stock_audit_log (branch_id, product_id, change_qty, reason, ref_order_id)
+  VALUES (v_branch, v_prod, p_received_qty, 'RESTOCK', p_po_id);
+
+  UPDATE purchase_order 
+  SET status = 'RECEIVED', received_by = p_employee_id, receiving_notes = p_notes, received_at = CURRENT_TIMESTAMP
+  WHERE po_id = p_po_id;
   COMMIT;
 END$$
 
