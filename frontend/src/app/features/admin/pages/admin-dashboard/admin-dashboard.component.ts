@@ -558,69 +558,79 @@ import { Employee, BackupInfo } from '../../../../core/models';
             }
           </div>
 
-          <!-- Academic Architecture & Disaster Recovery Workflow Card -->
-          <div class="section-card">
-            <div class="card-title-row">
-              <span class="material-symbols-outlined" style="color: #0369a1;">account_tree</span>
-              <div>
-                <h3>Point-in-Time Recovery (PITR) & Disaster Recovery Architecture</h3>
-                <p class="card-meta">ICT3222 ADBMS Viva Defense Specification (Member 5)</p>
+          <!-- Academic Architecture & Disaster Recovery Workflow Card (Collapsible) -->
+          <div class="section-card collapsible-card">
+            <div class="card-title-row clickable-header" (click)="togglePitrArchitecture()">
+              <div style="display: flex; align-items: center; gap: 12px;">
+                <span class="material-symbols-outlined" style="color: #0369a1; font-size: 26px;">account_tree</span>
+                <div>
+                  <h3 style="margin: 0; font-size: 1rem;">Point-in-Time Recovery (PITR) & Disaster Recovery Architecture</h3>
+                  <p class="card-meta" style="margin: 2px 0 0 0;">ICT3222 ADBMS Technical Architecture & Viva Defense Reference</p>
+                </div>
               </div>
+              <button class="btn-pill btn-sm btn-outline toggle-guide-btn" (click)="$event.stopPropagation(); togglePitrArchitecture()">
+                <span class="material-symbols-outlined">
+                  {{ showPitrArchitecture() ? 'expand_less' : 'expand_more' }}
+                </span>
+                {{ showPitrArchitecture() ? 'Hide Architecture Guide' : 'Show Architecture Guide' }}
+              </button>
             </div>
 
-            <div class="pitr-workflow-grid">
-              <div class="pitr-step-box">
-                <div class="pitr-step-header">
-                  <span class="step-num">Step 1</span>
-                  <strong>Non-Blocking Consistent Snapshot</strong>
+            @if (showPitrArchitecture()) {
+              <div class="pitr-workflow-grid">
+                <div class="pitr-step-box">
+                  <div class="pitr-step-header">
+                    <span class="step-num">Step 1</span>
+                    <strong>Non-Blocking Consistent Snapshot</strong>
+                  </div>
+                  <div class="terminal-command">
+                    <code>mysqldump --single-transaction --flush-logs --source-data=2 --routines --triggers --events supermarket_db</code>
+                  </div>
+                  <span class="step-desc">
+                    Leverages InnoDB MVCC snapshot read view. POS Cashiers continue transacting without experiencing table lock contention.
+                  </span>
                 </div>
-                <div class="terminal-command">
-                  <code>mysqldump --single-transaction --flush-logs --source-data=2 --routines --triggers --events supermarket_db</code>
-                </div>
-                <span class="step-desc">
-                  Leverages InnoDB MVCC snapshot read view. POS Cashiers continue transacting without experiencing table lock contention.
-                </span>
-              </div>
 
-              <div class="pitr-step-box">
-                <div class="pitr-step-header">
-                  <span class="step-num">Step 2</span>
-                  <strong>Continuous Differential Binlog Stream</strong>
+                <div class="pitr-step-box">
+                  <div class="pitr-step-header">
+                    <span class="step-num">Step 2</span>
+                    <strong>Continuous Differential Binlog Stream</strong>
+                  </div>
+                  <div class="terminal-command">
+                    <code>log_bin = ON, binlog_format = ROW, sync_binlog = 1</code>
+                  </div>
+                  <span class="step-desc">
+                    Captures all row-level state changes (INSERT, UPDATE, DELETE, DDL) in real-time with strict ACID transactional durability.
+                  </span>
                 </div>
-                <div class="terminal-command">
-                  <code>log_bin = ON, binlog_format = ROW, sync_binlog = 1</code>
-                </div>
-                <span class="step-desc">
-                  Captures all row-level state changes (INSERT, UPDATE, DELETE, DDL) in real-time with strict ACID transactional durability.
-                </span>
-              </div>
 
-              <div class="pitr-step-box">
-                <div class="pitr-step-header">
-                  <span class="step-num">Step 3</span>
-                  <strong>Targeted Disaster Recovery Cut-Off</strong>
+                <div class="pitr-step-box">
+                  <div class="pitr-step-header">
+                    <span class="step-num">Step 3</span>
+                    <strong>Targeted Disaster Recovery Cut-Off</strong>
+                  </div>
+                  <div class="terminal-command">
+                    <code>mysqlbinlog --stop-datetime="2026-10-18 14:32:14" binlog.00000X | mysql -u root -p supermarket_db</code>
+                  </div>
+                  <span class="step-desc">
+                    Replays transactions up to 1 second before catastrophic failure or accidental table destruction, recovering all state with zero loss.
+                  </span>
                 </div>
-                <div class="terminal-command">
-                  <code>mysqlbinlog --stop-datetime="2026-10-18 14:32:14" binlog.00000X | mysql -u root -p supermarket_db</code>
-                </div>
-                <span class="step-desc">
-                  Replays transactions up to 1 second before catastrophic failure or accidental table destruction, recovering all state with zero loss.
-                </span>
-              </div>
 
-              <div class="pitr-step-box">
-                <div class="pitr-step-header">
-                  <span class="step-num">Step 4</span>
-                  <strong>Post-Restore Row-Count Integrity Audit</strong>
+                <div class="pitr-step-box">
+                  <div class="pitr-step-header">
+                    <span class="step-num">Step 4</span>
+                    <strong>Post-Restore Row-Count Integrity Audit</strong>
+                  </div>
+                  <div class="terminal-command">
+                    <code>powershell -File database/scripts/restore_database.ps1 -Force</code>
+                  </div>
+                  <span class="step-desc">
+                    Re-verifies table counts across <code>employee</code>, <code>branch</code>, <code>product</code>, <code>inventory</code>, and <code>security_event_log</code>.
+                  </span>
                 </div>
-                <div class="terminal-command">
-                  <code>powershell -File database/scripts/restore_database.ps1 -Force</code>
-                </div>
-                <span class="step-desc">
-                  Re-verifies table counts across <code>employee</code>, <code>branch</code>, <code>product</code>, <code>inventory</code>, and <code>security_event_log</code>.
-                </span>
               </div>
-            </div>
+            }
           </div>
         </div>
       }
@@ -1281,11 +1291,55 @@ import { Employee, BackupInfo } from '../../../../core/models';
       }
     }
 
+    .collapsible-card {
+      transition: all 0.2s ease;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+    }
+
+    .clickable-header {
+      cursor: pointer;
+      user-select: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+
+      &:hover h3 {
+        color: #0284c7;
+      }
+    }
+
+    .toggle-guide-btn {
+      white-space: nowrap;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      border: 1px solid #cbd5e1;
+      color: #0369a1;
+      border-radius: var(--radius-pill);
+      background: #f0f9ff;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      &:hover {
+        background: #e0f2fe;
+        border-color: #0284c7;
+      }
+    }
+
     .pitr-workflow-grid {
       display: grid;
       grid-template-columns: repeat(2, 1fr);
       gap: 14px;
-      margin-top: 10px;
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid #f1f5f9;
 
       @media (max-width: 900px) {
         grid-template-columns: 1fr;
@@ -1395,6 +1449,11 @@ export class AdminDashboardComponent implements OnInit {
 
   selectedEmployeeForRole = signal<Employee | null>(null);
   newRoleSelection: 'ADMIN' | 'MANAGER' | 'CASHIER' = 'CASHIER';
+  showPitrArchitecture = signal<boolean>(false);
+
+  togglePitrArchitecture(): void {
+    this.showPitrArchitecture.update(v => !v);
+  }
 
   ngOnInit(): void {
     this.authService.fetchEmployeesHttp().subscribe();
