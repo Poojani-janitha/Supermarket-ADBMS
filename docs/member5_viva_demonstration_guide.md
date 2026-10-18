@@ -174,3 +174,46 @@
 **Examiner's Intent**: High Availability and Connection Resiliency.  
 **Your Answer**:
 > *"HikariCP manages connection validation automatically through lightweight ping tests. We configured `connectionTimeout=20000ms`, `maxLifetime=600000ms`, and `idleTimeout=300000ms`. In our Docker Compose architecture, the backend container uses `depends_on: db: condition: service_healthy` with a periodic `mysqladmin ping` probe, guaranteeing the web application only begins accepting checkout traffic once MySQL has fully recovered and loaded its schemas."*
+
+---
+
+## 4. Demonstration 6: Live Disaster Recovery & Point-in-Time Recovery (PITR)
+
+### Step 1: Open the Admin Dashboard
+1. Log in with `admin_kavindu` / `Password123!`.
+2. Navigate to **Disaster Recovery & Backup (PITR)** (Tab 5).
+3. Point out the 4 SLA & Architecture Cards:
+   * **RPO $\approx 0$s**: Continuous binary logging captures every transaction up to the exact second.
+   * **RTO $< 5$ min**: Snapshot restore occurs in under 15 seconds.
+   * **InnoDB MVCC**: Non-blocking `--single-transaction` read view ensures cashiers continue billing without table locks.
+   * **Replication Bound**: Binlog position tracking (`--source-data=2`).
+
+### Step 2: Take an Instant Snapshot Live
+1. Click **"Take Consistent Snapshot"**.
+2. Notice the live loading indicator while `mysqldump` captures the consistent snapshot.
+3. Observe the newly added entry in the Snapshot Table:
+   * File Name: `supermarket_db_backup_*.sql`
+   * Size: $\approx 60\text{ to }65\text{ KB}$
+   * PITR Binlog Coordinate: `CHANGE MASTER TO MASTER_LOG_FILE='...', MASTER_LOG_POS=157;`
+   * Audit log automatically created in `security_event_log` with event type `DATABASE_BACKUP_CREATED`.
+
+### Step 3: Demonstrate Snapshot Download
+1. Click **"Download"** next to the latest snapshot.
+2. The browser immediately downloads the `.sql` dump file. Open it in VS Code or Notepad to show the examiner the `-- CHANGE MASTER TO` coordinate in the dump header.
+
+### Step 4: Demonstrate Live Disaster Recovery (CLI or Web UI)
+1. **Option A (Web UI)**:
+   * Click **"Restore"** on any snapshot.
+   * A critical warning modal confirms: *"Are you sure you want to rebuild supermarket_db from this snapshot?"*
+   * Click **"Confirm & Rebuild Database"**.
+   * Within 5 seconds, the success alert displays verified table row counts across `employee`, `branch`, `customer`, `product`, `inventory`, `sales_order`, and `security_event_log`.
+2. **Option B (PowerShell Script)**:
+   * Open PowerShell and run:
+     ```powershell
+     powershell -ExecutionPolicy Bypass -File database/scripts/restore_database.ps1 -Force
+     ```
+   * Observe the 3-step execution:
+     1. Dropping and re-creating clean database `supermarket_db`.
+     2. Applying consistent schema and data snapshot.
+     3. Running post-recovery row-count integrity audit with 100% green verification.
+

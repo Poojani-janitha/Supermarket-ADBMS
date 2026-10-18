@@ -4,6 +4,9 @@ import jakarta.validation.Valid;
 import lk.supermarket.audit.dto.*;
 import lk.supermarket.audit.service.AuditService;
 import lk.supermarket.common.JwtUtil;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -108,5 +111,39 @@ public class AuditController {
     @GetMapping("/backups")
     public ResponseEntity<List<BackupInfoDto>> getBackups() {
         return ResponseEntity.ok(auditService.getBackupList());
+    }
+
+    @GetMapping("/backup/download/{fileName}")
+    public ResponseEntity<Resource> downloadBackup(@PathVariable String fileName) {
+        if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+            return ResponseEntity.badRequest().build();
+        }
+        Resource resource = auditService.getBackupResource(fileName);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + fileName + "\"")
+                .body(resource);
+    }
+
+    @PostMapping("/backup/restore/{fileName}")
+    public ResponseEntity<Map<String, Object>> restoreBackup(
+            @PathVariable String fileName,
+            @RequestHeader(value = "Authorization", required = false) String authHeader
+    ) {
+        if (fileName.contains("..") || fileName.contains("/") || fileName.contains("\\")) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid file name"));
+        }
+        String performer = "Admin (Member 5)";
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            try {
+                String username = jwtUtil.extractUsername(authHeader.substring(7));
+                if (username != null && !username.isBlank()) {
+                    performer = username + " (Admin)";
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        Map<String, Object> result = auditService.restoreDatabase(fileName, performer);
+        return ResponseEntity.ok(result);
     }
 }

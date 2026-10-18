@@ -504,4 +504,12 @@ export class AuthService {
       })
     );
   }
+
+  downloadBackup(fileName: string): Observable<Blob> {
+    return this.http.get(`/api/admin/backup/download/${fileName}`, { responseType: 'blob' });
+  }
+
+  restoreBackupHttp(fileName: string): Observable<any> {
+    return this.http.post(`/api/admin/backup/restore/${fileName}`, {});
+  }
 }

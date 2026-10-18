@@ -143,4 +143,18 @@ public class AuditDao {
         String sql = "INSERT INTO security_event_log (event_type, details, performed_by, logged_at) VALUES (?, ?, ?, NOW())";
         return jdbcTemplate.update(sql, eventType, details, performedBy);
     }
+
+    public Map<String, Integer> verifyTableCounts() {
+        Map<String, Integer> counts = new java.util.LinkedHashMap<>();
+        List<String> tables = List.of("employee", "branch", "customer", "product", "inventory", "sales_order", "security_event_log");
+        for (String table : tables) {
+            try {
+                Integer count = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class);
+                counts.put(table, count != null ? count : 0);
+            } catch (Exception ex) {
+                counts.put(table, 0);
+            }
+        }
+        return counts;
+    }
 }

@@ -4,6 +4,8 @@ import lk.supermarket.audit.dao.AuditDao;
 import lk.supermarket.audit.dto.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.FileSystemResource;
+import org.springframework.core.io.Resource;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -16,6 +18,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -201,6 +204,105 @@ public class AuditService {
             }
         }
         return "mysqldump";
+    }
+
+    public Resource getBackupResource(String fileName) {
+        File backupDir = resolveBackupDirectory();
+        File file = new File(backupDir, fileName);
+        if (!file.exists() || !file.isFile()) {
+            throw new RuntimeException("Backup file not found: " + fileName);
+        }
+        return new FileSystemResource(file);
+    }
+
+    /**
+     * Rebuilds database from target snapshot and executes integrity audit.
+     * Complies with Member 5 Point-in-Time Recovery (PITR) ADBMS requirements.
+     */
+    public Map<String, Object> restoreDatabase(String fileName, String performedBy) {
+        File backupDir = resolveBackupDirectory();
+        File file = new File(backupDir, fileName);
+        if (!file.exists() || !file.isFile()) {
+            throw new RuntimeException("Target backup snapshot not found: " + fileName);
+        }
+
+        String mysqlPath = resolveMysqlExecutable();
+        log.info("Initiating database restoration using binary: {} with file: {}", mysqlPath, file.getAbsolutePath());
+
+        try {
+            // 1. Drop and recreate clean database
+            ProcessBuilder pbDrop = new ProcessBuilder(
+                    mysqlPath,
+                    "--host=localhost",
+                    "--port=3306",
+                    "--user=root",
+                    "--password=1234",
+                    "-e",
+                    "DROP DATABASE IF EXISTS supermarket_db; CREATE DATABASE supermarket_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+            );
+            pbDrop.redirectErrorStream(true);
+            Process pDrop = pbDrop.start();
+            boolean dropFinished = pDrop.waitFor(30, TimeUnit.SECONDS);
+            if (!dropFinished || pDrop.exitValue() != 0) {
+                throw new RuntimeException("Failed to drop and recreate database");
+            }
+
+            // 2. Restore snapshot
+            String normalizedPath = file.getAbsolutePath().replace('\\', '/');
+            ProcessBuilder pbRestore = new ProcessBuilder(
+                    mysqlPath,
+                    "--host=localhost",
+                    "--port=3306",
+                    "--user=root",
+                    "--password=1234",
+                    "--database=supermarket_db",
+                    "-e",
+                    "source " + normalizedPath + ";"
+            );
+            pbRestore.redirectErrorStream(true);
+            Process pRestore = pbRestore.start();
+            boolean restored = pRestore.waitFor(60, TimeUnit.SECONDS);
+            if (!restored || pRestore.exitValue() != 0) {
+                throw new RuntimeException("mysql restore exited with error code " + pRestore.exitValue());
+            }
+
+            // 3. Post-recovery table row count audit
+            Map<String, Integer> counts = auditDao.verifyTableCounts();
+
+            // 4. Log security audit event
+            auditDao.logSecurityEvent(
+                    "DATABASE_RESTORED",
+                    "Database successfully restored from snapshot: " + fileName + ". Verified tables: " + counts,
+                    performedBy != null ? performedBy : "Admin (Member 5)"
+            );
+
+            log.info("Database restoration completed successfully: {}", counts);
+            return Map.of(
+                    "status", "SUCCESS",
+                    "message", "Database successfully restored from " + fileName,
+                    "restoredFile", fileName,
+                    "tableCounts", counts
+            );
+        } catch (Exception e) {
+            log.error("Database restoration failed: {}", e.getMessage(), e);
+            throw new RuntimeException("Database restoration failed: " + e.getMessage(), e);
+        }
+    }
+
+    private String resolveMysqlExecutable() {
+        String[] candidates = new String[]{
+                "C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe",
+                "C:\\Program Files\\MySQL\\MySQL Server 8.4\\bin\\mysql.exe",
+                "C:\\Program Files\\MySQL\\MySQL Server 9.0\\bin\\mysql.exe",
+                "C:\\Program Files (x86)\\MySQL\\MySQL Server 8.0\\bin\\mysql.exe",
+                "mysql"
+        };
+        for (String candidate : candidates) {
+            if (new File(candidate).exists()) {
+                return candidate;
+            }
+        }
+        return "mysql";
     }
 
     private String extractBinlogCoordinate(File file) {

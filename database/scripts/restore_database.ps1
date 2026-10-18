@@ -103,6 +103,8 @@ SELECT 'employee' AS table_name, COUNT(*) AS total_rows FROM employee
 UNION ALL
 SELECT 'branch', COUNT(*) FROM branch
 UNION ALL
+SELECT 'customer', COUNT(*) FROM customer
+UNION ALL
 SELECT 'product', COUNT(*) FROM product
 UNION ALL
 SELECT 'inventory', COUNT(*) FROM inventory

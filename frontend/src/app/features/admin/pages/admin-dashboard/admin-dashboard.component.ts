@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../../core/services/auth.service';
 import { CustomerService } from '../../../../core/services/customer.service';
-import { Employee } from '../../../../core/models';
+import { Employee, BackupInfo } from '../../../../core/models';
 
 @Component({
   selector: 'app-admin-dashboard',
@@ -534,10 +534,22 @@ import { Employee } from '../../../../core/models';
                         <span class="badge-pill badge-active">{{ b.status }}</span>
                       </td>
                       <td style="text-align: right;">
-                        <span class="badge-pill badge-primary">
-                          <span class="material-symbols-outlined" style="font-size: 13px; vertical-align: middle;">verified</span>
-                          PITR READY
-                        </span>
+                        <div class="action-buttons-group">
+                          <button
+                            class="btn-pill btn-sm btn-outline"
+                            (click)="downloadSnapshot(b.fileName)"
+                            title="Download SQL Snapshot File"
+                          >
+                            <span class="material-symbols-outlined">download</span> Download
+                          </button>
+                          <button
+                            class="btn-pill btn-sm btn-danger-outline"
+                            (click)="openRestoreModal(b)"
+                            title="Restore database from this point-in-time snapshot"
+                          >
+                            <span class="material-symbols-outlined">restore</span> Restore
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   }
@@ -689,6 +701,46 @@ import { Employee } from '../../../../core/models';
             <div class="modal-footer">
               <button class="btn-pill btn-secondary" (click)="isRegisterModalOpen.set(false)">Cancel</button>
               <button class="btn-pill btn-primary" (click)="confirmRegisterEmployee()">Provision & Save</button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: CONFIRM RESTORE SNAPSHOT (DISASTER RECOVERY) -->
+      @if (selectedBackupForRestore()) {
+        <div class="modal-backdrop">
+          <div class="modal-card">
+            <div class="modal-header">
+              <h3 style="color: #b91c1c; display: flex; align-items: center; gap: 8px;">
+                <span class="material-symbols-outlined" style="color: #b91c1c;">warning</span>
+                Confirm Disaster Recovery Restore
+              </h3>
+              <button class="close-btn" (click)="selectedBackupForRestore.set(null)">&times;</button>
+            </div>
+            <div class="modal-body">
+              <p>
+                You are about to rebuild <strong>supermarket_db</strong> from the snapshot:
+              </p>
+              <div class="backup-modal-details">
+                <div><strong>File:</strong> <code>{{ selectedBackupForRestore()!.fileName }}</code></div>
+                <div><strong>Size:</strong> {{ selectedBackupForRestore()!.fileSizeKb }} KB</div>
+                <div><strong>Snapshot Time:</strong> {{ selectedBackupForRestore()!.createdAt }}</div>
+                <div><strong>PITR Coordinate:</strong> <code>{{ selectedBackupForRestore()!.binlogCoordinate }}</code></div>
+              </div>
+              <div class="info-note" style="border-left: 3px solid #b91c1c; background: #fef2f2; color: #991b1b;">
+                <span class="material-symbols-outlined" style="color: #b91c1c;">error</span>
+                <span><strong>CRITICAL WARNING:</strong> Existing schema and tables will be dropped and re-created to this exact snapshot point. Automated table row-count audit will run post-recovery.</span>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button class="btn-pill btn-secondary" [disabled]="isRestoring()" (click)="selectedBackupForRestore.set(null)">Cancel</button>
+              <button class="btn-pill btn-primary" style="background: #dc2626;" [disabled]="isRestoring()" (click)="executeRestore()">
+                @if (isRestoring()) {
+                  <span class="material-symbols-outlined rotating">progress_activity</span> Restoring Database...
+                } @else {
+                  <span class="material-symbols-outlined">restart_alt</span> Confirm & Rebuild Database
+                }
+              </button>
             </div>
           </div>
         </div>
@@ -1275,6 +1327,22 @@ import { Employee } from '../../../../core/models';
       line-height: 1.4;
     }
 
+    .backup-modal-details {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+
+      code {
+        font-family: monospace;
+        color: #0f766e;
+      }
+    }
+
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
@@ -1293,6 +1361,8 @@ export class AdminDashboardComponent implements OnInit {
   activeTab = signal<'EMPLOYEES' | 'MASKING' | 'AUDIT' | 'MATRIX' | 'BACKUP'>('EMPLOYEES');
   actionFeedback = signal<{ success: boolean; message: string } | null>(null);
   isBackingUp = signal<boolean>(false);
+  isRestoring = signal<boolean>(false);
+  selectedBackupForRestore = signal<BackupInfo | null>(null);
 
   selectedEmployeeForRole = signal<Employee | null>(null);
   newRoleSelection: 'ADMIN' | 'MANAGER' | 'CASHIER' = 'CASHIER';
@@ -1332,6 +1402,64 @@ export class AdminDashboardComponent implements OnInit {
         this.actionFeedback.set({
           success: true,
           message: 'Backup snapshot catalog refreshed from disk.'
+        });
+      }
+    });
+  }
+
+  openRestoreModal(backup: BackupInfo): void {
+    this.selectedBackupForRestore.set(backup);
+  }
+
+  downloadSnapshot(fileName: string): void {
+    this.authService.downloadBackup(fileName).subscribe({
+      next: (blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        window.URL.revokeObjectURL(url);
+        this.actionFeedback.set({
+          success: true,
+          message: `Snapshot file '${fileName}' downloaded successfully.`
+        });
+      },
+      error: () => {
+        this.actionFeedback.set({
+          success: false,
+          message: `Failed to download snapshot file '${fileName}'.`
+        });
+      }
+    });
+  }
+
+  executeRestore(): void {
+    const backup = this.selectedBackupForRestore();
+    if (!backup) return;
+
+    this.isRestoring.set(true);
+    this.authService.restoreBackupHttp(backup.fileName).subscribe({
+      next: (res: any) => {
+        this.isRestoring.set(false);
+        this.selectedBackupForRestore.set(null);
+        const countsSummary = res?.tableCounts
+          ? Object.entries(res.tableCounts).map(([k, v]) => `${k}: ${v}`).join(', ')
+          : 'Verified';
+        this.actionFeedback.set({
+          success: true,
+          message: `Disaster Recovery Successful! Database restored from '${backup.fileName}'. Verified row counts: [${countsSummary}]`
+        });
+        this.authService.fetchEmployeesHttp().subscribe();
+        this.authService.fetchAuditLogsHttp().subscribe();
+        this.authService.fetchSecurityLogsHttp().subscribe();
+        this.authService.fetchBackupsHttp().subscribe();
+      },
+      error: (err: any) => {
+        this.isRestoring.set(false);
+        this.actionFeedback.set({
+          success: false,
+          message: 'Database restoration failed: ' + (err?.error?.message || err?.message || 'Server error')
         });
       }
     });
