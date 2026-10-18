@@ -86,4 +86,27 @@ public class AuditController {
     public ResponseEntity<List<MaskedCustomerDto>> getMaskedCustomers() {
         return ResponseEntity.ok(auditService.getMaskedCustomers());
     }
+
+    @PostMapping("/backup")
+    public ResponseEntity<BackupInfoDto> createBackup(
+            @RequestHeader(value = "Authorization", required = false) String authHeader
+    ) {
+        String performer = "Admin (Member 5)";
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            try {
+                String username = jwtUtil.extractUsername(authHeader.substring(7));
+                if (username != null && !username.isBlank()) {
+                    performer = username + " (Admin)";
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        BackupInfoDto result = auditService.createDatabaseBackup(performer);
+        return ResponseEntity.ok(result);
+    }
+
+    @GetMapping("/backups")
+    public ResponseEntity<List<BackupInfoDto>> getBackups() {
+        return ResponseEntity.ok(auditService.getBackupList());
+    }
 }

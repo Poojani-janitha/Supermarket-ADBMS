@@ -138,4 +138,9 @@ public class AuditDao {
                 rs.getInt("loyalty_points")
         ));
     }
+
+    public int logSecurityEvent(String eventType, String details, String performedBy) {
+        String sql = "INSERT INTO security_event_log (event_type, details, performed_by, logged_at) VALUES (?, ?, ?, NOW())";
+        return jdbcTemplate.update(sql, eventType, details, performedBy);
+    }
 }

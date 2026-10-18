@@ -70,6 +70,14 @@ import { Employee } from '../../../../core/models';
           <span class="material-symbols-outlined">table_view</span>
           MySQL 8 Role Privilege Matrix
         </button>
+        <button
+          class="tab-btn"
+          [class.active]="activeTab() === 'BACKUP'"
+          (click)="activeTab.set('BACKUP')"
+        >
+          <span class="material-symbols-outlined">settings_backup_restore</span>
+          Disaster Recovery & Backup (PITR)
+        </button>
       </div>
 
       <!-- ================= TAB 1: EMPLOYEES & RBAC ================= -->
@@ -404,6 +412,201 @@ import { Employee } from '../../../../core/models';
               <div class="db-user-card">
                 <strong>admin_user</strong>
                 <span>Full DBA privileges, Point-in-time recovery, user creation</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ================= TAB 5: DISASTER RECOVERY & BACKUP (PITR) ================= -->
+      @if (activeTab() === 'BACKUP') {
+        <div class="dr-container">
+          <!-- Architecture Metrics Grid -->
+          <div class="metrics-summary-grid">
+            <div class="metric-summary-card">
+              <div class="metric-icon-box" style="background: #ecfdf5; color: #059669;">
+                <span class="material-symbols-outlined">timer</span>
+              </div>
+              <div class="metric-text-box">
+                <span class="metric-label">Recovery Point Objective (RPO)</span>
+                <span class="metric-value">~ 0 Seconds</span>
+                <span class="metric-sub">Continuous Binary Logging (sync_binlog=1)</span>
+              </div>
+            </div>
+
+            <div class="metric-summary-card">
+              <div class="metric-icon-box" style="background: #eff6ff; color: #2563eb;">
+                <span class="material-symbols-outlined">speed</span>
+              </div>
+              <div class="metric-text-box">
+                <span class="metric-label">Recovery Time Objective (RTO)</span>
+                <span class="metric-value">&lt; 5 Minutes</span>
+                <span class="metric-sub">Automated Snapshot & Table Integrity Checks</span>
+              </div>
+            </div>
+
+            <div class="metric-summary-card">
+              <div class="metric-icon-box" style="background: #fef3c7; color: #d97706;">
+                <span class="material-symbols-outlined">lock_open_right</span>
+              </div>
+              <div class="metric-text-box">
+                <span class="metric-label">InnoDB MVCC Isolation</span>
+                <span class="metric-value">Non-Blocking</span>
+                <span class="metric-sub">--single-transaction (Zero POS Lock Contention)</span>
+              </div>
+            </div>
+
+            <div class="metric-summary-card">
+              <div class="metric-icon-box" style="background: #f3e8ff; color: #9333ea;">
+                <span class="material-symbols-outlined">history_toggle_off</span>
+              </div>
+              <div class="metric-text-box">
+                <span class="metric-label">Point-in-Time Recovery</span>
+                <span class="metric-value">Coordinate Bound</span>
+                <span class="metric-sub">--source-data=2 Replication Header</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Backup Management Card -->
+          <div class="table-card">
+            <div class="card-inner-header">
+              <div>
+                <h3>Database Backup Snapshots (supermarket_db)</h3>
+                <p class="card-meta">
+                  Consistent full database snapshots generated via mysqldump with transactional isolation. Audited in security_event_log.
+                </p>
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button class="btn-pill btn-secondary" (click)="refreshBackups()">
+                  <span class="material-symbols-outlined">refresh</span> Refresh Catalog
+                </button>
+                <button
+                  class="btn-pill btn-primary"
+                  [disabled]="isBackingUp()"
+                  (click)="triggerBackup()"
+                >
+                  @if (isBackingUp()) {
+                    <span class="material-symbols-outlined rotating">progress_activity</span> Generating Snapshot...
+                  } @else {
+                    <span class="material-symbols-outlined">database</span> Take Consistent Snapshot
+                  }
+                </button>
+              </div>
+            </div>
+
+            @if (authService.backups().length === 0) {
+              <div class="empty-backups-box">
+                <span class="material-symbols-outlined empty-icon">folder_zip</span>
+                <p>No snapshots found on disk. Click <strong>Take Consistent Snapshot</strong> to execute non-blocking backup.</p>
+              </div>
+            } @else {
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>SNAPSHOT FILENAME</th>
+                    <th>FILE SIZE</th>
+                    <th>CREATED TIMESTAMP</th>
+                    <th>PITR BINLOG COORDINATE</th>
+                    <th>STATUS</th>
+                    <th style="text-align: right;">RECOVERY CAPABILITY</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (b of authService.backups(); track b.fileName) {
+                    <tr>
+                      <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                          <span class="material-symbols-outlined" style="color: #0284c7; font-size: 20px;">description</span>
+                          <span class="backup-filename">{{ b.fileName }}</span>
+                        </div>
+                      </td>
+                      <td>
+                        <span class="code-sku">{{ b.fileSizeKb }} KB</span>
+                      </td>
+                      <td>
+                        <span class="time-meta" style="font-weight: 600; color: #334155;">{{ b.createdAt }}</span>
+                      </td>
+                      <td>
+                        <code class="binlog-pill">{{ b.binlogCoordinate }}</code>
+                      </td>
+                      <td>
+                        <span class="badge-pill badge-active">{{ b.status }}</span>
+                      </td>
+                      <td style="text-align: right;">
+                        <span class="badge-pill badge-primary">
+                          <span class="material-symbols-outlined" style="font-size: 13px; vertical-align: middle;">verified</span>
+                          PITR READY
+                        </span>
+                      </td>
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            }
+          </div>
+
+          <!-- Academic Architecture & Disaster Recovery Workflow Card -->
+          <div class="section-card">
+            <div class="card-title-row">
+              <span class="material-symbols-outlined" style="color: #0369a1;">account_tree</span>
+              <div>
+                <h3>Point-in-Time Recovery (PITR) & Disaster Recovery Architecture</h3>
+                <p class="card-meta">ICT3222 ADBMS Viva Defense Specification (Member 5)</p>
+              </div>
+            </div>
+
+            <div class="pitr-workflow-grid">
+              <div class="pitr-step-box">
+                <div class="pitr-step-header">
+                  <span class="step-num">Step 1</span>
+                  <strong>Non-Blocking Consistent Snapshot</strong>
+                </div>
+                <p>
+                  <code>mysqldump --single-transaction --flush-logs --source-data=2 --routines --triggers --events supermarket_db</code>
+                </p>
+                <span class="step-desc">
+                  Leverages InnoDB MVCC snapshot read view. POS Cashiers continue transacting without experiencing table lock contention.
+                </span>
+              </div>
+
+              <div class="pitr-step-box">
+                <div class="pitr-step-header">
+                  <span class="step-num">Step 2</span>
+                  <strong>Continuous Differential Binlog Stream</strong>
+                </div>
+                <p>
+                  <code>log_bin = ON, binlog_format = ROW, sync_binlog = 1</code>
+                </p>
+                <span class="step-desc">
+                  Captures all row-level state changes (INSERT, UPDATE, DELETE, DDL) in real-time with strict ACID transactional durability.
+                </span>
+              </div>
+
+              <div class="pitr-step-box">
+                <div class="pitr-step-header">
+                  <span class="step-num">Step 3</span>
+                  <strong>Targeted Disaster Recovery Cut-Off</strong>
+                </div>
+                <p>
+                  <code>mysqlbinlog --stop-datetime="2026-10-18 14:32:14" binlog.00000X | mysql -u root -p supermarket_db</code>
+                </p>
+                <span class="step-desc">
+                  Replays transactions up to 1 second before catastrophic failure or accidental table destruction, recovering all state with zero loss.
+                </span>
+              </div>
+
+              <div class="pitr-step-box">
+                <div class="pitr-step-header">
+                  <span class="step-num">Step 4</span>
+                  <strong>Post-Restore Row-Count Integrity Audit</strong>
+                </div>
+                <p>
+                  <code>powershell -File database/scripts/restore_database.ps1 -Force</code>
+                </p>
+                <span class="step-desc">
+                  Re-verifies table counts across <code>employee</code>, <code>branch</code>, <code>product</code>, <code>inventory</code>, and <code>security_event_log</code>.
+                </span>
               </div>
             </div>
           </div>
@@ -927,14 +1130,169 @@ import { Employee } from '../../../../core/models';
       justify-content: flex-end;
       gap: 10px;
     }
+
+    .dr-container {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .metrics-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .metric-summary-card {
+      background: #ffffff;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      box-shadow: var(--shadow-card);
+    }
+
+    .metric-icon-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+
+      .material-symbols-outlined { font-size: 24px; }
+    }
+
+    .metric-text-box {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .metric-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text-main);
+    }
+
+    .metric-sub {
+      font-size: 0.68rem;
+      color: #64748b;
+    }
+
+    .backup-filename {
+      font-family: monospace;
+      font-weight: 700;
+      color: #1e293b;
+      font-size: 0.85rem;
+    }
+
+    .binlog-pill {
+      font-family: monospace;
+      font-size: 0.73rem;
+      background: #f1f5f9;
+      padding: 3px 8px;
+      border-radius: 6px;
+      color: #0f766e;
+      display: inline-block;
+      max-width: 320px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .empty-backups-box {
+      text-align: center;
+      padding: 36px 20px;
+      color: var(--text-muted);
+      font-size: 0.88rem;
+
+      .empty-icon {
+        font-size: 48px;
+        color: #94a3b8;
+        display: block;
+        margin-bottom: 8px;
+      }
+    }
+
+    .pitr-workflow-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px;
+      margin-top: 10px;
+    }
+
+    .pitr-step-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      code {
+        font-family: monospace;
+        font-size: 0.73rem;
+        background: #e2e8f0;
+        padding: 4px 6px;
+        border-radius: 4px;
+        color: #0f172a;
+        word-break: break-all;
+      }
+    }
+
+    .pitr-step-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .step-num {
+      background: #0284c7;
+      color: #ffffff;
+      font-size: 0.68rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 10px;
+      text-transform: uppercase;
+    }
+
+    .step-desc {
+      font-size: 0.75rem;
+      color: #475569;
+      line-height: 1.4;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    .rotating {
+      animation: spin 1s linear infinite;
+      display: inline-block;
+    }
   `]
 })
 export class AdminDashboardComponent implements OnInit {
   readonly authService = inject(AuthService);
   readonly customerService = inject(CustomerService);
 
-  activeTab = signal<'EMPLOYEES' | 'MASKING' | 'AUDIT' | 'MATRIX'>('EMPLOYEES');
+  activeTab = signal<'EMPLOYEES' | 'MASKING' | 'AUDIT' | 'MATRIX' | 'BACKUP'>('EMPLOYEES');
   actionFeedback = signal<{ success: boolean; message: string } | null>(null);
+  isBackingUp = signal<boolean>(false);
 
   selectedEmployeeForRole = signal<Employee | null>(null);
   newRoleSelection: 'ADMIN' | 'MANAGER' | 'CASHIER' = 'CASHIER';
@@ -943,6 +1301,40 @@ export class AdminDashboardComponent implements OnInit {
     this.authService.fetchEmployeesHttp().subscribe();
     this.authService.fetchAuditLogsHttp().subscribe();
     this.authService.fetchSecurityLogsHttp().subscribe();
+    this.authService.fetchBackupsHttp().subscribe();
+  }
+
+  triggerBackup(): void {
+    this.isBackingUp.set(true);
+    this.authService.createBackupHttp().subscribe({
+      next: (res) => {
+        this.isBackingUp.set(false);
+        this.actionFeedback.set({
+          success: true,
+          message: `Database backup snapshot '${res.fileName}' (${res.fileSizeKb} KB) generated successfully with MVCC single-transaction! PITR: ${res.binlogCoordinate}`
+        });
+        this.authService.fetchSecurityLogsHttp().subscribe();
+        this.authService.fetchBackupsHttp().subscribe();
+      },
+      error: (err) => {
+        this.isBackingUp.set(false);
+        this.actionFeedback.set({
+          success: false,
+          message: 'Database backup failed: ' + (err?.error?.message || err?.message || 'Server error')
+        });
+      }
+    });
+  }
+
+  refreshBackups(): void {
+    this.authService.fetchBackupsHttp().subscribe({
+      next: () => {
+        this.actionFeedback.set({
+          success: true,
+          message: 'Backup snapshot catalog refreshed from disk.'
+        });
+      }
+    });
   }
 
   openRoleModal(emp: Employee): void {

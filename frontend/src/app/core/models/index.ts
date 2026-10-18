@@ -165,11 +165,21 @@ export interface EmployeeAuditLog {
 
 export interface SecurityEventLog {
   logId: number;
-  eventType: 'LOGIN_SUCCESS' | 'LOGIN_FAILURE' | 'ROLE_ASSIGN' | 'UNAUTHORIZED_ACCESS' | 'EMPLOYEE_DEACTIVATED' | 'EMPLOYEE_REGISTERED';
+  eventType: 'LOGIN_SUCCESS' | 'LOGIN_FAILURE' | 'ROLE_ASSIGN' | 'UNAUTHORIZED_ACCESS' | 'EMPLOYEE_DEACTIVATED' | 'EMPLOYEE_REGISTERED' | 'DATABASE_BACKUP_CREATED';
   description: string;
   username: string;
   ipAddress: string;
   createdAt: string;
+}
+
+export interface BackupInfo {
+  fileName: string;
+  filePath: string;
+  fileSizeKb: number;
+  createdAt: string;
+  binlogCoordinate: string;
+  status: string;
+  message: string;
 }
 
 export interface MonthlyRollupRow {

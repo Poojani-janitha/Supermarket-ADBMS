@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap, catchError, of, map } from 'rxjs';
-import { Employee, EmployeeAuditLog, SecurityEventLog } from '../models';
+import { Employee, EmployeeAuditLog, SecurityEventLog, BackupInfo } from '../models';
 
 @Injectable({
   providedIn: 'root'
@@ -11,6 +11,9 @@ export class AuthService {
 
   // JWT Token Signal
   readonly token = signal<string | null>(typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null);
+
+  // Database Backup snapshots (Member 5: PITR & Disaster Recovery)
+  readonly backups = signal<BackupInfo[]>([]);
 
   // Staff directory simulating employee table
   readonly employees = signal<Employee[]>([
@@ -479,5 +482,26 @@ export class AuthService {
 
   registerEmployeeHttp(payload: any): Observable<any> {
     return this.http.post('/api/admin/employees', payload);
+  }
+
+  fetchBackupsHttp(): Observable<BackupInfo[]> {
+    return this.http.get<BackupInfo[]>('/api/admin/backups').pipe(
+      tap(data => {
+        if (data) {
+          this.backups.set(data);
+        }
+      }),
+      catchError(() => of(this.backups()))
+    );
+  }
+
+  createBackupHttp(): Observable<BackupInfo> {
+    return this.http.post<BackupInfo>('/api/admin/backup', {}).pipe(
+      tap(res => {
+        if (res) {
+          this.backups.update(prev => [res, ...prev.filter(b => b.fileName !== res.fileName)]);
+        }
+      })
+    );
   }
 }
