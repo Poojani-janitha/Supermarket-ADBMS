@@ -44,7 +44,8 @@ import { Employee, BackupInfo } from '../../../../core/models';
           (click)="activeTab.set('EMPLOYEES')"
         >
           <span class="material-symbols-outlined">badge</span>
-          Employee Management & RBAC (sp_change_user_role)
+          <span>Staff & RBAC</span>
+          <span class="tab-chip">sp_change_user_role</span>
         </button>
         <button
           class="tab-btn"
@@ -52,7 +53,8 @@ import { Employee, BackupInfo } from '../../../../core/models';
           (click)="activeTab.set('MASKING')"
         >
           <span class="material-symbols-outlined">visibility_off</span>
-          Data Masking Demo (fn_mask_phone)
+          <span>Data Masking</span>
+          <span class="tab-chip">fn_mask_phone</span>
         </button>
         <button
           class="tab-btn"
@@ -60,7 +62,8 @@ import { Employee, BackupInfo } from '../../../../core/models';
           (click)="activeTab.set('AUDIT')"
         >
           <span class="material-symbols-outlined">history</span>
-          Trigger Audit Logs (trg_employee_audit)
+          <span>Trigger Audit</span>
+          <span class="tab-chip">trg_employee_audit</span>
         </button>
         <button
           class="tab-btn"
@@ -68,7 +71,8 @@ import { Employee, BackupInfo } from '../../../../core/models';
           (click)="activeTab.set('MATRIX')"
         >
           <span class="material-symbols-outlined">table_view</span>
-          MySQL 8 Role Privilege Matrix
+          <span>Privilege Matrix</span>
+          <span class="tab-chip">CREATE ROLE</span>
         </button>
         <button
           class="tab-btn"
@@ -76,7 +80,8 @@ import { Employee, BackupInfo } from '../../../../core/models';
           (click)="activeTab.set('BACKUP')"
         >
           <span class="material-symbols-outlined">settings_backup_restore</span>
-          Disaster Recovery & Backup (PITR)
+          <span>Disaster Recovery</span>
+          <span class="tab-chip">PITR & Backup</span>
         </button>
       </div>
 
@@ -574,9 +579,9 @@ import { Employee, BackupInfo } from '../../../../core/models';
                   <span class="step-num">Step 1</span>
                   <strong>Non-Blocking Consistent Snapshot</strong>
                 </div>
-                <p>
+                <div class="terminal-command">
                   <code>mysqldump --single-transaction --flush-logs --source-data=2 --routines --triggers --events supermarket_db</code>
-                </p>
+                </div>
                 <span class="step-desc">
                   Leverages InnoDB MVCC snapshot read view. POS Cashiers continue transacting without experiencing table lock contention.
                 </span>
@@ -587,9 +592,9 @@ import { Employee, BackupInfo } from '../../../../core/models';
                   <span class="step-num">Step 2</span>
                   <strong>Continuous Differential Binlog Stream</strong>
                 </div>
-                <p>
+                <div class="terminal-command">
                   <code>log_bin = ON, binlog_format = ROW, sync_binlog = 1</code>
-                </p>
+                </div>
                 <span class="step-desc">
                   Captures all row-level state changes (INSERT, UPDATE, DELETE, DDL) in real-time with strict ACID transactional durability.
                 </span>
@@ -600,9 +605,9 @@ import { Employee, BackupInfo } from '../../../../core/models';
                   <span class="step-num">Step 3</span>
                   <strong>Targeted Disaster Recovery Cut-Off</strong>
                 </div>
-                <p>
+                <div class="terminal-command">
                   <code>mysqlbinlog --stop-datetime="2026-10-18 14:32:14" binlog.00000X | mysql -u root -p supermarket_db</code>
-                </p>
+                </div>
                 <span class="step-desc">
                   Replays transactions up to 1 second before catastrophic failure or accidental table destruction, recovering all state with zero loss.
                 </span>
@@ -613,9 +618,9 @@ import { Employee, BackupInfo } from '../../../../core/models';
                   <span class="step-num">Step 4</span>
                   <strong>Post-Restore Row-Count Integrity Audit</strong>
                 </div>
-                <p>
+                <div class="terminal-command">
                   <code>powershell -File database/scripts/restore_database.ps1 -Force</code>
-                </p>
+                </div>
                 <span class="step-desc">
                   Re-verifies table counts across <code>employee</code>, <code>branch</code>, <code>product</code>, <code>inventory</code>, and <code>security_event_log</code>.
                 </span>
@@ -826,9 +831,11 @@ import { Employee, BackupInfo } from '../../../../core/models';
 
     .nav-tabs-bar {
       display: flex;
+      flex-wrap: wrap;
+      align-items: center;
       gap: 8px;
       border-bottom: 2px solid var(--border-subtle);
-      padding-bottom: 6px;
+      padding-bottom: 8px;
     }
 
     .tab-btn {
@@ -836,14 +843,15 @@ import { Employee, BackupInfo } from '../../../../core/models';
       align-items: center;
       gap: 8px;
       background: none;
-      border: none;
-      padding: 10px 18px;
+      border: 1px solid transparent;
+      padding: 8px 14px;
       border-radius: 12px;
-      font-size: 0.84rem;
+      font-size: 0.82rem;
       font-weight: 700;
       color: var(--text-muted);
       cursor: pointer;
       transition: all 0.2s;
+      white-space: nowrap;
 
       .material-symbols-outlined {
         font-size: 19px;
@@ -857,7 +865,27 @@ import { Employee, BackupInfo } from '../../../../core/models';
       &.active {
         background: var(--primary-green-light);
         color: var(--primary-green);
+        border-color: rgba(6, 95, 70, 0.15);
       }
+    }
+
+    .tab-chip {
+      font-size: 0.68rem;
+      font-family: monospace;
+      padding: 2px 6px;
+      border-radius: 6px;
+      background: #f1f5f9;
+      color: #64748b;
+      font-weight: 600;
+      border: 1px solid #e2e8f0;
+      letter-spacing: -0.2px;
+      transition: all 0.2s;
+    }
+
+    .tab-btn.active .tab-chip {
+      background: #ffffff;
+      color: var(--primary-green);
+      border-color: rgba(6, 95, 70, 0.25);
     }
 
     .table-card, .section-card {
@@ -1282,6 +1310,10 @@ import { Employee, BackupInfo } from '../../../../core/models';
       grid-template-columns: repeat(2, 1fr);
       gap: 14px;
       margin-top: 10px;
+
+      @media (max-width: 900px) {
+        grid-template-columns: 1fr;
+      }
     }
 
     .pitr-step-box {
@@ -1291,16 +1323,25 @@ import { Employee, BackupInfo } from '../../../../core/models';
       padding: 14px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 10px;
+    }
+
+    .terminal-command {
+      background: #0f172a;
+      border-radius: 6px;
+      padding: 8px 12px;
+      overflow-x: auto;
+      border: 1px solid #1e293b;
 
       code {
-        font-family: monospace;
-        font-size: 0.73rem;
-        background: #e2e8f0;
-        padding: 4px 6px;
-        border-radius: 4px;
-        color: #0f172a;
-        word-break: break-all;
+        font-family: 'Fira Code', 'Cascadia Code', Consolas, monospace;
+        font-size: 0.74rem;
+        color: #38bdf8;
+        background: transparent;
+        padding: 0;
+        white-space: nowrap;
+        word-break: normal;
+        display: inline-block;
       }
     }
 
@@ -1322,9 +1363,21 @@ import { Employee, BackupInfo } from '../../../../core/models';
     }
 
     .step-desc {
-      font-size: 0.75rem;
+      font-size: 0.76rem;
       color: #475569;
-      line-height: 1.4;
+      line-height: 1.45;
+      word-break: normal;
+      overflow-wrap: break-word;
+
+      code {
+        background: #e2e8f0;
+        color: #0f172a;
+        padding: 1px 5px;
+        border-radius: 4px;
+        font-size: 0.72rem;
+        font-family: monospace;
+        word-break: normal;
+      }
     }
 
     .backup-modal-details {
