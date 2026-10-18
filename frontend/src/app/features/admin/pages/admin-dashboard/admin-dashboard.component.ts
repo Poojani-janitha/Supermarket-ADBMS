@@ -44,8 +44,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
           (click)="activeTab.set('EMPLOYEES')"
         >
           <span class="material-symbols-outlined">badge</span>
-          <span>Staff & RBAC</span>
-          <span class="tab-chip">sp_change_user_role</span>
+          <span>Employee Management</span>
         </button>
         <button
           class="tab-btn"
@@ -54,7 +53,6 @@ import { Employee, BackupInfo } from '../../../../core/models';
         >
           <span class="material-symbols-outlined">visibility_off</span>
           <span>Data Masking</span>
-          <span class="tab-chip">fn_mask_phone</span>
         </button>
         <button
           class="tab-btn"
@@ -62,8 +60,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
           (click)="activeTab.set('AUDIT')"
         >
           <span class="material-symbols-outlined">history</span>
-          <span>Trigger Audit</span>
-          <span class="tab-chip">trg_employee_audit</span>
+          <span>Trigger Audit Logs</span>
         </button>
         <button
           class="tab-btn"
@@ -71,8 +68,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
           (click)="activeTab.set('MATRIX')"
         >
           <span class="material-symbols-outlined">table_view</span>
-          <span>Privilege Matrix</span>
-          <span class="tab-chip">CREATE ROLE</span>
+          <span>Role Privilege Matrix</span>
         </button>
         <button
           class="tab-btn"
@@ -80,8 +76,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
           (click)="activeTab.set('BACKUP')"
         >
           <span class="material-symbols-outlined">settings_backup_restore</span>
-          <span>Disaster Recovery</span>
-          <span class="tab-chip">PITR & Backup</span>
+          <span>Disaster Recovery & Backup</span>
         </button>
       </div>
 
@@ -844,9 +839,9 @@ import { Employee, BackupInfo } from '../../../../core/models';
       gap: 8px;
       background: none;
       border: 1px solid transparent;
-      padding: 8px 14px;
+      padding: 10px 18px;
       border-radius: 12px;
-      font-size: 0.82rem;
+      font-size: 0.84rem;
       font-weight: 700;
       color: var(--text-muted);
       cursor: pointer;
@@ -867,25 +862,6 @@ import { Employee, BackupInfo } from '../../../../core/models';
         color: var(--primary-green);
         border-color: rgba(6, 95, 70, 0.15);
       }
-    }
-
-    .tab-chip {
-      font-size: 0.68rem;
-      font-family: monospace;
-      padding: 2px 6px;
-      border-radius: 6px;
-      background: #f1f5f9;
-      color: #64748b;
-      font-weight: 600;
-      border: 1px solid #e2e8f0;
-      letter-spacing: -0.2px;
-      transition: all 0.2s;
-    }
-
-    .tab-btn.active .tab-chip {
-      background: #ffffff;
-      color: var(--primary-green);
-      border-color: rgba(6, 95, 70, 0.25);
     }
 
     .table-card, .section-card {
