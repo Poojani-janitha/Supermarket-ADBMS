@@ -732,10 +732,12 @@ import { Employee, BackupInfo } from '../../../../core/models';
       border-radius: var(--radius-md);
       display: flex;
       align-items: center;
-      gap: 10px;
-      font-size: 0.85rem;
+      gap: 12px;
+      font-size: 0.86rem;
       font-weight: 600;
       position: relative;
+      animation: alertSlideDown 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05);
 
       &.success {
         background: #ecfdf5;
@@ -753,9 +755,12 @@ import { Employee, BackupInfo } from '../../../../core/models';
         margin-left: auto;
         background: none;
         border: none;
-        font-size: 1.2rem;
+        font-size: 1.25rem;
         cursor: pointer;
         color: inherit;
+        opacity: 0.7;
+        transition: opacity 0.15s;
+        &:hover { opacity: 1; }
       }
     }
 
@@ -780,22 +785,27 @@ import { Employee, BackupInfo } from '../../../../core/models';
       font-weight: 700;
       color: var(--text-muted);
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
       white-space: nowrap;
 
       .material-symbols-outlined {
-        font-size: 19px;
+        font-size: 20px;
+        transition: transform 0.2s;
       }
 
       &:hover {
         background: #f1f5f9;
         color: var(--text-main);
+        .material-symbols-outlined {
+          transform: scale(1.08);
+        }
       }
 
       &.active {
         background: var(--primary-green-light);
         color: var(--primary-green);
-        border-color: rgba(6, 95, 70, 0.15);
+        border-color: rgba(6, 95, 70, 0.18);
+        box-shadow: 0 1px 3px rgba(6, 95, 70, 0.08);
       }
     }
 
@@ -804,28 +814,33 @@ import { Employee, BackupInfo } from '../../../../core/models';
       border-radius: var(--radius-lg);
       border: 1px solid var(--border-subtle);
       box-shadow: var(--shadow-card);
-      padding: 20px;
+      padding: 22px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      overflow-x: auto;
+      transition: box-shadow 0.2s ease;
     }
 
     .card-inner-header, .card-title-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
 
       h3 {
         font-size: 1.05rem;
         font-weight: 800;
         margin: 0;
         color: var(--text-main);
+        letter-spacing: -0.2px;
       }
 
       .card-meta {
         font-size: 0.78rem;
         color: var(--text-muted);
-        margin: 2px 0 0 0;
+        margin: 3px 0 0 0;
       }
     }
 
@@ -836,18 +851,28 @@ import { Employee, BackupInfo } from '../../../../core/models';
 
       th {
         text-align: left;
-        padding: 10px 12px;
-        color: var(--text-muted);
+        padding: 11px 14px;
+        color: #64748b;
+        background: #f8fafc;
         font-size: 0.72rem;
         font-weight: 700;
+        letter-spacing: 0.04em;
         text-transform: uppercase;
-        border-bottom: 1px solid var(--border-subtle);
+        border-bottom: 1.5px solid #e2e8f0;
+        white-space: nowrap;
       }
 
       td {
-        padding: 12px;
-        border-bottom: 1px solid #f8fafc;
+        padding: 13px 14px;
+        border-bottom: 1px solid #f1f5f9;
         vertical-align: middle;
+      }
+
+      tbody tr {
+        transition: background-color 0.15s ease;
+        &:hover {
+          background-color: #f8fafc;
+        }
       }
 
       tr.inactive-row td {
@@ -857,18 +882,25 @@ import { Employee, BackupInfo } from '../../../../core/models';
     }
 
     .code-sku {
-      font-family: monospace;
+      font-family: 'Fira Code', monospace;
       font-weight: 700;
-      color: #64748b;
+      color: #475569;
       background: #f1f5f9;
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      font-size: 0.78rem;
     }
 
     .username-pill {
-      font-family: monospace;
+      font-family: 'Fira Code', monospace;
       color: #0369a1;
+      background: #f0f9ff;
+      padding: 2px 8px;
+      border-radius: 6px;
+      border: 1px solid #bae6fd;
       font-weight: 600;
+      font-size: 0.78rem;
     }
 
     .badge-pill {
@@ -878,16 +910,17 @@ import { Employee, BackupInfo } from '../../../../core/models';
       font-weight: 700;
       text-transform: uppercase;
       display: inline-block;
+      letter-spacing: 0.03em;
 
-      &.badge-primary { background: #ecfdf5; color: #065f46; }
-      &.badge-admin { background: #fee2e2; color: #991b1b; }
-      &.badge-mgr { background: #e0e7ff; color: #3730a3; }
-      &.badge-cashier { background: #fef3c7; color: #92400e; }
-      &.badge-active { background: #dcfce7; color: #166534; }
-      &.badge-danger { background: #fee2e2; color: #b91c1c; }
-      &.badge-gold { background: #fef3c7; color: #b45309; }
-      &.badge-silver { background: #f1f5f9; color: #475569; }
-      &.badge-bronze { background: #ffedd5; color: #c2410c; }
+      &.badge-primary { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
+      &.badge-admin { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+      &.badge-mgr { background: #e0e7ff; color: #3730a3; border: 1px solid #c7d2fe; }
+      &.badge-cashier { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+      &.badge-active { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+      &.badge-danger { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+      &.badge-gold { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+      &.badge-silver { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+      &.badge-bronze { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
     }
 
     .action-buttons-group {
@@ -897,26 +930,57 @@ import { Employee, BackupInfo } from '../../../../core/models';
     }
 
     .btn-pill {
-      padding: 7px 14px;
+      padding: 8px 16px;
       border-radius: var(--radius-pill);
-      font-size: 0.8rem;
+      font-size: 0.81rem;
       font-weight: 700;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 6px;
       border: 1px solid transparent;
+      transition: all 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      user-select: none;
 
-      &.btn-sm {
-        padding: 5px 10px;
-        font-size: 0.74rem;
-        .material-symbols-outlined { font-size: 15px; }
+      &:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(0, 0, 0, 0.06);
       }
 
-      &.btn-primary { background: var(--primary-green); color: #ffffff; }
-      &.btn-secondary { background: #f1f5f9; color: #334155; }
-      &.btn-outline { background: #ffffff; border-color: var(--border-subtle); color: #334155; }
-      &.btn-danger-outline { background: #ffffff; border-color: #fca5a5; color: #dc2626; }
+      &:active {
+        transform: translateY(0);
+        box-shadow: none;
+      }
+
+      &.btn-sm {
+        padding: 5px 12px;
+        font-size: 0.74rem;
+        .material-symbols-outlined { font-size: 16px; }
+      }
+
+      &.btn-primary {
+        background: var(--primary-green);
+        color: #ffffff;
+        &:hover { background: var(--primary-green-dark); }
+      }
+      &.btn-secondary {
+        background: #f1f5f9;
+        color: #334155;
+        border-color: #e2e8f0;
+        &:hover { background: #e2e8f0; color: #0f172a; }
+      }
+      &.btn-outline {
+        background: #ffffff;
+        border-color: #cbd5e1;
+        color: #334155;
+        &:hover { background: #f8fafc; border-color: #94a3b8; color: #0f172a; }
+      }
+      &.btn-danger-outline {
+        background: #ffffff;
+        border-color: #fca5a5;
+        color: #dc2626;
+        &:hover { background: #fef2f2; border-color: #ef4444; color: #b91c1c; }
+      }
     }
 
     .masking-container {
@@ -929,40 +993,42 @@ import { Employee, BackupInfo } from '../../../../core/models';
       background: #f0fdf4;
       border: 1.5px dashed var(--primary-green);
       border-radius: var(--radius-md);
-      padding: 16px 20px;
+      padding: 18px 24px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 20px;
+      box-shadow: 0 2px 8px rgba(6, 95, 70, 0.04);
     }
 
     .masking-info {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 16px;
 
       p {
         margin: 4px 0 0 0;
-        font-size: 0.8rem;
+        font-size: 0.82rem;
         color: #475569;
-        line-height: 1.4;
+        line-height: 1.45;
       }
     }
 
     .shield-icon {
-      font-size: 36px;
+      font-size: 38px;
       color: var(--primary-green);
     }
 
     .masked-phone {
-      font-family: monospace;
+      font-family: 'Fira Code', monospace;
       font-weight: 700;
 
       &.highlight {
         color: #059669;
         background: #ecfdf5;
-        padding: 2px 6px;
-        border-radius: 4px;
+        padding: 3px 8px;
+        border-radius: 6px;
+        border: 1px solid #a7f3d0;
       }
     }
 
@@ -970,20 +1036,27 @@ import { Employee, BackupInfo } from '../../../../core/models';
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 20px;
+
+      @media (max-width: 1024px) {
+        grid-template-columns: 1fr;
+      }
     }
 
     .audit-change-val {
-      font-family: monospace;
+      font-family: 'Fira Code', monospace;
       font-size: 0.78rem;
 
       &.highlight {
         color: var(--primary-green);
         font-weight: 700;
+        background: #ecfdf5;
+        padding: 1px 5px;
+        border-radius: 4px;
       }
     }
 
     .time-meta {
-      font-size: 0.72rem;
+      font-size: 0.74rem;
       color: #94a3b8;
     }
 
@@ -991,7 +1064,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
       margin-top: 10px;
 
       th, td {
-        padding: 12px;
+        padding: 12px 14px;
       }
     }
 
@@ -1001,21 +1074,24 @@ import { Employee, BackupInfo } from '../../../../core/models';
       border-radius: 8px;
       font-size: 0.74rem;
       font-weight: 700;
+      letter-spacing: 0.02em;
 
-      &.yes { background: #dcfce7; color: #166534; }
-      &.no { background: #fee2e2; color: #991b1b; }
+      &.yes { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+      &.no { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
     }
 
     .db-user-box {
       margin-top: 14px;
       background: #f8fafc;
+      border: 1px solid #e2e8f0;
       border-radius: 12px;
-      padding: 16px;
+      padding: 16px 20px;
 
       h4 {
-        margin: 0 0 10px 0;
+        margin: 0 0 12px 0;
         font-size: 0.88rem;
         color: #334155;
+        font-weight: 700;
       }
     }
 
@@ -1023,19 +1099,33 @@ import { Employee, BackupInfo } from '../../../../core/models';
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 12px;
+
+      @media (max-width: 1024px) {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      @media (max-width: 600px) {
+        grid-template-columns: 1fr;
+      }
     }
 
     .db-user-card {
       background: #ffffff;
       border: 1px solid #e2e8f0;
       border-radius: 10px;
-      padding: 10px;
+      padding: 12px;
       display: flex;
       flex-direction: column;
       gap: 4px;
+      transition: all 0.15s ease;
+
+      &:hover {
+        border-color: #cbd5e1;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+      }
 
       strong {
-        font-family: monospace;
+        font-family: 'Fira Code', monospace;
         color: var(--primary-green);
         font-size: 0.85rem;
       }
@@ -1043,6 +1133,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
       span {
         font-size: 0.72rem;
         color: #64748b;
+        line-height: 1.35;
       }
     }
 
@@ -1053,22 +1144,27 @@ import { Employee, BackupInfo } from '../../../../core/models';
       left: 0;
       right: 0;
       bottom: 0;
-      background: rgba(0, 0, 0, 0.45);
+      background: rgba(15, 23, 42, 0.45);
+      backdrop-filter: blur(4px);
+      -webkit-backdrop-filter: blur(4px);
       display: flex;
       align-items: center;
       justify-content: center;
       z-index: 1000;
+      animation: modalFadeIn 0.2s ease;
     }
 
     .modal-card {
       background: #ffffff;
-      width: 440px;
-      border-radius: 16px;
-      box-shadow: var(--shadow-modal);
+      width: 460px;
+      max-width: 90vw;
+      border-radius: 18px;
+      box-shadow: 0 20px 40px -8px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.05);
       padding: 24px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      animation: modalSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     .modal-header {
@@ -1076,8 +1172,26 @@ import { Employee, BackupInfo } from '../../../../core/models';
       justify-content: space-between;
       align-items: center;
 
-      h3 { margin: 0; font-size: 1.1rem; }
-      .close-btn { background: none; border: none; font-size: 1.4rem; cursor: pointer; }
+      h3 { margin: 0; font-size: 1.1rem; font-weight: 800; }
+      .close-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: #f1f5f9;
+        border: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+        cursor: pointer;
+        color: #64748b;
+        transition: all 0.15s ease;
+
+        &:hover {
+          background: #e2e8f0;
+          color: #0f172a;
+        }
+      }
     }
 
     .modal-body {
@@ -1092,28 +1206,36 @@ import { Employee, BackupInfo } from '../../../../core/models';
       flex-direction: column;
       gap: 6px;
 
-      label { font-weight: 700; font-size: 0.8rem; }
+      label { font-weight: 700; font-size: 0.8rem; color: #334155; }
     }
 
     .select-input {
-      padding: 10px;
-      border: 1.5px solid var(--border-subtle);
-      border-radius: 8px;
+      padding: 10px 12px;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
       font-size: 0.85rem;
       outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      background: #ffffff;
+
+      &:focus {
+        border-color: var(--primary-green);
+        box-shadow: 0 0 0 3px rgba(6, 95, 70, 0.12);
+      }
     }
 
     .info-note {
       background: #f8fafc;
+      border: 1px solid #e2e8f0;
       border-radius: 8px;
-      padding: 10px;
+      padding: 10px 12px;
       display: flex;
       gap: 8px;
       font-size: 0.75rem;
       color: #64748b;
       line-height: 1.4;
 
-      .material-symbols-outlined { font-size: 18px; color: #0284c7; }
+      .material-symbols-outlined { font-size: 18px; color: #0284c7; flex-shrink: 0; }
     }
 
     .modal-footer {
@@ -1132,17 +1254,31 @@ import { Employee, BackupInfo } from '../../../../core/models';
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 14px;
+
+      @media (max-width: 1100px) {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      @media (max-width: 640px) {
+        grid-template-columns: 1fr;
+      }
     }
 
     .metric-summary-card {
       background: #ffffff;
       border: 1px solid var(--border-subtle);
       border-radius: var(--radius-md);
-      padding: 16px;
+      padding: 16px 18px;
       display: flex;
-      gap: 12px;
+      gap: 14px;
       align-items: center;
       box-shadow: var(--shadow-card);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-card-hover);
+      }
     }
 
     .metric-icon-box {
@@ -1168,6 +1304,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
       color: var(--text-muted);
       font-weight: 700;
       text-transform: uppercase;
+      letter-spacing: 0.04em;
     }
 
     .metric-value {
@@ -1182,18 +1319,19 @@ import { Employee, BackupInfo } from '../../../../core/models';
     }
 
     .backup-filename {
-      font-family: monospace;
+      font-family: 'Fira Code', monospace;
       font-weight: 700;
       color: #1e293b;
       font-size: 0.85rem;
     }
 
     .binlog-pill {
-      font-family: monospace;
+      font-family: 'Fira Code', monospace;
       font-size: 0.73rem;
-      background: #f1f5f9;
+      background: #f0fdfa;
       padding: 3px 8px;
       border-radius: 6px;
+      border: 1px solid #99f6e4;
       color: #0f766e;
       display: inline-block;
       max-width: 320px;
@@ -1216,8 +1354,6 @@ import { Employee, BackupInfo } from '../../../../core/models';
       }
     }
 
-
-
     .backup-modal-details {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
@@ -1229,7 +1365,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
       gap: 6px;
 
       code {
-        font-family: monospace;
+        font-family: 'Fira Code', monospace;
         color: #0f766e;
       }
     }
@@ -1242,6 +1378,21 @@ import { Employee, BackupInfo } from '../../../../core/models';
     .rotating {
       animation: spin 1s linear infinite;
       display: inline-block;
+    }
+
+    @keyframes alertSlideDown {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes modalFadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes modalSlideUp {
+      from { opacity: 0; transform: translateY(12px) scale(0.97); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
     }
   `]
 })
