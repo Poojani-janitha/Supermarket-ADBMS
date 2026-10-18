@@ -47,13 +47,13 @@ BEGIN
   -- 1 point for meeting min length 8
   SET v_score = v_score + 1;
 
-  -- Check uppercase
-  IF p_password REGEXP '[A-Z]' THEN
+  -- Check uppercase (case-sensitive via 'c' match type in MySQL 8)
+  IF REGEXP_LIKE(p_password, '[A-Z]', 'c') THEN
     SET v_score = v_score + 1;
   END IF;
 
-  -- Check lowercase
-  IF p_password REGEXP '[a-z]' THEN
+  -- Check lowercase (case-sensitive via 'c' match type in MySQL 8)
+  IF REGEXP_LIKE(p_password, '[a-z]', 'c') THEN
     SET v_score = v_score + 1;
   END IF;
 
@@ -69,7 +69,7 @@ BEGIN
 
   IF v_score >= 5 THEN
     RETURN 'STRONG';
-  ELSEIF v_score >= 3 THEN
+  ELSEIF v_score >= 4 THEN
     RETURN 'MEDIUM';
   ELSE
     RETURN 'WEAK';

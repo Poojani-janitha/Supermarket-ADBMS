@@ -5,12 +5,13 @@ import { adminRoleGuard } from './core/guards/role.guard';
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'pos',
+    redirectTo: 'login',
     pathMatch: 'full'
   },
   {
     path: 'pos',
-    loadComponent: () => import('./features/pos/pos.component').then(m => m.PosComponent)
+    loadComponent: () => import('./features/pos/pos.component').then(m => m.PosComponent),
+    canActivate: [authGuard]
   },
   {
     path: 'products',
@@ -51,6 +52,6 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    redirectTo: 'pos'
+    redirectTo: 'login'
   }
 ];

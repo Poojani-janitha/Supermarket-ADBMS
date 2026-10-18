@@ -379,8 +379,12 @@ export class AuthService {
     }
   }
 
+  logout(): void {
+    this.clearToken();
+  }
+
   isAuthenticated(): boolean {
-    return !!this.token() || !!this.currentUser();
+    return !!this.getToken();
   }
 
   // Real REST API integration connecting to Spring Boot backend

@@ -738,6 +738,7 @@ export class LoginComponent {
         this.isLoading.set(false);
         if (ok) {
           const user = this.authService.currentUser();
+          this.authService.setToken('viva-demo-token-' + user.username);
           this.successMessage.set(`Welcome ${user.fullName}! (Demo Session) Role: ${user.role}_role`);
           setTimeout(() => {
             if (user.role === 'ADMIN') {

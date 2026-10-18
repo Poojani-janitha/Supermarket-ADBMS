@@ -1,6 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterModule } from '@angular/router';
+import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
 
 @Component({
@@ -95,9 +95,9 @@ import { AuthService } from '../../../core/services/auth.service';
             <span class="material-symbols-outlined logout-icon">published_with_changes</span>
             <span>Switch Role</span>
           </button>
-          <a routerLink="/login" class="login-link-btn" title="Go to sp_get_login screen">
-            <span class="material-symbols-outlined logout-icon">login</span>
-          </a>
+          <button class="login-link-btn" (click)="signOut()" title="Sign Out & Return to Login">
+            <span class="material-symbols-outlined logout-icon">logout</span>
+          </button>
         </div>
       </div>
     </aside>
@@ -320,6 +320,7 @@ import { AuthService } from '../../../core/services/auth.service';
 })
 export class SidebarComponent {
   readonly authService = inject(AuthService);
+  private readonly router = inject(Router);
 
   switchUser(role: 'CASHIER' | 'MANAGER' | 'ADMIN' | 'SUPPLIER'): void {
     this.authService.switchUser(role);
@@ -331,5 +332,10 @@ export class SidebarComponent {
     else if (current === 'MANAGER') this.switchUser('ADMIN');
     else if (current === 'ADMIN') this.switchUser('SUPPLIER');
     else this.switchUser('CASHIER');
+  }
+
+  signOut(): void {
+    this.authService.logout();
+    this.router.navigate(['/login']);
   }
 }

@@ -31,16 +31,16 @@ INSERT INTO supplier (supplier_id, name, contact_person, phone, email, city) VAL
 ON DUPLICATE KEY UPDATE name=VALUES(name);
 
 -- 4. Employees (BCrypt hashes for 'Password123!')
--- BCrypt: $2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lR5.e3l6zS7G3N9.Kj.Z8zW6zR5aK
+-- BCrypt: $2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi
 INSERT INTO employee (employee_id, branch_id, full_name, role, username, password_hash) VALUES
-(1,   1, 'System Administrator', 'ADMIN',   'admin',           '$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lR5.e3l6zS7G3N9.Kj.Z8zW6zR5aK'),
-(2,   1, 'Arlene McCoy (Manager)', 'MANAGER', 'manager1',      '$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lR5.e3l6zS7G3N9.Kj.Z8zW6zR5aK'),
-(3,   1, 'Floyd Miles (Cashier)', 'CASHIER', 'cashier1',       '$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lR5.e3l6zS7G3N9.Kj.Z8zW6zR5aK'),
-(100, 1, 'Kavindu Perera (Admin)', 'ADMIN',  'admin_kavindu',  '$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lR5.e3l6zS7G3N9.Kj.Z8zW6zR5aK'),
-(101, 1, 'Floyd Miles',            'CASHIER','cashier_floyd',  '$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lR5.e3l6zS7G3N9.Kj.Z8zW6zR5aK'),
-(102, 1, 'Arlene McCoy',           'MANAGER','manager_arlene', '$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lR5.e3l6zS7G3N9.Kj.Z8zW6zR5aK'),
-(103, 2, 'Kamal Gunaratne',        'CASHIER','cashier_kamal',  '$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lR5.e3l6zS7G3N9.Kj.Z8zW6zR5aK'),
-(104, 3, 'Nimal Silva',            'MANAGER','manager_nimal',  '$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lR5.e3l6zS7G3N9.Kj.Z8zW6zR5aK')
+(1,   1, 'System Administrator', 'ADMIN',   'admin',           '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
+(2,   1, 'Arlene McCoy (Manager)', 'MANAGER', 'manager1',      '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
+(3,   1, 'Floyd Miles (Cashier)', 'CASHIER', 'cashier1',       '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
+(100, 1, 'Kavindu Perera (Admin)', 'ADMIN',  'admin_kavindu',  '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
+(101, 1, 'Floyd Miles',            'CASHIER','cashier_floyd',  '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
+(102, 1, 'Arlene McCoy',           'MANAGER','manager_arlene', '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
+(103, 2, 'Kamal Gunaratne',        'CASHIER','cashier_kamal',  '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
+(104, 3, 'Nimal Silva',            'MANAGER','manager_nimal',  '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi')
 ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password_hash=VALUES(password_hash);
 
 -- 5. Customers

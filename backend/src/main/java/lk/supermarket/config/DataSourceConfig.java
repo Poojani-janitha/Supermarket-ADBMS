@@ -26,10 +26,10 @@ public class DataSourceConfig {
     @Value("${spring.datasource.url:jdbc:mysql://localhost:3306/supermarket_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC}")
     private String dbUrl;
 
-    @Value("${spring.datasource.username:app_user}")
+    @Value("${spring.datasource.username:root}")
     private String dbUsername;
 
-    @Value("${spring.datasource.password:App_Secret_Pass!2026}")
+    @Value("${spring.datasource.password:1234}")
     private String dbPassword;
 
     @Value("${spring.datasource.driver-class-name:com.mysql.cj.jdbc.Driver}")
