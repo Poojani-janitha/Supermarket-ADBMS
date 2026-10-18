@@ -16,7 +16,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
         <div>
           <h1 class="page-title">Enterprise Security & Administration</h1>
           <p class="page-subtitle">
-            Managed by Member 5 | MySQL 8 Roles (CREATE ROLE) | Procedures: sp_deactivate_employee, sp_change_user_role | Triggers: trg_employee_audit
+            Manage system staff roles, customer data privacy, automated audit trails, and database disaster recovery.
           </p>
         </div>
         <div class="role-badge-box">
@@ -85,8 +85,8 @@ import { Employee, BackupInfo } from '../../../../core/models';
         <div class="table-card">
           <div class="card-inner-header">
             <div>
-              <h3>Employee Directory (employee table)</h3>
-              <p class="card-meta">Manage roles and deactivations enforced via stored procedures and triggers</p>
+              <h3>Employee Directory</h3>
+              <p class="card-meta">Manage roles, permissions, and account status</p>
             </div>
             <div style="display: flex; gap: 8px;">
               <button class="btn-pill btn-secondary" (click)="testSelfLockout()">
@@ -239,8 +239,8 @@ import { Employee, BackupInfo } from '../../../../core/models';
             <div class="card-title-row">
               <span class="material-symbols-outlined" style="color: #065f46;">security_update_good</span>
               <div>
-                <h3>Employee Trigger Audit Log (employee_audit_log)</h3>
-                <p class="card-meta">Automatically recorded by MySQL Trigger: trg_employee_audit (AFTER UPDATE ON employee)</p>
+                <h3>Employee Audit Log</h3>
+                <p class="card-meta">Automated record of role changes, branch transfers, and deactivations</p>
               </div>
             </div>
 
@@ -287,8 +287,8 @@ import { Employee, BackupInfo } from '../../../../core/models';
             <div class="card-title-row">
               <span class="material-symbols-outlined" style="color: #dc2626;">crisis_alert</span>
               <div>
-                <h3>Security Event Log (security_event_log)</h3>
-                <p class="card-meta">High-priority authentication and authorization events</p>
+                <h3>Security Event Log</h3>
+                <p class="card-meta">High-priority authentication, authorization, and backup events</p>
               </div>
             </div>
 
@@ -472,9 +472,9 @@ import { Employee, BackupInfo } from '../../../../core/models';
           <div class="table-card">
             <div class="card-inner-header">
               <div>
-                <h3>Database Backup Snapshots (supermarket_db)</h3>
+                <h3>Database Backup Snapshots</h3>
                 <p class="card-meta">
-                  Consistent full database snapshots generated via mysqldump with transactional isolation. Audited in security_event_log.
+                  Consistent full database snapshots with transactional isolation and point-in-time recovery capability
                 </p>
               </div>
               <div style="display: flex; gap: 8px;">
@@ -557,90 +557,15 @@ import { Employee, BackupInfo } from '../../../../core/models';
               </table>
             }
           </div>
-
-          <!-- Academic Architecture & Disaster Recovery Workflow Card (Collapsible) -->
-          <div class="section-card collapsible-card">
-            <div class="card-title-row clickable-header" (click)="togglePitrArchitecture()">
-              <div style="display: flex; align-items: center; gap: 12px;">
-                <span class="material-symbols-outlined" style="color: #0369a1; font-size: 26px;">account_tree</span>
-                <div>
-                  <h3 style="margin: 0; font-size: 1rem;">Point-in-Time Recovery (PITR) & Disaster Recovery Architecture</h3>
-                  <p class="card-meta" style="margin: 2px 0 0 0;">ICT3222 ADBMS Technical Architecture & Viva Defense Reference</p>
-                </div>
-              </div>
-              <button class="btn-pill btn-sm btn-outline toggle-guide-btn" (click)="$event.stopPropagation(); togglePitrArchitecture()">
-                <span class="material-symbols-outlined">
-                  {{ showPitrArchitecture() ? 'expand_less' : 'expand_more' }}
-                </span>
-                {{ showPitrArchitecture() ? 'Hide Architecture Guide' : 'Show Architecture Guide' }}
-              </button>
-            </div>
-
-            @if (showPitrArchitecture()) {
-              <div class="pitr-workflow-grid">
-                <div class="pitr-step-box">
-                  <div class="pitr-step-header">
-                    <span class="step-num">Step 1</span>
-                    <strong>Non-Blocking Consistent Snapshot</strong>
-                  </div>
-                  <div class="terminal-command">
-                    <code>mysqldump --single-transaction --flush-logs --source-data=2 --routines --triggers --events supermarket_db</code>
-                  </div>
-                  <span class="step-desc">
-                    Leverages InnoDB MVCC snapshot read view. POS Cashiers continue transacting without experiencing table lock contention.
-                  </span>
-                </div>
-
-                <div class="pitr-step-box">
-                  <div class="pitr-step-header">
-                    <span class="step-num">Step 2</span>
-                    <strong>Continuous Differential Binlog Stream</strong>
-                  </div>
-                  <div class="terminal-command">
-                    <code>log_bin = ON, binlog_format = ROW, sync_binlog = 1</code>
-                  </div>
-                  <span class="step-desc">
-                    Captures all row-level state changes (INSERT, UPDATE, DELETE, DDL) in real-time with strict ACID transactional durability.
-                  </span>
-                </div>
-
-                <div class="pitr-step-box">
-                  <div class="pitr-step-header">
-                    <span class="step-num">Step 3</span>
-                    <strong>Targeted Disaster Recovery Cut-Off</strong>
-                  </div>
-                  <div class="terminal-command">
-                    <code>mysqlbinlog --stop-datetime="2026-10-18 14:32:14" binlog.00000X | mysql -u root -p supermarket_db</code>
-                  </div>
-                  <span class="step-desc">
-                    Replays transactions up to 1 second before catastrophic failure or accidental table destruction, recovering all state with zero loss.
-                  </span>
-                </div>
-
-                <div class="pitr-step-box">
-                  <div class="pitr-step-header">
-                    <span class="step-num">Step 4</span>
-                    <strong>Post-Restore Row-Count Integrity Audit</strong>
-                  </div>
-                  <div class="terminal-command">
-                    <code>powershell -File database/scripts/restore_database.ps1 -Force</code>
-                  </div>
-                  <span class="step-desc">
-                    Re-verifies table counts across <code>employee</code>, <code>branch</code>, <code>product</code>, <code>inventory</code>, and <code>security_event_log</code>.
-                  </span>
-                </div>
-              </div>
-            }
-          </div>
         </div>
       }
 
-      <!-- MODAL: CHANGE ROLE (sp_change_user_role) -->
+      <!-- MODAL: CHANGE ROLE -->
       @if (selectedEmployeeForRole()) {
         <div class="modal-backdrop">
           <div class="modal-card">
             <div class="modal-header">
-              <h3>Change Employee Role (sp_change_user_role)</h3>
+              <h3>Change Employee Role</h3>
               <button class="close-btn" (click)="selectedEmployeeForRole.set(null)">&times;</button>
             </div>
             <div class="modal-body">
@@ -1291,124 +1216,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
       }
     }
 
-    .collapsible-card {
-      transition: all 0.2s ease;
-      background: #ffffff;
-      border: 1px solid #e2e8f0;
-      border-radius: var(--radius-lg);
-      padding: 16px 20px;
-    }
 
-    .clickable-header {
-      cursor: pointer;
-      user-select: none;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-
-      &:hover h3 {
-        color: #0284c7;
-      }
-    }
-
-    .toggle-guide-btn {
-      white-space: nowrap;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 6px 14px;
-      font-size: 0.8rem;
-      font-weight: 700;
-      border: 1px solid #cbd5e1;
-      color: #0369a1;
-      border-radius: var(--radius-pill);
-      background: #f0f9ff;
-      cursor: pointer;
-      transition: all 0.2s;
-
-      &:hover {
-        background: #e0f2fe;
-        border-color: #0284c7;
-      }
-    }
-
-    .pitr-workflow-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 14px;
-      margin-top: 16px;
-      padding-top: 14px;
-      border-top: 1px solid #f1f5f9;
-
-      @media (max-width: 900px) {
-        grid-template-columns: 1fr;
-      }
-    }
-
-    .pitr-step-box {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .terminal-command {
-      background: #0f172a;
-      border-radius: 6px;
-      padding: 8px 12px;
-      overflow-x: auto;
-      border: 1px solid #1e293b;
-
-      code {
-        font-family: 'Fira Code', 'Cascadia Code', Consolas, monospace;
-        font-size: 0.74rem;
-        color: #38bdf8;
-        background: transparent;
-        padding: 0;
-        white-space: nowrap;
-        word-break: normal;
-        display: inline-block;
-      }
-    }
-
-    .pitr-step-header {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      font-size: 0.85rem;
-    }
-
-    .step-num {
-      background: #0284c7;
-      color: #ffffff;
-      font-size: 0.68rem;
-      font-weight: 800;
-      padding: 2px 8px;
-      border-radius: 10px;
-      text-transform: uppercase;
-    }
-
-    .step-desc {
-      font-size: 0.76rem;
-      color: #475569;
-      line-height: 1.45;
-      word-break: normal;
-      overflow-wrap: break-word;
-
-      code {
-        background: #e2e8f0;
-        color: #0f172a;
-        padding: 1px 5px;
-        border-radius: 4px;
-        font-size: 0.72rem;
-        font-family: monospace;
-        word-break: normal;
-      }
-    }
 
     .backup-modal-details {
       background: #f8fafc;
@@ -1449,11 +1257,6 @@ export class AdminDashboardComponent implements OnInit {
 
   selectedEmployeeForRole = signal<Employee | null>(null);
   newRoleSelection: 'ADMIN' | 'MANAGER' | 'CASHIER' = 'CASHIER';
-  showPitrArchitecture = signal<boolean>(false);
-
-  togglePitrArchitecture(): void {
-    this.showPitrArchitecture.update(v => !v);
-  }
 
   ngOnInit(): void {
     this.authService.fetchEmployeesHttp().subscribe();
