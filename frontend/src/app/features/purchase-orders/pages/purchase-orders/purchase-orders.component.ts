@@ -16,15 +16,6 @@ import { Product, PurchaseOrder } from '../../../../core/models';
       <div class="page-header">
         <div>
           <h1 class="page-title">Procurement & Purchase Orders</h1>
-          <p class="page-subtitle">
-            3-Way Reorder Matching | Procedures: <code>sp_create_purchase_order</code>, <code>sp_receive_purchase</code> (GRN)
-          </p>
-        </div>
-        <div class="header-badges">
-          <span class="branch-pill">
-            <span class="material-symbols-outlined">store</span>
-            {{ currentBranchName() }}
-          </span>
         </div>
       </div>
 
@@ -36,7 +27,7 @@ import { Product, PurchaseOrder } from '../../../../core/models';
           (click)="activeTab.set('REORDER')"
         >
           <span class="material-symbols-outlined">add_shopping_cart</span>
-          Order Products from Suppliers (sp_create_purchase_order)
+          Order Products from Suppliers
         </button>
         <button
           class="tab-btn"
@@ -44,7 +35,7 @@ import { Product, PurchaseOrder } from '../../../../core/models';
           (click)="activeTab.set('RECEIVING')"
         >
           <span class="material-symbols-outlined">verified</span>
-          Receiving Confirmation & GRN (sp_receive_purchase)
+          Receiving Confirmation & GRN
           @if (pendingReceivingCount() > 0) {
             <span class="count-pill">{{ pendingReceivingCount() }}</span>
           }
@@ -70,69 +61,185 @@ import { Product, PurchaseOrder } from '../../../../core/models';
 
       <!-- TAB 1: ORDER PRODUCTS FROM SUPPLIERS -->
       @if (activeTab() === 'REORDER') {
-        <div class="search-filter-card">
-          <div class="search-input-box">
-            <span class="material-symbols-outlined">search</span>
-            <input
-              type="text"
-              placeholder="Search product by name, SKU, or category..."
-              [(ngModel)]="searchFilter"
-            />
+        <!-- DIRECT PURCHASE ORDER REQUISITION FORM CARD -->
+        <div class="po-form-card">
+          <div class="po-form-header">
+            <div class="header-left">
+              <div class="header-icon-box">
+                <span class="material-symbols-outlined">add_shopping_cart</span>
+              </div>
+              <div>
+                <h2 class="po-form-title">Purchase Order</h2>
+              </div>
+            </div>
           </div>
-          <span class="result-count">{{ filteredCatalog().length }} Products available to order</span>
-        </div>
 
-        <div class="table-card">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>PRODUCT</th>
-                <th>SKU</th>
-                <th>CATEGORY</th>
-                <th>UNIT (UoM)</th>
-                <th>CURRENT STOCK</th>
-                <th>EST. COST</th>
-                <th>PRIMARY SUPPLIER</th>
-                <th style="text-align: right;">PROCUREMENT ACTION</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (prod of filteredCatalog(); track prod.id) {
-                <tr>
-                  <td>
-                    <div class="product-cell">
-                      <img [src]="prod.imageUrl" [alt]="prod.name" class="product-thumb" />
-                      <div>
-                        <strong>{{ prod.name }}</strong>
-                        @if (prod.stockQty <= (prod.minOrderQty || 10)) {
-                          <span class="badge-tag danger">LOW STOCK</span>
-                        }
-                      </div>
+          @if (formError()) {
+            <div class="banner-danger">
+              <span class="material-symbols-outlined">error</span>
+              <span>{{ formError() }}</span>
+            </div>
+          }
+
+          <div class="po-form-body">
+            <div class="po-form-grid">
+              <!-- Available Items Dropdown (Full Width) -->
+              <div class="form-field full-width">
+                <label class="field-label" for="productSelect">
+                  <span class="material-symbols-outlined label-icon">inventory_2</span>
+                  Select Product / Item to Order <span class="required">*</span>
+                </label>
+                <div class="select-wrapper">
+                  <select
+                    id="productSelect"
+                    [ngModel]="formProductId()"
+                    (ngModelChange)="onFormProductSelect($event)"
+                    class="form-select"
+                  >
+                    <option value="" disabled selected>-- Choose an item from product catalog --</option>
+                    @for (item of productService.products(); track item.id) {
+                      <option [value]="item.id">
+                        [{{ item.sku }}] {{ item.name }} &bull; {{ item.categoryName }} ({{ item.unitOfMeasure || 'PIECE' }}) — \${{ item.costPrice.toFixed(2) }}
+                      </option>
+                    }
+                  </select>
+                </div>
+              </div>
+
+              <!-- Available Suppliers Dropdown -->
+              <div class="form-field">
+                <label class="field-label" for="supplierSelect">
+                  <span class="material-symbols-outlined label-icon">local_shipping</span>
+                  Select Registered Supplier <span class="required">*</span>
+                </label>
+                <div class="select-wrapper">
+                  <select
+                    id="supplierSelect"
+                    [ngModel]="formSupplierId()"
+                    (ngModelChange)="formSupplierId.set($event)"
+                    class="form-select"
+                  >
+                    <option value="" disabled selected>-- Choose a registered vendor --</option>
+                    @for (sup of inventoryService.suppliers(); track sup.supplierId) {
+                      <option [value]="sup.supplierId">
+                        {{ sup.name }} &bull; {{ sup.city }} (Tax: {{ sup.taxNumber }})
+                      </option>
+                    }
+                  </select>
+                </div>
+              </div>
+
+              <!-- Unit of Measure (UoM) Dropdown -->
+              <div class="form-field">
+                <label class="field-label" for="unitSelect">
+                  <span class="material-symbols-outlined label-icon">straighten</span>
+                  Unit of Measure <span class="required">*</span>
+                </label>
+                <div class="select-wrapper">
+                  <select
+                    id="unitSelect"
+                    [ngModel]="formUnitOfMeasure()"
+                    (ngModelChange)="formUnitOfMeasure.set($event)"
+                    class="form-select"
+                  >
+                    @for (unit of productService.units(); track unit.code) {
+                      <option [value]="unit.code">{{ unit.displayName }} ({{ unit.code }})</option>
+                    }
+                  </select>
+                </div>
+              </div>
+
+              <!-- Quantity Input with UoM -->
+              <div class="form-field">
+                <label class="field-label" for="quantityInput">
+                  <span class="material-symbols-outlined label-icon">format_list_numbered</span>
+                  Order Quantity <span class="required">*</span>
+                </label>
+                <div class="qty-field-group">
+                  <input
+                    id="quantityInput"
+                    type="number"
+                    [ngModel]="formQuantity()"
+                    (ngModelChange)="formQuantity.set($event)"
+                    min="1"
+                    step="1"
+                    placeholder="e.g. 50"
+                    class="form-input qty-input"
+                  />
+                  <span class="qty-uom-addon">{{ formUnitOfMeasure() }}</span>
+                </div>
+              </div>
+
+              <!-- Receiving Branch & Stock Info Box -->
+              <div class="form-field">
+                <label class="field-label">
+                  <span class="material-symbols-outlined label-icon">domain</span>
+                  Receiving Branch & Current Stock
+                </label>
+                <div class="branch-stock-info-box">
+                  <div class="info-row">
+                    <span class="info-label">Branch:</span>
+                    <strong class="info-val">{{ currentBranchName() }}</strong>
+                  </div>
+                  @if (selectedFormProduct()) {
+                    <div class="info-row">
+                      <span class="info-label">Current Stock:</span>
+                      <span class="stock-badge" [class.low]="getBranchStock(selectedFormProduct()!.id) <= (selectedFormProduct()!.minOrderQty || 10)">
+                        {{ getBranchStock(selectedFormProduct()!.id) }} {{ formUnitOfMeasure() }}
+                      </span>
                     </div>
-                  </td>
-                  <td><span class="code-sku">{{ prod.sku }}</span></td>
-                  <td><span class="category-pill">{{ prod.categoryName }}</span></td>
-                  <td><span class="unit-pill">{{ prod.unitOfMeasure || 'PIECE' }}</span></td>
-                  <td>
-                    <strong [class.text-danger]="prod.stockQty <= 15">{{ prod.stockQty }} {{ prod.unitOfMeasure || 'PIECE' }}</strong>
-                  </td>
-                  <td>\${{ prod.costPrice.toFixed(2) }}</td>
-                  <td>
-                    <span class="supplier-tag">
-                      <span class="material-symbols-outlined">local_shipping</span>
-                      {{ prod.supplierName || 'Registered Vendor' }}
-                    </span>
-                  </td>
-                  <td style="text-align: right;">
-                    <button class="btn-pill btn-primary btn-sm" (click)="openOrderModal(prod)">
-                      <span class="material-symbols-outlined">send</span>
-                      Order Stock
-                    </button>
-                  </td>
-                </tr>
-              }
-            </tbody>
-          </table>
+                  }
+                </div>
+              </div>
+            </div>
+
+            <!-- Dynamic Product & Cost Calculation Summary Strip -->
+            @if (selectedFormProduct()) {
+              <div class="po-summary-strip">
+                <div class="summary-col">
+                  <span class="summary-label">Selected SKU</span>
+                  <span class="summary-val code-val">{{ selectedFormProduct()!.sku }}</span>
+                </div>
+                <div class="summary-col">
+                  <span class="summary-label">Category</span>
+                  <span class="summary-val">{{ selectedFormProduct()!.categoryName }}</span>
+                </div>
+                <div class="summary-col">
+                  <span class="summary-label">Branch Stock</span>
+                  <span class="summary-val stock-val">
+                    {{ getBranchStock(selectedFormProduct()!.id) }} {{ formUnitOfMeasure() }}
+                  </span>
+                </div>
+                <div class="summary-col">
+                  <span class="summary-label">Unit Cost Price</span>
+                  <span class="summary-val">\${{ selectedFormProduct()!.costPrice.toFixed(2) }}</span>
+                </div>
+                <div class="summary-col highlight-col">
+                  <span class="summary-label">Estimated Total Cost</span>
+                  <span class="summary-val total-cost-val">
+                    \${{ (formQuantity() * selectedFormProduct()!.costPrice).toFixed(2) }}
+                  </span>
+                </div>
+              </div>
+            }
+
+            <!-- Form Action Footer -->
+            <div class="po-form-actions">
+              <button type="button" class="btn-pill btn-secondary" (click)="resetDirectForm()">
+                <span class="material-symbols-outlined">restart_alt</span>
+                Reset Form
+              </button>
+              <button
+                type="button"
+                class="btn-pill btn-primary btn-submit-po"
+                (click)="submitDirectPurchaseOrder()"
+                [disabled]="!formProductId() || !formSupplierId() || formQuantity() <= 0"
+              >
+                <span class="material-symbols-outlined">send</span>
+                Submit Purchase Order
+              </button>
+            </div>
+          </div>
         </div>
       }
 
@@ -200,7 +307,7 @@ import { Product, PurchaseOrder } from '../../../../core/models';
                     @if (po.status === 'CONFIRMED') {
                       <button class="btn-pill btn-receive btn-sm" (click)="openReceiveModal(po)">
                         <span class="material-symbols-outlined">inventory</span>
-                        Inspect & Receive (sp_receive_purchase)
+                        Receive
                       </button>
                     } @else {
                       <span class="badge-pill badge-disabled">Awaiting Vendor Dispatch</span>
@@ -274,83 +381,6 @@ import { Product, PurchaseOrder } from '../../../../core/models';
         </div>
       }
     </div>
-
-    <!-- POPUP MODAL: SEND PURCHASING REQUEST (sp_create_purchase_order) -->
-    @if (showOrderModal() && selectedProduct()) {
-      <div class="modal-backdrop" (click)="closeOrderModal()">
-        <div class="modal-dialog" (click)="$event.stopPropagation()">
-          <div class="modal-header">
-            <div>
-              <h2 class="modal-title">Create Purchase Order</h2>
-              <p class="modal-subtitle">Procedure: <code>sp_create_purchase_order</code></p>
-            </div>
-            <button class="btn-close" (click)="closeOrderModal()">&times;</button>
-          </div>
-
-          <div class="modal-body">
-            <!-- Product Preview Card -->
-            <div class="selected-product-card">
-              <img [src]="selectedProduct()!.imageUrl" class="modal-prod-img" />
-              <div class="modal-prod-info">
-                <h4>{{ selectedProduct()!.name }}</h4>
-                <div class="modal-prod-meta">
-                  <span>SKU: <strong>{{ selectedProduct()!.sku }}</strong></span>
-                  <span>Unit: <strong>{{ selectedProduct()!.unitOfMeasure || 'PIECE' }}</strong></span>
-                  <span>Cost Price: <strong>\${{ selectedProduct()!.costPrice.toFixed(2) }}</strong></span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Form Fields -->
-            <div class="form-grid">
-              <div class="form-group">
-                <label>Destination Branch</label>
-                <input type="text" [value]="currentBranchName()" disabled class="input-disabled" />
-              </div>
-
-              <div class="form-group">
-                <label>Registered Supplier (Searchable Vendor)</label>
-                <select [(ngModel)]="selectedSupplierId">
-                  @for (sup of inventoryService.suppliers(); track sup.supplierId) {
-                    <option [value]="sup.supplierId">{{ sup.name }} ({{ sup.city }})</option>
-                  }
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label>Order Quantity (in {{ selectedProduct()!.unitOfMeasure || 'Units' }})</label>
-                <div class="qty-input-group">
-                  <input
-                    type="number"
-                    [(ngModel)]="orderQuantity"
-                    min="1"
-                    step="1"
-                    class="input-qty"
-                  />
-                  <span class="input-addon">{{ selectedProduct()!.unitOfMeasure || 'PIECE' }}</span>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Calculated Estimated Cost</label>
-                <div class="cost-preview-box">
-                  <span class="cost-val">\${{ (orderQuantity * selectedProduct()!.costPrice).toFixed(2) }}</span>
-                  <span class="cost-note">Total payable upon physical goods receipt</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="modal-footer">
-            <button class="btn-pill btn-secondary" (click)="closeOrderModal()">Cancel</button>
-            <button class="btn-pill btn-primary" (click)="confirmCreateOrder()">
-              <span class="material-symbols-outlined">send</span>
-              Send Purchasing Request
-            </button>
-          </div>
-        </div>
-      </div>
-    }
 
     <!-- POPUP MODAL: RECEIVING CONFIRMATION & GRN (sp_receive_purchase) -->
     @if (showReceiveModal() && selectedPO()) {
@@ -439,10 +469,13 @@ import { Product, PurchaseOrder } from '../../../../core/models';
   `,
   styles: [`
     .page-container {
-      padding: 24px 32px;
+      padding: 24px 32px 64px;
       display: flex;
       flex-direction: column;
       gap: 20px;
+      height: 100vh;
+      overflow-y: auto;
+      box-sizing: border-box;
     }
 
     .page-header {
@@ -473,18 +506,6 @@ import { Product, PurchaseOrder } from '../../../../core/models';
       }
     }
 
-    .branch-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 14px;
-      background: #ecfdf5;
-      color: #065f46;
-      border: 1px solid #a7f3d0;
-      border-radius: 20px;
-      font-weight: 700;
-      font-size: 0.85rem;
-    }
 
     .nav-tabs-bar {
       display: flex;
@@ -547,6 +568,382 @@ import { Product, PurchaseOrder } from '../../../../core/models';
         font-size: 20px;
         cursor: pointer;
         color: #065f46;
+      }
+    }
+
+    /* Direct Purchase Order Requisition Form Card */
+    .po-form-card {
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+      overflow: hidden;
+      margin-bottom: 24px;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .po-form-header {
+      padding: 18px 24px;
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border-bottom: 1px solid #d1fae5;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+
+      .header-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+      }
+    }
+
+    .header-icon-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: #065f46;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 10px rgba(6, 95, 70, 0.25);
+    }
+
+    .po-form-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      color: #064e3b;
+      margin: 0;
+      letter-spacing: -0.2px;
+    }
+
+    .po-form-body {
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .po-form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+
+      .full-width {
+        grid-column: 1 / -1;
+      }
+    }
+
+    @media (max-width: 900px) {
+      .po-form-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .branch-stock-info-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 6px;
+      background: #f8fafc;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 10px 16px;
+      min-height: 44px;
+      box-sizing: border-box;
+
+      .info-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        font-size: 0.84rem;
+
+        .info-label {
+          color: #64748b;
+          font-weight: 600;
+        }
+
+        .info-val {
+          color: #0f172a;
+          font-weight: 700;
+        }
+
+        .stock-badge {
+          display: inline-flex;
+          align-items: center;
+          padding: 2px 8px;
+          border-radius: 6px;
+          font-weight: 700;
+          font-size: 0.78rem;
+          background: #ecfdf5;
+          color: #065f46;
+
+          &.low {
+            background: #fef2f2;
+            color: #b91c1c;
+          }
+        }
+      }
+    }
+
+    .form-field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .field-label {
+      font-size: 0.84rem;
+      font-weight: 700;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+
+      .label-icon {
+        font-size: 18px;
+        color: #065f46;
+      }
+
+      .required {
+        color: #ef4444;
+      }
+    }
+
+    .field-hint {
+      font-size: 0.72rem;
+      color: #64748b;
+    }
+
+    .branch-locked-input {
+      display: flex;
+      align-items: center;
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 8px 14px;
+      gap: 10px;
+
+      .store-ic {
+        font-size: 20px;
+        color: #065f46;
+      }
+
+      input {
+        flex: 1;
+        border: none;
+        background: transparent;
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #0f172a;
+        cursor: not-allowed;
+      }
+
+      .lock-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #64748b;
+        background: #e2e8f0;
+        padding: 3px 8px;
+        border-radius: 6px;
+
+        span { font-size: 13px; }
+      }
+    }
+
+    .select-wrapper {
+      position: relative;
+
+      .form-select {
+        width: 100%;
+        padding: 10px 14px;
+        background: #ffffff;
+        border: 1.5px solid #cbd5e1;
+        border-radius: 10px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #0f172a;
+        outline: none;
+        cursor: pointer;
+        transition: border-color 0.2s, box-shadow 0.2s;
+
+        &:focus {
+          border-color: #059669;
+          box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+        }
+      }
+    }
+
+    .qty-field-group {
+      display: flex;
+      align-items: center;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      background: #ffffff;
+      overflow: hidden;
+      transition: border-color 0.2s, box-shadow 0.2s;
+
+      &:focus-within {
+        border-color: #059669;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+      }
+
+      .qty-input {
+        flex: 1;
+        border: none;
+        padding: 10px 14px;
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #0f172a;
+        outline: none;
+      }
+
+      .qty-uom-addon {
+        padding: 10px 16px;
+        background: #f1f5f9;
+        border-left: 1px solid #e2e8f0;
+        font-size: 0.78rem;
+        font-weight: 800;
+        color: #475569;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+    }
+
+    .cost-rate-badge {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      background: #f8fafc;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 9px 14px;
+
+      .rate-val {
+        font-size: 1.15rem;
+        font-weight: 800;
+        color: #065f46;
+      }
+
+      .rate-uom {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #64748b;
+        text-transform: uppercase;
+      }
+    }
+
+    .po-summary-strip {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px 18px;
+
+      .summary-col {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+
+        .summary-label {
+          font-size: 0.72rem;
+          font-weight: 700;
+          color: #64748b;
+          text-transform: uppercase;
+          letter-spacing: 0.4px;
+        }
+
+        .summary-val {
+          font-size: 0.92rem;
+          font-weight: 700;
+          color: #0f172a;
+
+          &.code-val {
+            font-family: monospace;
+            color: #0284c7;
+          }
+
+          &.stock-val {
+            color: #059669;
+          }
+        }
+
+        &.highlight-col {
+          border-left: 2px solid #bbf7d0;
+          padding-left: 12px;
+
+          .total-cost-val {
+            font-size: 1.25rem;
+            font-weight: 900;
+            color: #065f46;
+          }
+        }
+      }
+    }
+
+    @media (max-width: 900px) {
+      .po-summary-strip {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .po-form-actions {
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 12px;
+      padding-top: 10px;
+      border-top: 1px solid #f1f5f9;
+
+      .btn-submit-po {
+        padding: 11px 24px;
+        font-size: 0.92rem;
+        box-shadow: 0 4px 14px rgba(6, 95, 70, 0.25);
+      }
+    }
+
+    .section-divider {
+      display: flex;
+      align-items: center;
+      text-align: center;
+      margin: 8px 0 16px;
+
+      &::before, &::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px dashed #cbd5e1;
+      }
+
+      span {
+        padding: 0 16px;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: #94a3b8;
+      }
+    }
+
+    .banner-danger {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #991b1b;
+      padding: 12px 18px;
+      border-radius: 10px;
+      font-size: 0.86rem;
+      font-weight: 600;
+
+      span.material-symbols-outlined {
+        color: #ef4444;
+        font-size: 20px;
       }
     }
 
@@ -982,10 +1379,18 @@ export class PurchaseOrdersComponent {
   searchFilter = '';
   actionMessage = signal<string | null>(null);
 
-  // Reorder Modal State
+  // Direct Requisition Form State
+  formProductId = signal<number | ''>('');
+  formSupplierId = signal<number | ''>('');
+  formUnitOfMeasure = signal<string>('PIECE');
+  formQuantity = signal<number>(10);
+  formError = signal<string | null>(null);
+
+  // Reorder Modal State (from quick catalog)
   showOrderModal = signal(false);
   selectedProduct = signal<Product | null>(null);
   selectedSupplierId = 1;
+  modalUnitOfMeasure = 'PIECE';
   orderQuantity = 10;
 
   // Receiving Modal State
@@ -994,9 +1399,20 @@ export class PurchaseOrdersComponent {
   physicallyReceivedQty = 10;
   receivingInspectionNote = 'Inspection passed: Packaging sealed and count verified.';
 
+  activeBranchId = computed(() => {
+    return this.authService.currentUser().branchId || this.inventoryService.selectedBranchId() || 1;
+  });
+
   currentBranchName = computed(() => {
-    const branch = this.inventoryService.branches.find(b => b.id === this.inventoryService.selectedBranchId());
+    const userBranchId = this.authService.currentUser().branchId;
+    const branch = this.inventoryService.branches.find(b => b.id === (userBranchId || this.inventoryService.selectedBranchId()));
     return branch ? branch.name : 'Colombo Central Flagship';
+  });
+
+  selectedFormProduct = computed(() => {
+    const id = this.formProductId();
+    if (!id) return null;
+    return this.productService.products().find(p => p.id === Number(id)) || null;
   });
 
   filteredCatalog = computed(() => {
@@ -1007,18 +1423,98 @@ export class PurchaseOrdersComponent {
   });
 
   activeOrders = computed(() => {
+    const branchId = this.activeBranchId();
     return this.inventoryService.purchaseOrders().filter(po =>
-      po.status === 'CONFIRMED' || po.status === 'REQUESTED'
+      (po.status === 'CONFIRMED' || po.status === 'REQUESTED') && po.branchId === branchId
     );
   });
 
   pendingReceivingCount = computed(() => {
-    return this.inventoryService.purchaseOrders().filter(po => po.status === 'CONFIRMED').length;
+    const branchId = this.activeBranchId();
+    return this.inventoryService.purchaseOrders().filter(po => po.status === 'CONFIRMED' && po.branchId === branchId).length;
   });
+
+  onFormProductSelect(productId: any): void {
+    const numId = Number(productId);
+    this.formProductId.set(numId);
+    this.formError.set(null);
+
+    const prod = this.productService.products().find(p => p.id === numId);
+    if (prod) {
+      if (prod.supplierId) {
+        this.formSupplierId.set(prod.supplierId);
+      }
+      if (prod.unitOfMeasure) {
+        this.formUnitOfMeasure.set(prod.unitOfMeasure);
+      }
+      this.formQuantity.set(prod.minOrderQty || 10);
+    }
+  }
+
+  getBranchStock(productId?: number): number {
+    if (!productId) return 0;
+    const branchId = this.activeBranchId();
+    const inv = this.inventoryService.inventory().find(i => i.branchId === branchId && i.productId === productId);
+    return inv ? inv.quantity : 0;
+  }
+
+  submitDirectPurchaseOrder(): void {
+    const prod = this.selectedFormProduct();
+    const supId = this.formSupplierId();
+    const qty = Number(this.formQuantity());
+
+    if (!prod) {
+      this.formError.set('Please select an available item from the dropdown.');
+      return;
+    }
+    if (!supId) {
+      this.formError.set('Please select a supplier from the dropdown.');
+      return;
+    }
+    if (!qty || qty <= 0) {
+      this.formError.set('Please enter a valid quantity greater than zero.');
+      return;
+    }
+
+    const branchId = this.activeBranchId();
+    const supplier = this.inventoryService.suppliers().find(s => s.supplierId === Number(supId));
+    const branch = this.inventoryService.branches.find(b => b.id === branchId);
+    const chosenUom = this.formUnitOfMeasure() || prod.unitOfMeasure || 'PIECE';
+
+    const res = this.inventoryService.createPurchaseOrder({
+      supplierId: Number(supId),
+      branchId: branchId,
+      productId: prod.id,
+      productName: prod.name,
+      sku: prod.sku,
+      unitOfMeasure: chosenUom,
+      requestedQty: qty,
+      unitCost: prod.costPrice,
+      requestedBy: this.authService.currentUser().fullName || this.authService.currentUser().username
+    });
+
+    this.formError.set(null);
+    this.actionMessage.set(`Purchase Order created successfully for ${qty} ${chosenUom} of "${prod.name}" at ${branch ? branch.name : 'Branch'}! (Triggered sp_create_purchase_order)`);
+
+    // Reset direct form
+    this.formProductId.set('');
+    this.formSupplierId.set('');
+    this.formUnitOfMeasure.set('PIECE');
+    this.formQuantity.set(10);
+  }
+
+  resetDirectForm(): void {
+    this.formProductId.set('');
+    this.formSupplierId.set('');
+    this.formUnitOfMeasure.set('PIECE');
+    this.formQuantity.set(10);
+    this.formError.set(null);
+  }
 
   openOrderModal(prod: Product): void {
     this.selectedProduct.set(prod);
     this.selectedSupplierId = prod.supplierId || 1;
+    this.modalUnitOfMeasure = prod.unitOfMeasure || 'PIECE';
     this.orderQuantity = prod.minOrderQty || 10;
     this.showOrderModal.set(true);
   }
@@ -1034,11 +1530,11 @@ export class PurchaseOrdersComponent {
 
     const res = this.inventoryService.createPurchaseOrder({
       supplierId: Number(this.selectedSupplierId),
-      branchId: this.inventoryService.selectedBranchId(),
+      branchId: this.activeBranchId(),
       productId: prod.id,
       productName: prod.name,
       sku: prod.sku,
-      unitOfMeasure: prod.unitOfMeasure || 'PIECE',
+      unitOfMeasure: this.modalUnitOfMeasure || prod.unitOfMeasure || 'PIECE',
       requestedQty: Number(this.orderQuantity),
       unitCost: prod.costPrice,
       requestedBy: this.authService.currentUser().username
