@@ -1,0 +1,10 @@
+{
+  "name": "supermarket-adbms-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix frontend start",
+    "start": "npm --prefix frontend start",
+    "build": "npm --prefix frontend run build"
+  }
+}
