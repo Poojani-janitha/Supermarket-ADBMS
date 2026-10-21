@@ -155,7 +155,7 @@ CREATE TABLE sales_order (
 
 -- ----------------------------------------------------------------------------
 -- 9. ORDER_ITEM
--- Individual items purchased in an order.
+-- Individual items purchased in an ogtrder.
 -- Clustered composite PK (order_id, product_id) enables single range reads for receipts.
 -- line_total is a STORED generated column.
 -- ----------------------------------------------------------------------------
