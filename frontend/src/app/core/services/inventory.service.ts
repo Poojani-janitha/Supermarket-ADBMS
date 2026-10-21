@@ -7,7 +7,7 @@ import { InventoryItem, LowStockAlert, PurchaseOrder, Supplier } from '../models
 })
 export class InventoryService {
   private readonly http = inject(HttpClient);
-  readonly apiUrl = 'http://localhost:8081/api';
+  readonly apiUrl = '/api';
 
   readonly branches = [
     { id: 1, name: 'Colombo Central Flagship' },
@@ -339,60 +339,6 @@ export class InventoryService {
     }
   ]);
 
-  constructor() {
-    this.refreshFromBackend();
-  }
-
-  // Refresh data from Spring Boot REST API
-  refreshFromBackend(branchId: number = this.selectedBranchId()) {
-    this.loadInventory(branchId);
-    this.loadLowStock(branchId);
-    this.loadPurchaseOrders(branchId);
-  }
-
-  loadInventory(branchId?: number) {
-    const url = branchId ? `${this.apiUrl}/inventory?branchId=${branchId}` : `${this.apiUrl}/inventory`;
-    this.http.get<InventoryItem[]>(url).subscribe({
-      next: (data) => {
-        if (data && data.length > 0) {
-          this.inventory.set(data);
-        }
-      },
-      error: () => {
-        // Backend offline / starting up: retain initial signal data seamlessly
-      }
-    });
-  }
-
-  loadLowStock(branchId?: number) {
-    const url = branchId ? `${this.apiUrl}/inventory/low-stock?branchId=${branchId}` : `${this.apiUrl}/inventory/low-stock`;
-    this.http.get<LowStockAlert[]>(url).subscribe({
-      next: (data) => {
-        if (data && data.length > 0) {
-          this.lowStockAlerts.set(data);
-        }
-      },
-      error: () => {}
-    });
-  }
-
-  loadPurchaseOrders(branchId?: number, supplierId?: number) {
-    let url = `${this.apiUrl}/purchase-orders`;
-    const params: string[] = [];
-    if (branchId) params.push(`branchId=${branchId}`);
-    if (supplierId) params.push(`supplierId=${supplierId}`);
-    if (params.length > 0) url += `?${params.join('&')}`;
-
-    this.http.get<PurchaseOrder[]>(url).subscribe({
-      next: (data) => {
-        if (data && data.length > 0) {
-          this.purchaseOrders.set(data);
-        }
-      },
-      error: () => {}
-    });
-  }
-
   // Procedure: sp_create_purchase_order (Store Manager creates stock purchase request)
   createPurchaseOrder(data: {
     supplierId: number;
@@ -435,15 +381,14 @@ export class InventoryService {
     this.http.post<{ success: boolean; data: number; message: string }>(`${this.apiUrl}/purchase-orders`, {
       supplierId: data.supplierId,
       branchId: data.branchId,
-      employeeId: 1,
+      employeeId: 101,
       productId: data.productId,
       qty: data.requestedQty
     }).subscribe({
       next: (res) => {
         console.log('Backend PO created:', res);
-        this.loadPurchaseOrders();
       },
-      error: (err) => console.debug('Backend offline, simulated PO retained:', err.status)
+      error: (err) => console.debug('Backend offline, simulated PO retained:', err?.status)
     });
 
     return {
@@ -479,17 +424,6 @@ export class InventoryService {
         return p;
       })
     );
-
-    // Dispatch to Spring Boot backend: sp_supplier_confirm_order
-    this.http.post<{ success: boolean; message: string }>(`${this.apiUrl}/purchase-orders/confirm`, {
-      poId,
-      supplierId,
-      confirmedQty,
-      notes
-    }).subscribe({
-      next: () => this.loadPurchaseOrders(),
-      error: (err) => console.debug('Backend offline, simulated confirm retained:', err.status)
-    });
 
     return {
       success: true,
@@ -562,21 +496,6 @@ export class InventoryService {
       alerts.map(a => (a.branchId === po.branchId && a.productId === po.productId ? { ...a, resolved: true } : a))
     );
 
-    // Dispatch to Spring Boot backend: sp_receive_purchase
-    this.http.post<{ success: boolean; message: string }>(`${this.apiUrl}/purchase-orders/receive`, {
-      poId,
-      employeeId: 1,
-      receivedQty,
-      notes
-    }).subscribe({
-      next: () => {
-        this.loadPurchaseOrders();
-        this.loadInventory(this.selectedBranchId());
-        this.loadLowStock(this.selectedBranchId());
-      },
-      error: (err) => console.debug('Backend offline, simulated receive retained:', err.status)
-    });
-
     return {
       success: true,
       message: `Shipment for #PO-${poId} verified and received! Added +${receivedQty} ${po.unitOfMeasure} of ${po.productName} to ${po.branchName} inventory. Logged to stock_audit_log (reason: RESTOCK).`
@@ -603,18 +522,6 @@ export class InventoryService {
         return i;
       })
     );
-
-    // Dispatch to Spring Boot backend: sp_transfer_stock
-    this.http.post<{ success: boolean; message: string }>(`${this.apiUrl}/inventory/transfer`, {
-      fromBranchId,
-      toBranchId,
-      productId,
-      qty
-    }).subscribe({
-      next: () => this.loadInventory(this.selectedBranchId()),
-      error: (err) => console.debug('Backend offline, simulated transfer retained:', err.status)
-    });
-
     return true;
   }
 
