@@ -18,7 +18,7 @@ export interface Product {
   isActive: boolean;
   imageUrl: string;
   dietType?: 'VEG' | 'NON_VEG';
-  unitOfMeasure?: 'KG' | 'G' | 'L' | 'ML' | 'PACKET' | 'PIECE' | 'CAN' | 'BOTTLE';
+  unitOfMeasure?: string;
   minOrderQty?: number;
   discountBadge?: string;
   stockQty: number;
@@ -44,6 +44,35 @@ export interface Customer {
   loyaltyPoints: number;
   tier: 'BRONZE' | 'SILVER' | 'GOLD';
   registeredDate: string;
+}
+
+export interface SalesOrderItem {
+  productId: number;
+  productName: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+export interface OrderPayment {
+  paymentId: number;
+  method: 'CASH' | 'CARD' | 'QR' | 'ONLINE';
+  amount: number;
+  paidAt: string;
+}
+
+export interface OrderDiscount {
+  ruleId: number;
+  ruleName: string;
+  amount: number;
+}
+
+export interface SalesOrderDetails extends Omit<SalesOrder, 'items' | 'discounts'> {
+  items: SalesOrderItem[];
+  payments: OrderPayment[];
+  discounts: OrderDiscount[];
+  itemCount: number;
 }
 
 export interface DiscountRule {
@@ -74,6 +103,7 @@ export interface Coupon {
 export interface Holiday {
   holidayDate: string;
   name: string;
+  discountPercent?: number;
 }
 
 export interface InventoryItem {
@@ -237,4 +267,5 @@ export interface SalesOrder {
   paymentMethod: 'CASH' | 'CARD' | 'QR';
   items: CartItem[];
   discounts: AppliedDiscount[];
+  itemCount?: number;
 }
