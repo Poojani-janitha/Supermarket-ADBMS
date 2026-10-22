@@ -2,6 +2,8 @@ package lk.supermarket.report;
 
 import lk.supermarket.report.dto.*;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -16,6 +18,12 @@ public class ReportService {
         this.reportDao = reportDao;
     }
 
+    /**
+     * Cross-Query Consistent Snapshot:
+     * Executes multi-query financial stats under REPEATABLE READ isolation to eliminate
+     * cross-query report skew (e.g. order count incrementing mid-read while revenue remains stale).
+     */
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     public SummaryMetricsDto getSummaryMetrics(Integer branchId) {
         int branch = (branchId != null) ? branchId : 1; // Default to Flagship branch
         Map<String, Object> stats = reportDao.getTodaySalesStats(branchId);
@@ -89,5 +97,12 @@ public class ReportService {
                 "improvementFactor", "79x faster (98.7% latency reduction)"
             )
         );
+    }
+
+    // Financial Reconciliation Audit Report (Consistent Read-Only Snapshot)
+    public FinancialReconciliationDto getFinancialReconciliation(Integer branchId, String startDate, String endDate) {
+        String start = (startDate != null && !startDate.isBlank()) ? startDate : "2024-01-01";
+        String end = (endDate != null && !endDate.isBlank()) ? endDate : java.time.LocalDate.now().toString();
+        return reportDao.getFinancialReconciliation(branchId, start, end);
     }
 }

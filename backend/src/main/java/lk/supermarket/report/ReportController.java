@@ -65,4 +65,12 @@ public class ReportController {
     public ResponseEntity<ExplainBenchmarkDto> getExplainBenchmark() {
         return ResponseEntity.ok(reportService.getExplainBenchmark());
     }
+
+    @GetMapping("/financial-reconciliation")
+    public ResponseEntity<FinancialReconciliationDto> getFinancialReconciliation(
+            @RequestParam(required = false) Integer branchId,
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        return ResponseEntity.ok(reportService.getFinancialReconciliation(branchId, startDate, endDate));
+    }
 }

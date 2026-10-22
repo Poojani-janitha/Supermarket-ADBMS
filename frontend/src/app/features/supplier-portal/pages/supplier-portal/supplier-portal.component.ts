@@ -161,7 +161,7 @@ import { PurchaseOrder } from '../../../../core/models';
                       <span class="text-muted">Not confirmed yet</span>
                     }
                   </td>
-                  <td><strong class="cost-val">\${{ po.totalCost.toFixed(2) }}</strong></td>
+                  <td><strong class="cost-val">Rs. {{ po.totalCost.toFixed(2) }}</strong></td>
                   <td>
                     @if (po.status === 'REQUESTED') {
                       <span class="badge-pill badge-requested">ACTION REQUIRED</span>

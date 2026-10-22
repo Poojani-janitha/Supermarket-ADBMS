@@ -6,6 +6,10 @@ import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.sql.CallableStatement;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -201,5 +205,87 @@ public class ReportDao {
             rs.getBigDecimal("fulfillment_rate"),
             rs.getString("rating_tier")
         ));
+    }
+
+    // 8. sp_financial_reconciliation_report (Consistent Snapshot Financial Audit)
+    public FinancialReconciliationDto getFinancialReconciliation(Integer branchId, String startDate, String endDate) {
+        return jdbcTemplate.execute((Connection con) -> {
+            try (CallableStatement cs = con.prepareCall("{CALL sp_financial_reconciliation_report(?, ?, ?)}")) {
+                if (branchId != null) {
+                    cs.setInt(1, branchId);
+                } else {
+                    cs.setNull(1, java.sql.Types.INTEGER);
+                }
+                if (startDate != null && !startDate.isBlank()) {
+                    cs.setDate(2, java.sql.Date.valueOf(startDate));
+                } else {
+                    cs.setNull(2, java.sql.Types.DATE);
+                }
+                if (endDate != null && !endDate.isBlank()) {
+                    cs.setDate(3, java.sql.Date.valueOf(endDate));
+                } else {
+                    cs.setNull(3, java.sql.Types.DATE);
+                }
+
+                boolean hasResults = cs.execute();
+
+                int totalOrders = 0;
+                BigDecimal grossSales = BigDecimal.ZERO;
+                BigDecimal totalDiscounts = BigDecimal.ZERO;
+                BigDecimal netRevenue = BigDecimal.ZERO;
+
+                if (hasResults) {
+                    try (ResultSet rs = cs.getResultSet()) {
+                        if (rs.next()) {
+                            totalOrders = rs.getInt("total_completed_orders");
+                            BigDecimal g = rs.getBigDecimal("gross_sales");
+                            if (g != null) grossSales = g;
+                            BigDecimal d = rs.getBigDecimal("total_discounts");
+                            if (d != null) totalDiscounts = d;
+                            BigDecimal n = rs.getBigDecimal("net_revenue");
+                            if (n != null) netRevenue = n;
+                        }
+                    }
+                }
+
+                List<FinancialReconciliationDto.PaymentTenderSummaryDto> tenders = new ArrayList<>();
+                BigDecimal totalCollected = BigDecimal.ZERO;
+
+                if (cs.getMoreResults()) {
+                    try (ResultSet rs = cs.getResultSet()) {
+                        while (rs.next()) {
+                            String method = rs.getString("payment_method");
+                            int count = rs.getInt("transaction_count");
+                            BigDecimal amount = rs.getBigDecimal("total_collected");
+                            BigDecimal amt = amount != null ? amount : BigDecimal.ZERO;
+                            totalCollected = totalCollected.add(amt);
+                            tenders.add(new FinancialReconciliationDto.PaymentTenderSummaryDto(method, count, amt, 0.0));
+                        }
+                    }
+                }
+
+                final BigDecimal finalTotal = totalCollected;
+                List<FinancialReconciliationDto.PaymentTenderSummaryDto> calculatedTenders = tenders.stream().map(t -> {
+                    double pct = (finalTotal.compareTo(BigDecimal.ZERO) > 0)
+                        ? t.totalCollected().multiply(BigDecimal.valueOf(100)).divide(finalTotal, 2, java.math.RoundingMode.HALF_UP).doubleValue()
+                        : 0.0;
+                    return new FinancialReconciliationDto.PaymentTenderSummaryDto(t.paymentMethod(), t.transactionCount(), t.totalCollected(), pct);
+                }).toList();
+
+                BigDecimal variance = netRevenue.subtract(totalCollected).abs();
+                boolean isBalanced = variance.compareTo(new BigDecimal("0.05")) <= 0;
+
+                return new FinancialReconciliationDto(
+                    totalOrders,
+                    grossSales,
+                    totalDiscounts,
+                    netRevenue,
+                    totalCollected,
+                    variance,
+                    isBalanced,
+                    calculatedTenders
+                );
+            }
+        });
     }
 }

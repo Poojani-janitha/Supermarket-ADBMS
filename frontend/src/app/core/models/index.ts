@@ -309,3 +309,21 @@ export interface SalesOrder {
   discounts: AppliedDiscount[];
   itemCount?: number;
 }
+
+export interface PaymentTenderSummary {
+  paymentMethod: string;
+  transactionCount: number;
+  totalCollected: number;
+  sharePercentage: number;
+}
+
+export interface FinancialReconciliation {
+  totalCompletedOrders: number;
+  grossSales: number;
+  totalDiscounts: number;
+  netRevenue: number;
+  totalCollected: number;
+  variance: number;
+  isBalanced: boolean;
+  tenders: PaymentTenderSummary[];
+}

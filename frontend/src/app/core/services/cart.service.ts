@@ -236,7 +236,7 @@ export class CartService {
     const currentEmp = this.authService.currentUser();
 
     const payload = {
-      branchId: 1,
+      branchId: currentEmp?.branchId || 1,
       customerId: cust ? cust.id : null,
       employeeId: currentEmp?.employeeId || 3,
       paymentMethod: this.paymentMethod(),

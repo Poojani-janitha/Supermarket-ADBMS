@@ -1,12 +1,14 @@
 import { Injectable, signal, inject } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { InventoryItem, LowStockAlert, PurchaseOrder, Supplier } from '../models';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class InventoryService {
   private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
   readonly apiUrl = '/api';
 
   readonly branches = [
@@ -16,7 +18,7 @@ export class InventoryService {
     { id: 4, name: 'Negombo Coastal Mart' }
   ];
 
-  readonly selectedBranchId = signal<number>(1);
+  readonly selectedBranchId = signal<number>(this.authService.currentUser()?.branchId || 1);
 
   // Registered Vendors in the B2B Supply Chain
   readonly suppliers = signal<Supplier[]>([

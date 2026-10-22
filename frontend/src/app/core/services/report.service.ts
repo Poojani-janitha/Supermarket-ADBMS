@@ -10,9 +10,11 @@ import {
   DiscountImpactItem,
   SupplierPerformanceItem,
   SummaryMetrics,
-  ExplainBenchmark
+  ExplainBenchmark,
+  FinancialReconciliation
 } from '../models';
 import { InventoryService } from './inventory.service';
+import { AuthService } from './auth.service';
 
 export type { ProductRankItem, DailySalesItem, SupplierPerformanceItem };
 
@@ -22,6 +24,7 @@ export type { ProductRankItem, DailySalesItem, SupplierPerformanceItem };
 export class ReportService {
   private readonly http = inject(HttpClient);
   private readonly inventoryService = inject(InventoryService);
+  private readonly authService = inject(AuthService);
   private readonly apiUrl = '/api/reports';
 
   // Available Chain Branches
@@ -32,8 +35,8 @@ export class ReportService {
     { id: 4, name: 'Negombo Coastal Mart' }
   ];
 
-  // Active Filter Signals
-  readonly selectedBranchId = signal<number | null>(null);
+  // Active Filter Signals: defaults to logged in staff member's branch
+  readonly selectedBranchId = signal<number | null>(this.authService.currentUser()?.branchId ?? 1);
   readonly selectedYear = signal<number>(new Date().getFullYear());
   readonly selectedMonth = signal<number>(new Date().getMonth() + 1);
   readonly rankingLimit = signal<number>(10);
@@ -71,6 +74,11 @@ export class ReportService {
 
   // 7. Member 2 & 4: v_supplier_performance (B2B Vendor Fulfillment & fn_supplier_fulfillment_rate UDF)
   readonly supplierPerformance = signal<SupplierPerformanceItem[]>([]);
+
+  // 8. Member 4: Consistent Snapshot Isolation (sp_financial_reconciliation_report)
+  readonly financialReconciliation = signal<FinancialReconciliation | null>(null);
+  readonly reconStartDate = signal<string>('2025-01-01');
+  readonly reconEndDate = signal<string>(new Date().toISOString().substring(0, 10));
 
   // 8. Member 4: EXPLAIN ANALYZE Benchmark on 50,000+ orders dataset
   readonly explainBenchmark = signal<ExplainBenchmark>({
@@ -161,6 +169,7 @@ export class ReportService {
     const discountsReq = this.fetchDiscountImpact();
     const benchmarkReq = this.fetchExplainBenchmark();
     const supplierReq = this.fetchSupplierPerformance();
+    const reconReq = this.fetchFinancialReconciliation(branch, this.reconStartDate(), this.reconEndDate());
 
     forkJoin({
       summary: summaryReq,
@@ -170,7 +179,8 @@ export class ReportService {
       cte: cteReq,
       discounts: discountsReq,
       benchmark: benchmarkReq,
-      supplierPerformance: supplierReq
+      supplierPerformance: supplierReq,
+      reconciliation: reconReq
     }).subscribe({
       next: (res) => {
         let connectedCount = 0;
@@ -181,6 +191,7 @@ export class ReportService {
         if (res.cte && res.cte.length > 0) { this.categorySalesCte.set(res.cte); connectedCount++; }
         if (res.discounts && res.discounts.length > 0) { this.discountImpact.set(res.discounts); connectedCount++; }
         if (res.benchmark) { this.explainBenchmark.set(res.benchmark); connectedCount++; }
+        if (res.reconciliation) { this.financialReconciliation.set(res.reconciliation); connectedCount++; }
         if (res.supplierPerformance && res.supplierPerformance.length > 0) {
           this.supplierPerformance.set(res.supplierPerformance);
           connectedCount++;
@@ -265,6 +276,28 @@ export class ReportService {
     return this.http.get<ExplainBenchmark>(`${this.apiUrl}/explain-benchmark`).pipe(
       catchError(() => of(null))
     );
+  }
+
+  // 9. GET /api/reports/financial-reconciliation (Consistent Read-Only Snapshot)
+  fetchFinancialReconciliation(branchId?: number | null, startDate?: string, endDate?: string) {
+    let params = new HttpParams();
+    if (branchId) params = params.set('branchId', branchId.toString());
+    if (startDate) params = params.set('startDate', startDate);
+    if (endDate) params = params.set('endDate', endDate);
+    return this.http.get<FinancialReconciliation>(`${this.apiUrl}/financial-reconciliation`, { params }).pipe(
+      catchError(() => of(null))
+    );
+  }
+
+  // Triggered when financial reconciliation date range changes
+  onReconDateChange(startDate: string, endDate: string): void {
+    this.reconStartDate.set(startDate);
+    this.reconEndDate.set(endDate);
+    this.fetchFinancialReconciliation(this.selectedBranchId(), startDate, endDate).subscribe(res => {
+      if (res) {
+        this.financialReconciliation.set(res);
+      }
+    });
   }
 
   // Triggered when branch selector changes

@@ -258,6 +258,52 @@ BEGIN
 END$$
 
 -- ============================================================================
+-- 6B. STORED PROCEDURE: sp_financial_reconciliation_report
+-- Demonstrates Transaction Isolation Level REPEATABLE READ with
+-- START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY
+-- Prevents cross-query skew and phantom anomalies across multiple analytical queries
+-- ============================================================================
+DROP PROCEDURE IF EXISTS sp_financial_reconciliation_report$$
+CREATE PROCEDURE sp_financial_reconciliation_report(
+    IN p_branch_id INT,
+    IN p_start_date DATE,
+    IN p_end_date DATE
+)
+BEGIN
+    -- Explicitly set transaction isolation level to REPEATABLE READ
+    SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+    -- Start consistent read-only snapshot: zero shared locks, no blocking OLTP cashiers
+    START TRANSACTION WITH CONSISTENT SNAPSHOT, READ ONLY;
+
+    -- 1. Summary Totals (Point-in-Time T0 snapshot)
+    SELECT 
+        COUNT(order_id) AS total_completed_orders,
+        COALESCE(SUM(subtotal), 0.00) AS gross_sales,
+        COALESCE(SUM(discount_total), 0.00) AS total_discounts,
+        COALESCE(SUM(total_amount), 0.00) AS net_revenue
+    FROM sales_order
+    WHERE status = 'COMPLETED'
+      AND (p_branch_id IS NULL OR branch_id = p_branch_id)
+      AND DATE(order_date) BETWEEN p_start_date AND p_end_date;
+
+    -- 2. Tender Payment Breakdown (Reconciles 100% mathematically with net_revenue)
+    SELECT 
+        p.method AS payment_method,
+        COUNT(p.payment_id) AS transaction_count,
+        COALESCE(SUM(p.amount), 0.00) AS total_collected
+    FROM payment p
+    JOIN sales_order o ON o.order_id = p.order_id
+    WHERE o.status = 'COMPLETED'
+      AND (p_branch_id IS NULL OR o.branch_id = p_branch_id)
+      AND DATE(o.order_date) BETWEEN p_start_date AND p_end_date
+    GROUP BY p.method;
+
+    -- Release read view snapshot
+    COMMIT;
+END$$
+
+-- ============================================================================
 -- 7. TRIGGER: trg_daily_sales_log
 -- Audit logging for daily sales analytics integrity.
 -- Fires AFTER INSERT on daily_sales_summary.

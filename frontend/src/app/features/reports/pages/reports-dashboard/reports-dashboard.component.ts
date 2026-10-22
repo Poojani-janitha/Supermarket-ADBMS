@@ -2,6 +2,7 @@ import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ReportService } from '../../../../core/services/report.service';
+import { AuthService } from '../../../../core/services/auth.service';
 
 @Component({
   selector: 'app-reports-dashboard',
@@ -86,7 +87,7 @@ import { ReportService } from '../../../../core/services/report.service';
           </div>
           <div class="kpi-info">
             <span class="kpi-label">Today's Sales Revenue</span>
-            <span class="kpi-val">\${{ (reportService.summaryMetrics().todayRevenue || 0).toFixed(2) }}</span>
+            <span class="kpi-val">Rs. {{ (reportService.summaryMetrics().todayRevenue || 0).toFixed(2) }}</span>
             <span class="kpi-sub green">
               <span class="material-symbols-outlined inline-icon">trending_up</span>
               Today's Gross Earnings
@@ -115,7 +116,7 @@ import { ReportService } from '../../../../core/services/report.service';
           </div>
           <div class="kpi-info">
             <span class="kpi-label">Discounts Awarded</span>
-            <span class="kpi-val">-\${{ (reportService.summaryMetrics().discountsGiven || 0).toFixed(2) }}</span>
+            <span class="kpi-val">-Rs. {{ (reportService.summaryMetrics().discountsGiven || 0).toFixed(2) }}</span>
             <span class="kpi-sub">Promotional Savings</span>
           </div>
         </div>
@@ -139,7 +140,7 @@ import { ReportService } from '../../../../core/services/report.service';
           </div>
           <div class="kpi-info">
             <span class="kpi-label">30-Day Moving Avg</span>
-            <span class="kpi-val">\${{ (reportService.summaryMetrics().movingAvg30Days || 0).toFixed(2) }}</span>
+            <span class="kpi-val">Rs. {{ (reportService.summaryMetrics().movingAvg30Days || 0).toFixed(2) }}</span>
             <span class="kpi-sub">Daily Average Volume</span>
           </div>
         </div>
@@ -205,6 +206,16 @@ import { ReportService } from '../../../../core/services/report.service';
         >
           <span class="material-symbols-outlined">local_shipping</span>
           <span class="tab-label">Supplier Performance</span>
+        </button>
+
+        <button
+          type="button"
+          class="tab-btn"
+          [class.active]="activeTab() === 'RECONCILIATION'"
+          (click)="activeTab.set('RECONCILIATION')"
+        >
+          <span class="material-symbols-outlined">balance</span>
+          <span class="tab-label">Financial Reconciliation</span>
         </button>
       </div>
 
@@ -292,7 +303,7 @@ import { ReportService } from '../../../../core/services/report.service';
                       <span class="volume-badge">{{ item.unitsSold }} units</span>
                     </td>
                     <td style="text-align: right;">
-                      <strong class="rev-val">\${{ (item.revenue || 0).toFixed(2) }}</strong>
+                      <strong class="rev-val">Rs. {{ (item.revenue || 0).toFixed(2) }}</strong>
                     </td>
                   </tr>
                 }
@@ -347,7 +358,7 @@ import { ReportService } from '../../../../core/services/report.service';
                       <span class="orders-count-badge">{{ day.ordersCount }} orders</span>
                     </td>
                     <td style="text-align: right;">
-                      <strong class="rev-val">\${{ (day.totalSales || 0).toFixed(2) }}</strong>
+                      <strong class="rev-val">Rs. {{ (day.totalSales || 0).toFixed(2) }}</strong>
                     </td>
                   </tr>
                 }
@@ -511,7 +522,7 @@ import { ReportService } from '../../../../core/services/report.service';
 
                     <td style="text-align: right;">
                       <span [class.highlight-grand]="row.isGrandTotal" [class.rev-val]="!row.isGrandTotal">
-                        \${{ (row.totalRevenue || 0).toFixed(2) }}
+                        Rs. {{ (row.totalRevenue || 0).toFixed(2) }}
                       </span>
                     </td>
 
@@ -640,7 +651,7 @@ import { ReportService } from '../../../../core/services/report.service';
                       <span class="volume-badge">{{ cte.totalProductsSold }} items</span>
                     </td>
                     <td style="text-align: right;">
-                      <strong class="rev-val">\${{ (cte.revenue || 0).toFixed(2) }}</strong>
+                      <strong class="rev-val">Rs. {{ (cte.revenue || 0).toFixed(2) }}</strong>
                     </td>
                     <td>
                       <div class="progress-bar-container">
@@ -745,9 +756,9 @@ import { ReportService } from '../../../../core/services/report.service';
                     <td style="text-align: center;">
                       <span class="volume-badge">{{ d.timesApplied }}x applied</span>
                     </td>
-                    <td class="discount-cost">-\${{ (d.totalDiscountAmount || 0).toFixed(2) }}</td>
+                    <td class="discount-cost">-Rs. {{ (d.totalDiscountAmount || 0).toFixed(2) }}</td>
                     <td style="text-align: right;">
-                      <strong class="rev-val">\${{ (d.attributedSales || 0).toFixed(2) }}</strong>
+                      <strong class="rev-val">Rs. {{ (d.attributedSales || 0).toFixed(2) }}</strong>
                     </td>
                     <td style="text-align: center;">
                       <span class="roi-pill">{{ d.roiRatio }}x ROI</span>
@@ -891,7 +902,7 @@ import { ReportService } from '../../../../core/services/report.service';
                       </div>
                     </td>
                     <td style="text-align: right;">
-                      <strong class="rev-val">\${{ (sup.totalSpend || 0).toFixed(2) }}</strong>
+                      <strong class="rev-val">Rs. {{ (sup.totalSpend || 0).toFixed(2) }}</strong>
                     </td>
                     <td style="text-align: center;">
                       <span
@@ -958,6 +969,129 @@ import { ReportService } from '../../../../core/services/report.service';
               </div>
             </div>
           }
+        </div>
+      }
+
+      <!-- ================= REPORT 7: FINANCIAL RECONCILIATION & AUDIT ================= -->
+      @if (activeTab() === 'RECONCILIATION') {
+        <div class="section-card printable-card">
+          <div class="card-inner-header">
+            <div class="card-title-row">
+              <span class="material-symbols-outlined title-icon purple">balance</span>
+              <div>
+                <h3>Financial Audit & Tender Reconciliation</h3>
+              </div>
+            </div>
+
+            <!-- Date Range Filter & Print -->
+            <div class="card-controls-group no-print">
+              <div class="date-filter-box">
+                <label>From: </label>
+                <input
+                  type="date"
+                  class="date-input"
+                  [ngModel]="reportService.reconStartDate()"
+                  (ngModelChange)="onReconStartDateChange($event)"
+                />
+                <label>To: </label>
+                <input
+                  type="date"
+                  class="date-input"
+                  [ngModel]="reportService.reconEndDate()"
+                  (ngModelChange)="onReconEndDateChange($event)"
+                />
+              </div>
+
+              <button
+                type="button"
+                class="btn-card-print"
+                (click)="printReport('Financial Audit & Tender Reconciliation')"
+                title="Print this report"
+              >
+                <span class="material-symbols-outlined">print</span>
+                <span>Print Report</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Financial Reconciliation KPI Metric Cards (Preserved for later use)
+          <div class="recon-kpi-grid">
+            <div class="recon-kpi-card">
+              <span class="recon-label">COMPLETED ORDERS</span>
+              <strong class="recon-val">{{ reportService.financialReconciliation()?.totalCompletedOrders || 0 }}</strong>
+              <span class="recon-sub">Audited Transactions</span>
+            </div>
+            <div class="recon-kpi-card">
+              <span class="recon-label">GROSS SALES (SUBTOTAL)</span>
+              <strong class="recon-val">Rs. {{ (reportService.financialReconciliation()?.grossSales || 0).toFixed(2) }}</strong>
+              <span class="recon-sub">Pre-Discount Subtotal</span>
+            </div>
+            <div class="recon-kpi-card">
+              <span class="recon-label">DISCOUNTS SURRENDERED</span>
+              <strong class="recon-val orange">-Rs. {{ (reportService.financialReconciliation()?.totalDiscounts || 0).toFixed(2) }}</strong>
+              <span class="recon-sub">Promotional Deductions</span>
+            </div>
+            <div class="recon-kpi-card highlight-net">
+              <span class="recon-label">AUDITED NET REVENUE</span>
+              <strong class="recon-val green">Rs. {{ (reportService.financialReconciliation()?.netRevenue || 0).toFixed(2) }}</strong>
+              <span class="recon-sub green">Target Collections</span>
+            </div>
+            <div class="recon-kpi-card highlight-collected">
+              <span class="recon-label">PAYMENTS COLLECTED</span>
+              <strong class="recon-val blue">Rs. {{ (reportService.financialReconciliation()?.totalCollected || 0).toFixed(2) }}</strong>
+              <span class="recon-sub blue">Tender Receipts</span>
+            </div>
+          </div>
+          -->
+
+          <!-- Tender Breakdown Table -->
+          <div class="table-responsive">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>PAYMENT METHOD</th>
+                  <th style="text-align: center;">TRANSACTION COUNT</th>
+                  <th style="text-align: right;">TOTAL COLLECTED</th>
+                  <th style="width: 240px;">SHARE OF REVENUE</th>
+                  <th style="text-align: center;">RECONCILIATION STATUS</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (t of reportService.financialReconciliation()?.tenders || []; track t.paymentMethod) {
+                  <tr>
+                    <td>
+                      <div class="tender-cell">
+                        <span class="material-symbols-outlined tender-icon">
+                          {{ t.paymentMethod === 'CASH' ? 'payments' : (t.paymentMethod === 'CARD' ? 'credit_card' : 'qr_code_2') }}
+                        </span>
+                        <strong>{{ t.paymentMethod }} PAYMENT</strong>
+                      </div>
+                    </td>
+                    <td style="text-align: center;">
+                      <span class="orders-count-badge">{{ t.transactionCount }} transactions</span>
+                    </td>
+                    <td style="text-align: right;">
+                      <strong class="rev-val">Rs. {{ (t.totalCollected || 0).toFixed(2) }}</strong>
+                    </td>
+                    <td>
+                      <div class="progress-bar-container">
+                        <div class="progress-bar-fill" [style.width.%]="t.sharePercentage"></div>
+                        <span class="progress-label">{{ t.sharePercentage }}%</span>
+                      </div>
+                    </td>
+                    <td style="text-align: center;">
+                      <span class="badge-pill badge-received">MATCHED</span>
+                    </td>
+                  </tr>
+                }
+                @if ((reportService.financialReconciliation()?.tenders || []).length === 0) {
+                  <tr>
+                    <td colspan="5" class="empty-state-cell">No transaction records found for the selected period.</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
         </div>
       }
     </div>
@@ -1285,7 +1419,7 @@ import { ReportService } from '../../../../core/services/report.service';
     .card-inner-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
+      align-items: flex-start;
       flex-wrap: wrap;
       gap: 16px;
       padding-bottom: 4px;
@@ -1304,6 +1438,7 @@ import { ReportService } from '../../../../core/services/report.service';
         &.blue { color: #1e40af; }
         &.emerald { color: #059669; }
         &.orange { color: #d97706; }
+        &.purple { color: #7c3aed; }
       }
 
       h3 {
@@ -1327,6 +1462,8 @@ import { ReportService } from '../../../../core/services/report.service';
       align-items: center;
       gap: 12px;
       flex-wrap: wrap;
+      margin-left: auto;
+      justify-content: flex-end;
     }
 
     /* Print Button inside Each Report Container */
@@ -1381,7 +1518,7 @@ import { ReportService } from '../../../../core/services/report.service';
       }
     }
 
-    /* Date Filter Box in Rollup */
+    /* Date Filter Box in Rollup & Reconciliation */
     .date-filter-box {
       display: flex;
       align-items: center;
@@ -1393,6 +1530,8 @@ import { ReportService } from '../../../../core/services/report.service';
       font-size: 0.82rem;
       font-weight: 600;
       color: #334155;
+      white-space: nowrap;
+      flex-shrink: 0;
     }
 
     .small-select {
@@ -1808,6 +1947,180 @@ import { ReportService } from '../../../../core/services/report.service';
       }
     }
 
+    /* Audit & Financial Reconciliation Report Styles */
+    .audit-status-banner {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 5px solid #64748b;
+      border-radius: 12px;
+      padding: 16px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+
+      &.balanced {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+        border-left: 5px solid #059669;
+      }
+
+      .banner-left {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+
+        .banner-icon {
+          font-size: 32px;
+          color: #059669;
+        }
+
+        .banner-title {
+          font-size: 0.95rem;
+          font-weight: 800;
+          color: #064e3b;
+          display: block;
+          margin-bottom: 2px;
+          letter-spacing: 0.02em;
+        }
+
+        .banner-desc {
+          margin: 0;
+          font-size: 0.8rem;
+          color: #334155;
+          code {
+            background: rgba(0, 0, 0, 0.06);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 700;
+            color: #047857;
+          }
+        }
+      }
+
+      .variance-pill {
+        background: #f1f5f9;
+        color: #475569;
+        font-size: 0.82rem;
+        font-weight: 800;
+        padding: 6px 14px;
+        border-radius: 20px;
+        border: 1px solid #cbd5e1;
+        white-space: nowrap;
+
+        &.zero {
+          background: #d1fae5;
+          color: #065f46;
+          border-color: #6ee7b7;
+        }
+      }
+    }
+
+    .recon-kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      margin-top: 4px;
+      margin-bottom: 4px;
+    }
+
+    .recon-kpi-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+
+      &.highlight-net {
+        background: #ecfdf5;
+        border-color: #a7f3d0;
+      }
+
+      &.highlight-collected {
+        background: #eff6ff;
+        border-color: #bfdbfe;
+      }
+
+      .recon-label {
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #64748b;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+
+      .recon-val {
+        font-size: 1.35rem;
+        font-weight: 900;
+        color: #0f172a;
+        letter-spacing: -0.02em;
+
+        &.orange { color: #d97706; }
+        &.green { color: #059669; }
+        &.blue { color: #2563eb; }
+      }
+
+      .recon-sub {
+        font-size: 0.75rem;
+        color: #64748b;
+        font-weight: 500;
+
+        &.green { color: #047857; font-weight: 700; }
+        &.blue { color: #1d4ed8; font-weight: 700; }
+      }
+    }
+
+    .tender-cell {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+
+      .tender-icon {
+        font-size: 22px;
+        color: #64748b;
+        background: #f1f5f9;
+        padding: 6px;
+        border-radius: 8px;
+      }
+
+      strong {
+        font-size: 0.88rem;
+        color: #0f172a;
+        font-weight: 700;
+      }
+    }
+
+    .orders-count-badge {
+      display: inline-block;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #475569;
+      background: #f1f5f9;
+      padding: 3px 10px;
+      border-radius: 12px;
+    }
+
+    .date-input {
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 4px 8px;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #0f172a;
+      background: #f8fafc;
+      outline: none;
+      font-family: inherit;
+      cursor: pointer;
+
+      &:focus {
+        border-color: #065f46;
+        background: #ffffff;
+      }
+    }
+
     /* Print Media Styles */
     @media print {
       .no-print,
@@ -1928,8 +2241,17 @@ import { ReportService } from '../../../../core/services/report.service';
 })
 export class ReportsDashboardComponent {
   readonly reportService = inject(ReportService);
+  readonly authService = inject(AuthService);
 
-  readonly activeTab = signal<'RANKINGS' | 'DAILY_SALES' | 'ROLLUP' | 'CTE' | 'PROMOTIONS' | 'SUPPLIERS'>('RANKINGS');
+  constructor() {
+    const userBranch = this.authService.currentUser()?.branchId;
+    if (userBranch && this.reportService.selectedBranchId() !== userBranch) {
+      this.reportService.selectedBranchId.set(userBranch);
+      this.reportService.refreshAll();
+    }
+  }
+
+  readonly activeTab = signal<'RANKINGS' | 'DAILY_SALES' | 'ROLLUP' | 'CTE' | 'PROMOTIONS' | 'SUPPLIERS' | 'RECONCILIATION'>('RANKINGS');
   readonly currentPrintingTitle = signal<string>('');
   readonly isPrinting = signal<boolean>(false);
   currentPrintDate = new Date();
@@ -2106,6 +2428,14 @@ export class ReportsDashboardComponent {
   onMonthChange(month: number): void {
     this.reportService.onDateFilterChange(this.reportService.selectedYear(), month);
     this.rollupPage.set(1);
+  }
+
+  onReconStartDateChange(date: string): void {
+    this.reportService.onReconDateChange(date, this.reportService.reconEndDate());
+  }
+
+  onReconEndDateChange(date: string): void {
+    this.reportService.onReconDateChange(this.reportService.reconStartDate(), date);
   }
 
   getBranchName(): string {
