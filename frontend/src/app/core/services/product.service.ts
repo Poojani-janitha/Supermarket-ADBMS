@@ -8,6 +8,8 @@ interface ProductRow {
   product_name: string;
   category_id: number;
   category_name: string;
+  category_parent_id: number | null;
+  category_parent_name: string | null;
   supplier_id: number;
   supplier_name: string;
   unit_price: number;
@@ -23,6 +25,7 @@ interface CategoryRow {
   category_id: number;
   name: string;
   icon: string | null;
+  parent_id: number | null;
   active_product_count: number;
 }
 
@@ -97,12 +100,13 @@ export class ProductService {
   loadCategories(): void {
     this.http.get<CategoryRow[]>(`${this.apiUrl}/categories`).subscribe({
       next: rows => this.categories.set([
-        { id: 0, name: 'All Aisles', icon: 'grid_view', itemCount: rows.reduce((sum, row) => sum + row.active_product_count, 0) },
+        { id: 0, name: 'All Aisles', icon: 'grid_view', itemCount: rows.reduce((sum, row) => sum + row.active_product_count, 0), parentId: null },
         ...rows.map(row => ({
           id: row.category_id,
           name: row.name,
           icon: row.icon ?? 'category',
-          itemCount: row.active_product_count
+          itemCount: row.active_product_count,
+          parentId: row.parent_id
         }))
       ]),
       error: () => this.loadError.set('Unable to load product categories.')
@@ -211,6 +215,8 @@ export class ProductService {
       costPrice: Number(row.cost_price),
       categoryId: row.category_id,
       categoryName: row.category_name,
+      categoryParentId: row.category_parent_id,
+      categoryParentName: row.category_parent_name,
       supplierId: row.supplier_id,
       supplierName: row.supplier_name,
       isActive: row.is_active,

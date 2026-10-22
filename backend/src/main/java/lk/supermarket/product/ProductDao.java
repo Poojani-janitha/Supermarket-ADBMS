@@ -22,11 +22,14 @@ public class ProductDao {
         if (search != null && !search.isBlank()) {
             sql = """
                     SELECT p.product_id, p.sku, p.name AS product_name, p.category_id,
-                           c.name AS category_name, p.supplier_id, s.name AS supplier_name,
+                           c.name AS category_name, c.parent_id AS category_parent_id,
+                           parent.name AS category_parent_name,
+                           p.supplier_id, s.name AS supplier_name,
                            p.unit_price, p.cost_price, p.image_url, p.diet_type,
                            p.unit_of_measure, p.min_order_qty, p.is_active
                     FROM product p
                     JOIN category c ON c.category_id = p.category_id
+                    LEFT JOIN category parent ON parent.category_id = c.parent_id
                     JOIN supplier s ON s.supplier_id = p.supplier_id
                     WHERE (? IS NULL OR p.category_id = ?)
                       AND (? IS NULL OR p.is_active = ?)
@@ -38,6 +41,7 @@ public class ProductDao {
         } else {
             sql = """
                     SELECT product_id, sku, product_name, category_id, category_name,
+                           category_parent_id, category_parent_name,
                            supplier_id, supplier_name, unit_price, cost_price, image_url,
                            diet_type, unit_of_measure, min_order_qty, is_active
                     FROM v_product_catalog
@@ -65,6 +69,15 @@ public class ProductDao {
         Integer parentId = parameters.get("parentId") == null
                 ? null
                 : ((Number) parameters.get("parentId")).intValue();
+
+        if (parentId != null) {
+            Integer parentExists = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM category WHERE category_id = ?",
+                    Integer.class, parentId);
+            if (parentExists == null || parentExists == 0) {
+                throw new IllegalArgumentException("Selected parent category does not exist");
+            }
+        }
 
         jdbcTemplate.update("""
                 INSERT INTO category (name, description, icon, parent_id)

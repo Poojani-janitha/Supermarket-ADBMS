@@ -15,9 +15,14 @@ import { Product } from '../../../../core/models';
         <div>
           <h1 class="page-title">Product Catalog & Pricing</h1>
         </div>
-        <button class="btn-pill btn-primary" (click)="openAddModal()">
-          <span class="material-symbols-outlined">add</span> Add New Product
-        </button>
+        <div class="page-header-actions">
+          <button class="btn-pill btn-outline" type="button" (click)="openCategoryModal()">
+            <span class="material-symbols-outlined">account_tree</span> Add Category
+          </button>
+          <button class="btn-pill btn-primary" type="button" (click)="openAddModal()">
+            <span class="material-symbols-outlined">add</span> Add New Product
+          </button>
+        </div>
       </div>
 
       <!-- Search & Filters -->
@@ -165,8 +170,13 @@ import { Product } from '../../../../core/models';
             </div>
 
             <div class="details-grid">
+              <div><span class="detail-label">Product ID</span><strong>{{ prod.id }}</strong></div>
+              <div><span class="detail-label">SKU</span><strong>{{ prod.sku }}</strong></div>
               <div><span class="detail-label">Category</span><strong>{{ prod.categoryName }}</strong></div>
+              <div><span class="detail-label">Parent category</span><strong>{{ prod.categoryParentName || 'Top-level category' }}</strong></div>
+              <div><span class="detail-label">Category ID</span><strong>{{ prod.categoryId }}</strong></div>
               <div><span class="detail-label">Supplier</span><strong>{{ prod.supplierName || 'Not specified' }}</strong></div>
+              <div><span class="detail-label">Supplier ID</span><strong>{{ prod.supplierId || 'Not specified' }}</strong></div>
               <div><span class="detail-label">Unit price</span><strong>\${{ prod.unitPrice.toFixed(2) }}</strong></div>
               <div><span class="detail-label">Cost price</span><strong>\${{ prod.costPrice.toFixed(2) }}</strong></div>
               <div><span class="detail-label">Unit of measure</span><strong>{{ unitDisplayName(prod.unitOfMeasure) }}</strong></div>
@@ -174,6 +184,7 @@ import { Product } from '../../../../core/models';
               <div><span class="detail-label">Diet type</span><strong>{{ prod.dietType || 'Not specified' }}</strong></div>
               <div><span class="detail-label">Status</span><strong>{{ prod.isActive ? 'Active' : 'Inactive' }}</strong></div>
               <div><span class="detail-label">Stock</span><strong>{{ prod.stockQty }}</strong></div>
+              <div class="detail-wide"><span class="detail-label">Image URL</span><strong>{{ prod.imageUrl || 'No image uploaded' }}</strong></div>
             </div>
 
             <div class="modal-actions">
@@ -280,15 +291,46 @@ import { Product } from '../../../../core/models';
         <div class="modal-backdrop category-backdrop" (click)="closeCategoryModal()">
           <div class="modal-dialog category-dialog" (click)="$event.stopPropagation()">
             <div class="modal-header">
-              <h3 class="modal-title">Add Category</h3>
+              <h3 class="modal-title">{{ categoryMode === 'parent' ? 'Add Parent Category' : 'Add Subcategory' }}</h3>
               <button class="close-btn" type="button" (click)="closeCategoryModal()">&times;</button>
             </div>
-            <p class="modal-description">Create a category now, then use it for this product.</p>
+            <p class="modal-description">
+              {{ categoryMode === 'parent'
+                ? 'Create a main parent category first.'
+                : 'Create a subcategory under the selected parent category.' }}
+            </p>
             @if (categoryError()) {
               <div class="form-error">{{ categoryError() }}</div>
             }
+            <div class="form-row">
+              <div class="form-group">
+                <label for="category-parent">Parent category</label>
+                <select id="category-parent" [(ngModel)]="newCategory.parentId" class="form-control"
+                        [disabled]="categoryMode === 'parent'">
+                  <option [ngValue]="null">Select parent category</option>
+                  @for (category of parentCategories(); track category.id) {
+                    <option [ngValue]="category.id">{{ category.name }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="category-subcategory">Existing subcategories</label>
+                <select id="category-subcategory" class="form-control"
+                        [disabled]="!newCategory.parentId">
+                  <option>{{ newCategory.parentId ? 'Select a subcategory' : 'Select a parent first' }}</option>
+                  @for (category of subcategoriesFor(newCategory.parentId); track category.id) {
+                    <option [ngValue]="category.id">{{ category.name }}</option>
+                  }
+                </select>
+              </div>
+            </div>
+            <div class="category-actions">
+              <button class="link-button" type="button" (click)="openParentCategoryModal()">+ Add parent</button>
+              <button class="link-button" type="button" [disabled]="!newCategory.parentId"
+                      (click)="openSubcategoryModal()">+ Add subcategory</button>
+            </div>
             <div class="form-group">
-              <label for="category-name">Category Name *</label>
+              <label for="category-name">{{ categoryMode === 'parent' ? 'Parent category name' : 'Subcategory name' }} *</label>
               <input id="category-name" type="text" [(ngModel)]="newCategory.name" class="form-control" maxlength="80" />
             </div>
             <div class="form-group">
@@ -298,15 +340,6 @@ import { Product } from '../../../../core/models';
             <div class="form-group">
               <label for="category-icon">Icon name</label>
               <input id="category-icon" type="text" [(ngModel)]="newCategory.icon" class="form-control" maxlength="50" />
-            </div>
-            <div class="form-group">
-              <label for="category-parent">Parent category</label>
-              <select id="category-parent" [(ngModel)]="newCategory.parentId" class="form-control">
-                <option [ngValue]="null">Top-level category</option>
-                @for (category of productService.categories().slice(1); track category.id) {
-                  <option [ngValue]="category.id">{{ category.name }}</option>
-                }
-              </select>
             </div>
             <div class="modal-actions">
               <button class="btn-pill btn-outline" type="button" (click)="closeCategoryModal()">Cancel</button>
@@ -348,12 +381,27 @@ import { Product } from '../../../../core/models';
             <div class="form-row">
               <div class="form-group">
                 <div class="label-with-action">
-                  <label for="product-category">Category *</label>
-                  <button type="button" class="link-button" (click)="openCategoryModal()">+ Add category</button>
+                  <label for="product-parent-category">Parent category *</label>
+                  <button type="button" class="link-button" (click)="openParentCategoryModal()">+ Add parent</button>
                 </div>
-                <select id="product-category" [(ngModel)]="newProduct.categoryId" class="form-control">
-                  <option [ngValue]="0">Select category</option>
-                  @for (category of productService.categories().slice(1); track category.id) {
+                <select id="product-parent-category" [(ngModel)]="productParentId"
+                        (ngModelChange)="onProductParentChange($event)" class="form-control">
+                  <option [ngValue]="null">Select parent category</option>
+                  @for (category of parentCategories(); track category.id) {
+                    <option [ngValue]="category.id">{{ category.name }}</option>
+                  }
+                </select>
+              </div>
+              <div class="form-group">
+                <div class="label-with-action">
+                  <label for="product-category">Subcategory *</label>
+                  <button type="button" class="link-button" [disabled]="!productParentId"
+                          (click)="openSubcategoryModal()">+ Add subcategory</button>
+                </div>
+                <select id="product-category" [(ngModel)]="newProduct.categoryId" class="form-control"
+                        [disabled]="!productParentId">
+                  <option [ngValue]="0">Select subcategory</option>
+                  @for (category of subcategoriesFor(productParentId); track category.id) {
                     <option [ngValue]="category.id">{{ category.name }}</option>
                   }
                 </select>
@@ -444,6 +492,12 @@ import { Product } from '../../../../core/models';
       display: flex;
       justify-content: space-between;
       align-items: center;
+    }
+
+    .page-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
     }
 
     .page-title {
@@ -678,6 +732,10 @@ import { Product } from '../../../../core/models';
       border-bottom: 1px solid #f1f5f9;
     }
 
+    .details-grid .detail-wide {
+      grid-column: 1 / -1;
+    }
+
     .detail-label {
       color: #64748b;
       font-size: 0.75rem;
@@ -751,6 +809,13 @@ import { Product } from '../../../../core/models';
       align-items: center;
     }
 
+    .category-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 14px;
+      margin: -4px 0 8px;
+    }
+
     .link-button {
       border: 0;
       padding: 0;
@@ -767,6 +832,12 @@ import { Product } from '../../../../core/models';
       border: 1px solid #cbd5e1;
       font-family: inherit;
       font-size: 0.9rem;
+    }
+
+    .form-help {
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      line-height: 1.35;
     }
 
     .active-input {
@@ -809,6 +880,8 @@ export class ProductListComponent {
   readonly categoryModalOpen = signal(false);
   readonly categoryError = signal<string | null>(null);
   readonly isSavingCategory = signal(false);
+  categoryMode: 'parent' | 'subcategory' = 'parent';
+  productParentId: number | null = null;
   readonly unitModalOpen = signal(false);
   readonly unitError = signal<string | null>(null);
   readonly isSavingUnit = signal(false);
@@ -855,6 +928,7 @@ export class ProductListComponent {
 
   openAddModal(): void {
     this.newProduct = this.emptyProduct();
+    this.productParentId = null;
     this.selectedImage = null;
     this.addProductError.set(null);
     this.addModalOpen.set(true);
@@ -868,6 +942,30 @@ export class ProductListComponent {
 
   openCategoryModal(): void {
     this.newCategory = this.emptyCategory();
+    this.categoryMode = this.parentCategories().length === 0 ? 'parent' : 'subcategory';
+    this.categoryError.set(null);
+    this.categoryModalOpen.set(true);
+  }
+
+  openParentCategoryModal(): void {
+    this.newCategory = this.emptyCategory();
+    this.categoryMode = 'parent';
+    this.categoryError.set(null);
+    this.categoryModalOpen.set(true);
+  }
+
+  openSubcategoryModal(): void {
+    const parentId = this.newCategory.parentId ?? this.productParentId;
+    if (parentId == null) {
+      this.categoryError.set('Select a parent category before adding a subcategory.');
+      if (!this.categoryModalOpen()) {
+        this.categoryMode = 'subcategory';
+        this.categoryModalOpen.set(true);
+      }
+      return;
+    }
+    this.newCategory = { ...this.emptyCategory(), parentId };
+    this.categoryMode = 'subcategory';
     this.categoryError.set(null);
     this.categoryModalOpen.set(true);
   }
@@ -923,6 +1021,20 @@ export class ProductListComponent {
       .slice(0, 30);
   }
 
+  parentCategories() {
+    return this.productService.categories().filter(category => category.id > 0 && category.parentId === null);
+  }
+
+  subcategoriesFor(parentId: number | null) {
+    if (parentId == null) return [];
+    return this.productService.categories().filter(category => category.parentId === parentId);
+  }
+
+  onProductParentChange(parentId: number | null): void {
+    this.productParentId = parentId;
+    this.newProduct.categoryId = 0;
+  }
+
   selectImage(event: Event): void {
     const input = event.target as HTMLInputElement;
     this.selectedImage = input.files?.[0] ?? null;
@@ -945,9 +1057,24 @@ export class ProductListComponent {
     }).subscribe({
       next: response => {
         this.isSavingCategory.set(false);
-        this.categoryModalOpen.set(false);
+        if (this.categoryMode === 'parent') {
+          this.productParentId = response.categoryId;
+          this.newProduct.categoryId = 0;
+          this.categoryMode = 'subcategory';
+          this.newCategory = {
+            ...this.emptyCategory(),
+            parentId: response.categoryId
+          };
+        } else {
+          this.productParentId = this.newCategory.parentId;
+          this.newProduct.categoryId = response.categoryId;
+          this.newCategory = {
+            ...this.emptyCategory(),
+            parentId: this.productParentId
+          };
+        }
+        this.categoryError.set(null);
         this.productService.loadCategories();
-        this.newProduct.categoryId = response.categoryId;
       },
       error: error => {
         this.isSavingCategory.set(false);
