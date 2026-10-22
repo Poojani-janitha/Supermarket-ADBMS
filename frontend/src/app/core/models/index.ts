@@ -251,6 +251,46 @@ export interface DailySalesItem {
   totalSales: number;
 }
 
+export interface SupplierPerformanceItem {
+  supplierId: number;
+  supplierName: string;
+  contactPerson: string;
+  phone: string;
+  city: string;
+  totalOrders: number;
+  totalRequestedQty: number;
+  totalConfirmedQty: number;
+  totalReceivedQty: number;
+  totalSpend: number;
+  fulfillmentRate: number;
+  ratingTier: 'PREFERRED' | 'RELIABLE' | 'UNDER_REVIEW' | string;
+}
+
+export interface SummaryMetrics {
+  todayRevenue: number;
+  ordersCount: number;
+  discountsGiven: number;
+  lowStockAlerts: number;
+  movingAvg7Days: number;
+  movingAvg30Days: number;
+}
+
+export interface ExplainBenchmarkSide {
+  scanType?: string;
+  cost: string | number;
+  executionTimeMs: number;
+  rowsExamined: number;
+  indexUsed?: string;
+  improvementFactor?: string;
+}
+
+export interface ExplainBenchmark {
+  queryDescription: string;
+  datasetSize: string;
+  beforeOptimization: ExplainBenchmarkSide | Record<string, any>;
+  afterOptimization: ExplainBenchmarkSide | Record<string, any>;
+}
+
 export interface SalesOrder {
   orderId: number;
   branchId: number;
@@ -271,4 +311,22 @@ export interface SalesOrder {
   items: CartItem[];
   discounts: AppliedDiscount[];
   itemCount?: number;
+}
+
+export interface PaymentTenderSummary {
+  paymentMethod: string;
+  transactionCount: number;
+  totalCollected: number;
+  sharePercentage: number;
+}
+
+export interface FinancialReconciliation {
+  totalCompletedOrders: number;
+  grossSales: number;
+  totalDiscounts: number;
+  netRevenue: number;
+  totalCollected: number;
+  variance: number;
+  isBalanced: boolean;
+  tenders: PaymentTenderSummary[];
 }

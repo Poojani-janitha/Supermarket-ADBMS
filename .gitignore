@@ -148,3 +148,4 @@ ENV/
 *.sqlite3
 database/backups/*.sql.gz
 database/scratch/
+database/seed_bulk/*.sql
