@@ -28,7 +28,7 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
           </div>
           <div>
             <span class="tier-name">GOLD TIER</span>
-            <span class="tier-desc">Spend &ge; \$1,000 &bull; 7% Rule Discount</span>
+            <span class="tier-desc">Spend &ge; Rs. 1,000 &bull; 7% Rule Discount</span>
           </div>
         </div>
 
@@ -38,7 +38,7 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
           </div>
           <div>
             <span class="tier-name">SILVER TIER</span>
-            <span class="tier-desc">Spend &ge; \$500 &bull; 5% Rule Discount</span>
+            <span class="tier-desc">Spend &ge; Rs. 500 &bull; 5% Rule Discount</span>
           </div>
         </div>
 
@@ -236,7 +236,7 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
                         <td>{{ order.orderDate | date:'medium' }}</td>
                         <td>{{ order.itemCount }}</td>
                         <td><span class="status-badge" [class.cancelled]="order.status === 'CANCELLED'">{{ order.status }}</span></td>
-                        <td><strong>{{ order.totalAmount | number:'1.2-2' }}</strong></td>
+                        <td><strong>Rs. {{ order.totalAmount | number:'1.2-2' }}</strong></td>
                         <td class="action-cell">
                           <button class="btn-pill btn-secondary btn-sm" (click)="viewOrder(order)">View</button>
                           <button class="btn-pill btn-outline btn-sm" (click)="editOrder(order)">Edit</button>
@@ -284,9 +284,9 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
             </table>
 
             <div class="order-total-box">
-              <div><span>Subtotal</span><strong>{{ selectedOrder()?.subtotal | number:'1.2-2' }}</strong></div>
-              <div><span>Discounts</span><strong>-{{ selectedOrder()?.discountTotal | number:'1.2-2' }}</strong></div>
-              <div class="grand-total"><span>Total</span><strong>{{ selectedOrder()?.totalAmount | number:'1.2-2' }}</strong></div>
+              <div><span>Subtotal</span><strong>Rs. {{ selectedOrder()?.subtotal | number:'1.2-2' }}</strong></div>
+              <div><span>Discounts</span><strong>-Rs. {{ selectedOrder()?.discountTotal | number:'1.2-2' }}</strong></div>
+              <div class="grand-total"><span>Total</span><strong>Rs. {{ selectedOrder()?.totalAmount | number:'1.2-2' }}</strong></div>
             </div>
 
             @if ((selectedOrder()?.discounts?.length ?? 0) > 0) {

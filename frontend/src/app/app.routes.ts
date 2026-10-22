@@ -11,6 +11,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/pos/pos.component').then(m => m.PosComponent)
   },
   {
+    path: 'sales-management',
+    loadComponent: () => import('./features/sales-management/sales-management.component').then(m => m.SalesManagementComponent)
+  },
+  {
     path: 'products',
     loadComponent: () => import('./features/products/pages/product-list/product-list.component').then(m => m.ProductListComponent)
   },
@@ -23,8 +27,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/purchase-orders/pages/purchase-orders/purchase-orders.component').then(m => m.PurchaseOrdersComponent)
   },
   {
-    path: 'supplier-portal',
+    path: 'orders',
     loadComponent: () => import('./features/supplier-portal/pages/supplier-portal/supplier-portal.component').then(m => m.SupplierPortalComponent)
+  },
+  {
+    path: 'supplier-portal',
+    redirectTo: 'orders',
+    pathMatch: 'full'
   },
   {
     path: 'customers',
