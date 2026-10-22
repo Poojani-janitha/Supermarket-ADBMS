@@ -102,6 +102,73 @@ begin
     END IF;
     RETURN COALESCE(v_avg, 0.00);
 END$$
+
+-- ============================================================================
+-- 4B. SCALAR FUNCTION: fn_supplier_fulfillment_rate
+-- Computes supplier reliability score: (Confirmed Qty / Requested Qty) * 100%
+-- Demonstrates user-defined scalar functions, NULL safety, and arithmetic rounding.
+-- ============================================================================
+DROP FUNCTION IF EXISTS fn_supplier_fulfillment_rate$$
+CREATE FUNCTION fn_supplier_fulfillment_rate(p_supplier_id INT)
+RETURNS DECIMAL(5,2)
+READS SQL DATA
+DETERMINISTIC
+BEGIN
+    DECLARE v_requested DECIMAL(12,2);
+    DECLARE v_confirmed DECIMAL(12,2);
+    DECLARE v_rate DECIMAL(5,2);
+
+    SELECT 
+        COALESCE(SUM(poi.requested_qty), 0),
+        COALESCE(SUM(poi.confirmed_qty), 0)
+    INTO v_requested, v_confirmed
+    FROM purchase_order po
+    JOIN purchase_order_item poi ON poi.po_id = po.po_id
+    WHERE po.supplier_id = p_supplier_id
+      AND po.status IN ('CONFIRMED', 'RECEIVED');
+
+    IF v_requested = 0 THEN
+        RETURN 100.00;
+    END IF;
+
+    SET v_rate = ROUND((v_confirmed / v_requested) * 100.0, 2);
+    RETURN LEAST(v_rate, 100.00);
+END$$
+
+DELIMITER ;
+
+-- ============================================================================
+-- 4C. ANALYTICAL VIEW: v_supplier_performance
+-- Joins supplier, purchase_order, and purchase_order_item to track vendor reliability,
+-- order fulfillment accuracy, order volume, and procurement expenditure.
+-- Integrates scalar UDF: fn_supplier_fulfillment_rate(s.supplier_id).
+-- ============================================================================
+CREATE OR REPLACE VIEW v_supplier_performance AS
+SELECT 
+    s.supplier_id,
+    s.name AS supplier_name,
+    s.contact_person,
+    s.phone,
+    s.city,
+    COUNT(DISTINCT po.po_id) AS total_orders,
+    COALESCE(SUM(poi.requested_qty), 0.00) AS total_requested_qty,
+    COALESCE(SUM(poi.confirmed_qty), 0.00) AS total_confirmed_qty,
+    COALESCE(SUM(poi.received_qty), 0.00) AS total_received_qty,
+    COALESCE(SUM(po.total_cost), 0.00) AS total_spend,
+    fn_supplier_fulfillment_rate(s.supplier_id) AS fulfillment_rate,
+    CASE 
+        WHEN fn_supplier_fulfillment_rate(s.supplier_id) >= 95.00 THEN 'PREFERRED'
+        WHEN fn_supplier_fulfillment_rate(s.supplier_id) >= 85.00 THEN 'RELIABLE'
+        ELSE 'UNDER_REVIEW'
+    END AS rating_tier
+FROM supplier s
+LEFT JOIN purchase_order po ON po.supplier_id = s.supplier_id
+LEFT JOIN purchase_order_item poi ON poi.po_id = po.po_id
+WHERE s.is_active = TRUE
+GROUP BY s.supplier_id, s.name, s.contact_person, s.phone, s.city;
+
+DELIMITER $$
+
 -- ============================================================================
 -- 5. STORED PROCEDURE: sp_monthly_report
 -- Hierarchical sales rollup report using GROUP BY ... WITH ROLLUP.
@@ -189,4 +256,101 @@ BEGIN
     FROM CategorySalesAgg
     ORDER BY hierarchy_level ASC, revenue DESC;
 END$$
+
+-- ============================================================================
+-- 7. TRIGGER: trg_daily_sales_log
+-- Audit logging for daily sales analytics integrity.
+-- Fires AFTER INSERT on daily_sales_summary.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS daily_sales_log (
+    log_id INT AUTO_INCREMENT PRIMARY KEY,
+    summary_date DATE NOT NULL,
+    branch_id INT NOT NULL,
+    total_orders INT NOT NULL,
+    total_sales DECIMAL(14,2) NOT NULL,
+    logged_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+DROP TRIGGER IF EXISTS trg_daily_sales_log$$
+
+CREATE TRIGGER trg_daily_sales_log
+AFTER INSERT ON daily_sales_summary
+FOR EACH ROW
+BEGIN
+    INSERT INTO daily_sales_log (summary_date, branch_id, total_orders, total_sales, logged_at)
+    VALUES (NEW.summary_date, NEW.branch_id, NEW.total_orders, NEW.total_sales, NOW());
+END$$
+
+-- ============================================================================
+-- 8. SCHEDULED EVENT: ev_daily_sales_summary
+-- Nightly event aggregating sales into daily_sales_summary at 01:00 AM.
+-- ============================================================================
+
+DROP EVENT IF EXISTS ev_daily_sales_summary$$
+
+CREATE EVENT ev_daily_sales_summary
+ON SCHEDULE EVERY 1 DAY
+STARTS (TIMESTAMP(CURDATE()) + INTERVAL 1 DAY + INTERVAL 1 HOUR)
+DO
+BEGIN
+    INSERT INTO daily_sales_summary (summary_date, branch_id, total_orders, total_sales)
+    SELECT 
+        DATE(order_date),
+        branch_id,
+        COUNT(*),
+        COALESCE(SUM(total_amount), 0.00)
+    FROM sales_order
+    WHERE status = 'COMPLETED'
+      AND order_date >= CURDATE() - INTERVAL 1 DAY
+      AND order_date < CURDATE()
+    GROUP BY DATE(order_date), branch_id
+    ON DUPLICATE KEY UPDATE 
+        total_orders = VALUES(total_orders),
+        total_sales  = VALUES(total_sales);
+END$$
+
+-- ============================================================================
+-- 9. SCHEDULED EVENT: ev_monthly_log_purge
+-- Monthly maintenance event purging audit log records older than 12 months.
+-- ============================================================================
+
+DROP EVENT IF EXISTS ev_monthly_log_purge$$
+
+CREATE EVENT ev_monthly_log_purge
+ON SCHEDULE EVERY 1 MONTH
+STARTS (TIMESTAMP(CURDATE()) + INTERVAL 1 DAY + INTERVAL 2 HOUR)
+DO
+BEGIN
+    DELETE FROM stock_audit_log 
+    WHERE logged_at < NOW() - INTERVAL 12 MONTH;
+END$$
+
 DELIMITER ;
+
+-- ============================================================================
+-- 10. ADVANCED TOPIC: RANGE Table Partitioning on stock_audit_log
+-- Demonstrates partition pruning, horizontal data distribution by Year,
+-- and query optimization on large audit movement datasets.
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS stock_audit_log_partitioned (
+    log_id INT AUTO_INCREMENT,
+    branch_id INT NOT NULL,
+    product_id INT NOT NULL,
+    change_qty INT NOT NULL,
+    reason ENUM('SALE', 'RESTOCK', 'CANCEL', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT') NOT NULL,
+    ref_order_id INT NULL,
+    logged_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (log_id, logged_at)
+) ENGINE=InnoDB
+PARTITION BY RANGE (YEAR(logged_at)) (
+    PARTITION p2024 VALUES LESS THAN (2025),
+    PARTITION p2025 VALUES LESS THAN (2026),
+    PARTITION p2026 VALUES LESS THAN (2027),
+    PARTITION p_future VALUES LESS THAN MAXVALUE
+);
+
+-- Proof query demonstrating Partition Pruning (EXPLAIN PARTITIONS):
+-- EXPLAIN SELECT * FROM stock_audit_log_partitioned 
+-- WHERE logged_at BETWEEN '2026-01-01' AND '2026-12-31';

@@ -64,6 +64,11 @@ public class ReportService {
         return reportDao.getDiscountImpact();
     }
 
+    // Supplier Performance (B2B vendor fulfillment analysis via v_supplier_performance)
+    public List<SupplierPerformanceDto> getSupplierPerformance() {
+        return reportDao.getSupplierPerformance();
+    }
+
     // Query Execution Benchmark (EXPLAIN ANALYZE comparison on 50k+ dataset)
     public ExplainBenchmarkDto getExplainBenchmark() {
         return new ExplainBenchmarkDto(

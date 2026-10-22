@@ -166,4 +166,40 @@ public class ReportDao {
             rs.getDouble("roi_ratio")
         ));
     }
+
+    // 7. v_supplier_performance (Vendor fulfillment reliability & UDF fn_supplier_fulfillment_rate)
+    public List<SupplierPerformanceDto> getSupplierPerformance() {
+        String sql = """
+            SELECT 
+                supplier_id,
+                supplier_name,
+                contact_person,
+                phone,
+                city,
+                total_orders,
+                total_requested_qty,
+                total_confirmed_qty,
+                total_received_qty,
+                total_spend,
+                fulfillment_rate,
+                rating_tier
+            FROM v_supplier_performance
+            ORDER BY fulfillment_rate DESC, total_spend DESC
+            """;
+
+        return jdbcTemplate.query(sql, (rs, rowNum) -> new SupplierPerformanceDto(
+            rs.getInt("supplier_id"),
+            rs.getString("supplier_name"),
+            rs.getString("contact_person"),
+            rs.getString("phone"),
+            rs.getString("city"),
+            rs.getInt("total_orders"),
+            rs.getBigDecimal("total_requested_qty"),
+            rs.getBigDecimal("total_confirmed_qty"),
+            rs.getBigDecimal("total_received_qty"),
+            rs.getBigDecimal("total_spend"),
+            rs.getBigDecimal("fulfillment_rate"),
+            rs.getString("rating_tier")
+        ));
+    }
 }

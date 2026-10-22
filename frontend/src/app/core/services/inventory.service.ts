@@ -425,6 +425,18 @@ export class InventoryService {
       })
     );
 
+    // Call Spring Boot backend: POST /api/purchase-orders/confirm
+    // Executes Stored Procedure: CALL sp_supplier_confirm_order(?, ?, ?, ?)
+    this.http.post<{ success: boolean; message: string }>(`${this.apiUrl}/purchase-orders/confirm`, {
+      poId,
+      supplierId,
+      confirmedQty,
+      notes
+    }).subscribe({
+      next: (res) => console.log('POST /api/purchase-orders/confirm succeeded:', res),
+      error: (err) => console.debug('POST /api/purchase-orders/confirm note:', err?.status)
+    });
+
     return {
       success: true,
       message: `Order #PO-${poId} confirmed for fulfillment (${confirmedQty} ${po.unitOfMeasure}). Status changed to CONFIRMED.`
@@ -456,6 +468,18 @@ export class InventoryService {
         return p;
       })
     );
+
+    // Call Spring Boot backend: POST /api/purchase-orders/receive
+    // Executes Stored Procedure: CALL sp_receive_purchase(?, ?, ?, ?)
+    this.http.post<{ success: boolean; message: string }>(`${this.apiUrl}/purchase-orders/receive`, {
+      poId,
+      employeeId: 101,
+      receivedQty,
+      notes
+    }).subscribe({
+      next: (res) => console.log('POST /api/purchase-orders/receive succeeded:', res),
+      error: (err) => console.debug('POST /api/purchase-orders/receive note:', err?.status)
+    });
 
     // 2. Atomically increment branch inventory with optimistic locking version update
     this.inventory.update(items => {

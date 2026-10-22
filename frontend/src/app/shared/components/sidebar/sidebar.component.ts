@@ -25,9 +25,9 @@ import { InventoryService } from '../../../core/services/inventory.service';
       <nav class="nav-menu">
         @if (authService.isSupplier()) {
           <!-- Supplier Dedicated Links -->
-          <a routerLink="/supplier-portal" routerLinkActive="active" class="nav-item">
+          <a routerLink="/orders" routerLinkActive="active" class="nav-item">
             <span class="material-symbols-outlined nav-icon">local_shipping</span>
-            <span class="nav-label">Vendor Portal</span>
+            <span class="nav-label">My Orders</span>
           </a>
           <a routerLink="/products" routerLinkActive="active" class="nav-item">
             <span class="material-symbols-outlined nav-icon">inventory_2</span>
@@ -51,8 +51,13 @@ import { InventoryService } from '../../../core/services/inventory.service';
           </a>
 
           <a routerLink="/purchase-orders" routerLinkActive="active" class="nav-item">
-            <span class="material-symbols-outlined nav-icon">local_shipping</span>
+            <span class="material-symbols-outlined nav-icon">receipt_long</span>
             <span class="nav-label">Purchase Orders</span>
+          </a>
+
+          <a routerLink="/orders" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">local_shipping</span>
+            <span class="nav-label">My Orders</span>
           </a>
 
           <a routerLink="/customers" routerLinkActive="active" class="nav-item">

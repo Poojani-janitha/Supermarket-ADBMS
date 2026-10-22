@@ -56,6 +56,11 @@ public class ReportController {
         return ResponseEntity.ok(reportService.getDiscountImpact());
     }
 
+    @GetMapping("/supplier-performance")
+    public ResponseEntity<List<SupplierPerformanceDto>> getSupplierPerformance() {
+        return ResponseEntity.ok(reportService.getSupplierPerformance());
+    }
+
     @GetMapping("/explain-benchmark")
     public ResponseEntity<ExplainBenchmarkDto> getExplainBenchmark() {
         return ResponseEntity.ok(reportService.getExplainBenchmark());
