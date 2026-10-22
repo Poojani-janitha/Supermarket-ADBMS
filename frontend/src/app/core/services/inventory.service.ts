@@ -1,10 +1,14 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { InventoryItem, LowStockAlert, PurchaseOrder, Supplier } from '../models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class InventoryService {
+  private readonly http = inject(HttpClient);
+  readonly apiUrl = '/api';
+
   readonly branches = [
     { id: 1, name: 'Colombo Central Flagship' },
     { id: 2, name: 'Kandy City Center' },
@@ -372,6 +376,21 @@ export class InventoryService {
     };
 
     this.purchaseOrders.update(list => [newPO, ...list]);
+
+    // Dispatch to Spring Boot backend: sp_create_purchase_order
+    this.http.post<{ success: boolean; data: number; message: string }>(`${this.apiUrl}/purchase-orders`, {
+      supplierId: data.supplierId,
+      branchId: data.branchId,
+      employeeId: 101,
+      productId: data.productId,
+      qty: data.requestedQty
+    }).subscribe({
+      next: (res) => {
+        console.log('Backend PO created:', res);
+      },
+      error: (err) => console.debug('Backend offline, simulated PO retained:', err?.status)
+    });
+
     return {
       success: true,
       poId: nextPoId,

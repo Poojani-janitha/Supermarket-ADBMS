@@ -118,10 +118,10 @@ import { Product } from '../../../../core/models';
                 </td>
                 <td>{{ p.categoryName }}</td>
                 <td>
-                  <span class="price-text">\${{ p.unitPrice.toFixed(2) }}</span>
+                  <span class="price-text">Rs. {{ p.unitPrice.toFixed(2) }}</span>
                 </td>
                 <td>
-                  <span class="price-text">\${{ p.costPrice.toFixed(2) }}</span>
+                  <span class="price-text">Rs. {{ p.costPrice.toFixed(2) }}</span>
                 </td>
                 <td>
                   <span class="stock-badge" [class.low-stock]="p.stockQty < 20">
