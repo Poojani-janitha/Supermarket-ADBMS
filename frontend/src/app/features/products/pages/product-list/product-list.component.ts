@@ -113,10 +113,10 @@ import { Product } from '../../../../core/models';
                 </td>
                 <td>{{ p.categoryName }}</td>
                 <td>
-                  <span class="price-text">\${{ p.unitPrice.toFixed(2) }}</span>
+                  <span class="price-text">Rs. {{ p.unitPrice.toFixed(2) }}</span>
                 </td>
                 <td>
-                  <span class="price-text">\${{ p.costPrice.toFixed(2) }}</span>
+                  <span class="price-text">Rs. {{ p.costPrice.toFixed(2) }}</span>
                 </td>
                 <td>
                   <span class="stock-badge" [class.low-stock]="p.stockQty < 20">
@@ -167,8 +167,8 @@ import { Product } from '../../../../core/models';
             <div class="details-grid">
               <div><span class="detail-label">Category</span><strong>{{ prod.categoryName }}</strong></div>
               <div><span class="detail-label">Supplier</span><strong>{{ prod.supplierName || 'Not specified' }}</strong></div>
-              <div><span class="detail-label">Unit price</span><strong>\${{ prod.unitPrice.toFixed(2) }}</strong></div>
-              <div><span class="detail-label">Cost price</span><strong>\${{ prod.costPrice.toFixed(2) }}</strong></div>
+              <div><span class="detail-label">Unit price</span><strong>Rs. {{ prod.unitPrice.toFixed(2) }}</strong></div>
+              <div><span class="detail-label">Cost price</span><strong>Rs. {{ prod.costPrice.toFixed(2) }}</strong></div>
               <div><span class="detail-label">Unit of measure</span><strong>{{ unitDisplayName(prod.unitOfMeasure) }}</strong></div>
               <div><span class="detail-label">Minimum order quantity</span><strong>{{ prod.minOrderQty }}</strong></div>
               <div><span class="detail-label">Diet type</span><strong>{{ prod.dietType || 'Not specified' }}</strong></div>

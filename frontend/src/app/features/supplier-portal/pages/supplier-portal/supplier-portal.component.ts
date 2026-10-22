@@ -232,7 +232,7 @@ import { PurchaseOrder } from '../../../../core/models';
               </div>
               <div class="detail-row">
                 <span class="detail-label">Unit Price / Cost:</span>
-                <strong>\${{ selectedPO()!.unitCost.toFixed(2) }} per {{ selectedPO()!.unitOfMeasure }}</strong>
+                <strong>Rs. {{ selectedPO()!.unitCost.toFixed(2) }} per {{ selectedPO()!.unitOfMeasure }}</strong>
               </div>
             </div>
 
@@ -271,7 +271,7 @@ import { PurchaseOrder } from '../../../../core/models';
             <div class="revised-cost-box">
               <span>Updated Order Invoice Amount:</span>
               <strong class="revised-val">
-                \${{ (amendedQuantity * selectedPO()!.unitCost).toFixed(2) }}
+                Rs. {{ (amendedQuantity * selectedPO()!.unitCost).toFixed(2) }}
               </strong>
             </div>
           </div>

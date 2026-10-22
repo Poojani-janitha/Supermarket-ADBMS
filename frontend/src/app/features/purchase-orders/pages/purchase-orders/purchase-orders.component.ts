@@ -99,7 +99,7 @@ import { Product, PurchaseOrder } from '../../../../core/models';
                     <option value="" disabled selected>-- Choose an item from product catalog --</option>
                     @for (item of productService.products(); track item.id) {
                       <option [value]="item.id">
-                        [{{ item.sku }}] {{ item.name }} &bull; {{ item.categoryName }} ({{ item.unitOfMeasure || 'PIECE' }}) — \${{ item.costPrice.toFixed(2) }}
+                        [{{ item.sku }}] {{ item.name }} &bull; {{ item.categoryName }} ({{ item.unitOfMeasure || 'PIECE' }}) — Rs. {{ item.costPrice.toFixed(2) }}
                       </option>
                     }
                   </select>
@@ -212,12 +212,12 @@ import { Product, PurchaseOrder } from '../../../../core/models';
                 </div>
                 <div class="summary-col">
                   <span class="summary-label">Unit Cost Price</span>
-                  <span class="summary-val">\${{ selectedFormProduct()!.costPrice.toFixed(2) }}</span>
+                  <span class="summary-val">Rs. {{ selectedFormProduct()!.costPrice.toFixed(2) }}</span>
                 </div>
                 <div class="summary-col highlight-col">
                   <span class="summary-label">Estimated Total Cost</span>
                   <span class="summary-val total-cost-val">
-                    \${{ (formQuantity() * selectedFormProduct()!.costPrice).toFixed(2) }}
+                    Rs. {{ (formQuantity() * selectedFormProduct()!.costPrice).toFixed(2) }}
                   </span>
                 </div>
               </div>
@@ -361,7 +361,7 @@ import { Product, PurchaseOrder } from '../../../../core/models';
                       <span class="text-muted">—</span>
                     }
                   </td>
-                  <td><strong>\${{ po.totalCost.toFixed(2) }}</strong></td>
+                  <td><strong>Rs. {{ po.totalCost.toFixed(2) }}</strong></td>
                   <td>
                     @if (po.status === 'RECEIVED') {
                       <span class="badge-pill badge-received">RECEIVED & IN STOCK</span>

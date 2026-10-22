@@ -40,6 +40,11 @@ import { InventoryService } from '../../../core/services/inventory.service';
             <span class="nav-label">POS / Checkout</span>
           </a>
 
+          <a routerLink="/sales-management" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">receipt_long</span>
+            <span class="nav-label">Sales Management</span>
+          </a>
+
           <a routerLink="/products" routerLinkActive="active" class="nav-item">
             <span class="material-symbols-outlined nav-icon">inventory_2</span>
             <span class="nav-label">Product Catalog</span>
