@@ -151,7 +151,7 @@ import { PurchaseOrder } from '../../../../core/models';
                     <span class="text-muted">Not confirmed yet</span>
                   }
                 </td>
-                <td><strong>\${{ po.totalCost.toFixed(2) }}</strong></td>
+                <td><strong>Rs. {{ po.totalCost.toFixed(2) }}</strong></td>
                 <td>
                   @if (po.status === 'REQUESTED') {
                     <span class="badge-pill badge-requested">ACTION REQUIRED</span>
@@ -217,7 +217,7 @@ import { PurchaseOrder } from '../../../../core/models';
               </div>
               <div class="detail-row">
                 <span class="detail-label">Unit Price / Cost:</span>
-                <strong>\${{ selectedPO()!.unitCost.toFixed(2) }} per {{ selectedPO()!.unitOfMeasure }}</strong>
+                <strong>Rs. {{ selectedPO()!.unitCost.toFixed(2) }} per {{ selectedPO()!.unitOfMeasure }}</strong>
               </div>
             </div>
 
@@ -256,7 +256,7 @@ import { PurchaseOrder } from '../../../../core/models';
             <div class="revised-cost-box">
               <span>Updated Order Invoice Amount:</span>
               <strong class="revised-val">
-                \${{ (amendedQuantity * selectedPO()!.unitCost).toFixed(2) }}
+                Rs. {{ (amendedQuantity * selectedPO()!.unitCost).toFixed(2) }}
               </strong>
             </div>
           </div>

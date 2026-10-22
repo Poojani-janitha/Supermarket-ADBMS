@@ -1,12 +1,13 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { HttpClient } from '@angular/common/http';
 import { ProductService } from '../../core/services/product.service';
 import { CartService } from '../../core/services/cart.service';
 import { CustomerService } from '../../core/services/customer.service';
 import { AuthService } from '../../core/services/auth.service';
 import { ReceiptModalComponent } from '../../shared/components/receipt-modal/receipt-modal.component';
-import { Customer, Product } from '../../core/models';
+import { Customer, Product, SalesOrder } from '../../core/models';
 
 @Component({
   selector: 'app-pos',
@@ -29,14 +30,6 @@ import { Customer, Product } from '../../core/models';
             @if (productService.searchQuery()) {
               <button class="clear-search-btn" (click)="productService.setSearchQuery('')">&times;</button>
             }
-          </div>
-
-          <div class="topbar-actions">
-            <!-- Order Lookup & Cancel Procedure Button (Member 1) -->
-            <button class="btn-pill btn-secondary lookup-btn" (click)="openLookupModal()" title="Order Lookup & Cancellation (sp_cancel_order)">
-              <span class="material-symbols-outlined">receipt_long</span>
-              <span>Lookup / Cancel</span>
-            </button>
           </div>
         </header>
 
@@ -90,7 +83,7 @@ import { Customer, Product } from '../../core/models';
                   <h3 class="product-name" [title]="product.name">{{ product.name }}</h3>
 
                   <div class="price-row">
-                    <span class="price-val">\${{ product.unitPrice.toFixed(2) }}</span>
+                    <span class="price-val">Rs. {{ product.unitPrice.toFixed(2) }}</span>
                     @if (product.stockQty <= 0) {
                       <span class="stock-warn">Out of Stock</span>
                     }
@@ -148,7 +141,7 @@ import { Customer, Product } from '../../core/models';
                 <div class="held-badge">{{ held.tag }}</div>
                 <div class="held-info">
                   <span class="held-title">{{ held.customerName }}</span>
-                  <span class="held-meta">{{ held.itemCount }} items &bull; \${{ held.subtotal.toFixed(2) }}</span>
+                  <span class="held-meta">{{ held.itemCount }} items &bull; Rs. {{ held.subtotal.toFixed(2) }}</span>
                 </div>
                 <button
                   class="held-remove-btn"
@@ -237,11 +230,11 @@ import { Customer, Product } from '../../core/models';
 
                 <div class="item-info">
                   <h4 class="item-name">{{ item.product.name }}</h4>
-                  <span class="item-unit-price">\${{ item.product.unitPrice.toFixed(2) }} &times; {{ item.quantity }}</span>
+                  <span class="item-unit-price">Rs. {{ item.product.unitPrice.toFixed(2) }} &times; {{ item.quantity }}</span>
                 </div>
 
                 <div class="item-action-col">
-                  <span class="item-line-total">\${{ item.lineTotal.toFixed(2) }}</span>
+                  <span class="item-line-total">Rs. {{ item.lineTotal.toFixed(2) }}</span>
                   <div class="item-qty-pills">
                     <button class="q-btn" (click)="cartService.updateQuantity(item.product.id, -1)">-</button>
                     <span class="q-val">{{ item.quantity }}</span>
@@ -283,7 +276,7 @@ import { Customer, Product } from '../../core/models';
         <div class="bill-summary-card">
           <div class="bill-line">
             <span class="label">Subtotal</span>
-            <span class="val">\${{ cartService.subtotal().toFixed(2) }}</span>
+            <span class="val">Rs. {{ cartService.subtotal().toFixed(2) }}</span>
           </div>
 
           @if (cartService.discountTotal() > 0) {
@@ -296,20 +289,20 @@ import { Customer, Product } from '../../core/models';
                   }
                 </span>
               </span>
-              <span class="val green">-\${{ cartService.discountTotal().toFixed(2) }}</span>
+              <span class="val green">-Rs. {{ cartService.discountTotal().toFixed(2) }}</span>
             </div>
           }
 
           <div class="bill-line">
             <span class="label">VAT (5% Standard)</span>
-            <span class="val">\${{ cartService.taxAmount().toFixed(2) }}</span>
+            <span class="val">Rs. {{ cartService.taxAmount().toFixed(2) }}</span>
           </div>
 
           <div class="bill-divider"></div>
 
           <div class="bill-line total-line">
             <span class="total-label">Net Payable Amount</span>
-            <span class="total-amount">\${{ cartService.totalAmount().toFixed(2) }}</span>
+            <span class="total-amount">Rs. {{ cartService.totalAmount().toFixed(2) }}</span>
           </div>
         </div>
 
@@ -348,11 +341,11 @@ import { Customer, Product } from '../../core/models';
           <div class="cash-tendered-box">
             <div class="tender-quick-chips">
               <button class="chip-btn" (click)="cartService.setCashTendered(cartService.totalAmount())">
-                Exact (\${{ cartService.totalAmount().toFixed(2) }})
+                Exact (Rs. {{ cartService.totalAmount().toFixed(2) }})
               </button>
-              <button class="chip-btn" (click)="cartService.setCashTendered(30)">\$30</button>
-              <button class="chip-btn" (click)="cartService.setCashTendered(50)">\$50</button>
-              <button class="chip-btn" (click)="cartService.setCashTendered(100)">\$100</button>
+              <button class="chip-btn" (click)="cartService.setCashTendered(30)">Rs. 30</button>
+              <button class="chip-btn" (click)="cartService.setCashTendered(50)">Rs. 50</button>
+              <button class="chip-btn" (click)="cartService.setCashTendered(100)">Rs. 100</button>
             </div>
             <div class="tender-calc-row">
               <div class="tender-input-wrap">
@@ -365,7 +358,7 @@ import { Customer, Product } from '../../core/models';
               </div>
               <div class="change-due-wrap">
                 <span class="change-label">Change Due:</span>
-                <span class="change-val">\${{ cartService.changeDue().toFixed(2) }}</span>
+                <span class="change-val">Rs. {{ cartService.changeDue().toFixed(2) }}</span>
               </div>
             </div>
           </div>
@@ -464,7 +457,7 @@ import { Customer, Product } from '../../core/models';
                   </div>
                   <div class="found-row">
                     <span>Order Total:</span>
-                    <strong>\${{ o.amount.toFixed(2) }}</strong>
+                    <strong>Rs. {{ o.amount.toFixed(2) }}</strong>
                   </div>
                   <div class="found-row">
                     <span>Database Status:</span>
@@ -1678,6 +1671,7 @@ import { Customer, Product } from '../../core/models';
   `]
 })
 export class PosComponent {
+  private readonly http = inject(HttpClient);
   readonly productService = inject(ProductService);
   readonly cartService = inject(CartService);
   readonly customerService = inject(CustomerService);
@@ -1694,6 +1688,30 @@ export class PosComponent {
   lookupOrderId: number | null = null;
   foundOrder = signal<{ id: number; customer: string; amount: number; status: 'COMPLETED' | 'CANCELLED' } | null>(null);
 
+  constructor() {
+    this.refreshStock();
+    effect(() => {
+      const prods = this.productService.products();
+      if (prods.length > 0 && prods.some(p => p.stockQty === 0)) {
+        this.refreshStock();
+      }
+    }, { allowSignalWrites: true });
+  }
+
+  refreshStock(): void {
+    this.http.get<Record<string, number>>('/api/orders/stock?branchId=1').subscribe({
+      next: (stockMap) => {
+        if (!stockMap) return;
+        this.productService.products.update(list =>
+          list.map(p => ({
+            ...p,
+            stockQty: stockMap[p.id] !== undefined ? stockMap[p.id] : p.stockQty
+          }))
+        );
+      }
+    });
+  }
+
   openLookupModal(): void {
     this.isLookupOpen.set(true);
     this.foundOrder.set(null);
@@ -1702,18 +1720,36 @@ export class PosComponent {
 
   searchOrder(): void {
     if (!this.lookupOrderId) return;
-    // Simulate finding order
-    this.foundOrder.set({
-      id: this.lookupOrderId,
-      customer: 'Devon Lane',
-      amount: 48.90,
-      status: 'COMPLETED'
+    this.http.get<SalesOrder>(`/api/orders/${this.lookupOrderId}`).subscribe({
+      next: (order) => {
+        this.foundOrder.set({
+          id: order.orderId,
+          customer: order.customerName || 'Walk-in Shopper',
+          amount: order.totalAmount,
+          status: order.status
+        });
+      },
+      error: () => {
+        alert(`Order #${this.lookupOrderId} not found.`);
+        this.foundOrder.set(null);
+      }
     });
   }
 
   cancelFoundOrder(): void {
-    if (!this.foundOrder()) return;
-    this.foundOrder.update(o => o ? { ...o, status: 'CANCELLED' } : null);
+    if (!this.foundOrder() || !this.lookupOrderId) return;
+    this.http.post<SalesOrder>(`/api/orders/${this.lookupOrderId}/cancel`, {}).subscribe({
+      next: (updatedOrder) => {
+        this.foundOrder.update(o => o ? { ...o, status: 'CANCELLED' } : null);
+        alert(`Order #${this.lookupOrderId} cancelled successfully. Stock restored.`);
+        this.productService.loadProducts();
+        this.refreshStock();
+      },
+      error: (err) => {
+        const msg = err?.error?.message || err?.error?.error || 'Cancellation failed';
+        alert(`Cancellation failed: ${msg}`);
+      }
+    });
   }
 
   openCustomerModal(): void {

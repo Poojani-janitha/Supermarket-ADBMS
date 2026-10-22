@@ -62,7 +62,7 @@ import { ReportService } from '../../../../core/services/report.service';
           </div>
           <div class="kpi-info">
             <span class="kpi-label">Today's Total Sales</span>
-            <span class="kpi-val">\${{ reportService.summaryMetrics().todayRevenue.toFixed(2) }}</span>
+            <span class="kpi-val">Rs. {{ reportService.summaryMetrics().todayRevenue.toFixed(2) }}</span>
             <span class="kpi-sub green">+12.4% vs last week</span>
           </div>
         </div>
@@ -84,7 +84,7 @@ import { ReportService } from '../../../../core/services/report.service';
           </div>
           <div class="kpi-info">
             <span class="kpi-label">Discounts Awarded</span>
-            <span class="kpi-val">\${{ reportService.summaryMetrics().discountsGiven.toFixed(2) }}</span>
+            <span class="kpi-val">Rs. {{ reportService.summaryMetrics().discountsGiven.toFixed(2) }}</span>
             <span class="kpi-sub">v_discount_impact</span>
           </div>
         </div>
@@ -95,7 +95,7 @@ import { ReportService } from '../../../../core/services/report.service';
           </div>
           <div class="kpi-info">
             <span class="kpi-label">7-Day Moving Average</span>
-            <span class="kpi-val">\${{ reportService.summaryMetrics().movingAvg7Days.toFixed(2) }}</span>
+            <span class="kpi-val">Rs. {{ reportService.summaryMetrics().movingAvg7Days.toFixed(2) }}</span>
             <span class="kpi-sub green">fn_avg_daily_sales(branch, 7)</span>
           </div>
         </div>
@@ -135,7 +135,7 @@ import { ReportService } from '../../../../core/services/report.service';
                     </td>
                     <td>{{ item.unitsSold }} units</td>
                     <td style="text-align: right;">
-                      <span class="rev-val">\${{ item.revenue.toFixed(2) }}</span>
+                      <span class="rev-val">Rs. {{ item.revenue.toFixed(2) }}</span>
                     </td>
                   </tr>
                 }
@@ -169,7 +169,7 @@ import { ReportService } from '../../../../core/services/report.service';
                     <td>{{ day.branchName }}</td>
                     <td>{{ day.ordersCount }}</td>
                     <td style="text-align: right;">
-                      <strong>\${{ day.totalSales.toFixed(2) }}</strong>
+                      <strong>Rs. {{ day.totalSales.toFixed(2) }}</strong>
                     </td>
                   </tr>
                 }
@@ -225,7 +225,7 @@ import { ReportService } from '../../../../core/services/report.service';
                   <td><strong>{{ row.ordersCount }} orders</strong></td>
                   <td style="text-align: right;">
                     <span class="rev-val" [class.highlight-grand]="row.isGrandTotal">
-                      \${{ row.totalRevenue.toFixed(2) }}
+                      Rs. {{ row.totalRevenue.toFixed(2) }}
                     </span>
                   </td>
                   <td style="text-align: center;">
@@ -281,7 +281,7 @@ import { ReportService } from '../../../../core/services/report.service';
                   </td>
                   <td><span class="code-sku">{{ cte.parentCategory }}</span></td>
                   <td>{{ cte.totalProductsSold }} items</td>
-                  <td><strong>\${{ cte.revenue.toFixed(2) }}</strong></td>
+                  <td><strong>Rs. {{ cte.revenue.toFixed(2) }}</strong></td>
                   <td>
                     <div class="progress-bar-container">
                       <div class="progress-bar-fill" [style.width.%]="cte.revenueSharePercent"></div>
@@ -325,8 +325,8 @@ import { ReportService } from '../../../../core/services/report.service';
                     <td><strong>{{ d.ruleName }}</strong></td>
                     <td><span class="badge-pill badge-tier">{{ d.ruleType }}</span></td>
                     <td>{{ d.timesApplied }}x</td>
-                    <td class="discount-cost">-\${{ d.totalDiscountAmount.toFixed(2) }}</td>
-                    <td style="text-align: right;"><strong>\${{ d.attributedSales.toFixed(2) }}</strong></td>
+                    <td class="discount-cost">-Rs. {{ d.totalDiscountAmount.toFixed(2) }}</td>
+                    <td style="text-align: right;"><strong>Rs. {{ d.attributedSales.toFixed(2) }}</strong></td>
                     <td><span class="roi-pill">{{ d.roiRatio }}x ROI</span></td>
                   </tr>
                 }
