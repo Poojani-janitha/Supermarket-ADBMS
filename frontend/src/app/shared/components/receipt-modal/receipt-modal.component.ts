@@ -62,8 +62,8 @@ import { CartService } from '../../../core/services/cart.service';
                     <small style="color: #64748b;">{{ item.product.sku }}</small>
                   </td>
                   <td style="text-align: center;">{{ item.quantity }}</td>
-                  <td style="text-align: right;">\${{ item.product.unitPrice.toFixed(2) }}</td>
-                  <td style="text-align: right; font-weight: 700;">\${{ item.lineTotal.toFixed(2) }}</td>
+                  <td style="text-align: right;">Rs. {{ item.product.unitPrice.toFixed(2) }}</td>
+                  <td style="text-align: right; font-weight: 700;">Rs. {{ item.lineTotal.toFixed(2) }}</td>
                 </tr>
               }
             </tbody>
@@ -75,24 +75,24 @@ import { CartService } from '../../../core/services/cart.service';
           <div class="totals-summary">
             <div class="calc-row">
               <span>Gross Subtotal:</span>
-              <span>\${{ order.subtotal.toFixed(2) }}</span>
+              <span>Rs. {{ order.subtotal.toFixed(2) }}</span>
             </div>
 
             @for (disc of order.discounts; track disc.ruleId) {
               <div class="calc-row discount-row">
                 <span>{{ disc.ruleName }}:</span>
-                <span>&minus;\${{ disc.amount.toFixed(2) }}</span>
+                <span>&minus;Rs. {{ disc.amount.toFixed(2) }}</span>
               </div>
             }
 
             <div class="calc-row">
               <span>VAT (5%):</span>
-              <span>\${{ order.taxAmount.toFixed(2) }}</span>
+              <span>Rs. {{ order.taxAmount.toFixed(2) }}</span>
             </div>
 
             <div class="calc-row total-row">
               <span>NET PAYABLE:</span>
-              <span>\${{ order.totalAmount.toFixed(2) }}</span>
+              <span>Rs. {{ order.totalAmount.toFixed(2) }}</span>
             </div>
 
             <div class="calc-row payment-row">

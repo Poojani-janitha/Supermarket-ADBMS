@@ -235,7 +235,7 @@ import { DiscountService } from '../../../../core/services/discount.service';
                 <td><strong>{{ rule.name }}</strong></td>
                 <td><span class="badge-pill badge-tier">{{ rule.ruleType }}</span></td>
                 <td><span class="disc-highlight">{{ rule.value }}% OFF</span></td>
-                <td>\${{ rule.minOrderAmount.toFixed(2) }}</td>
+                <td>Rs. {{ rule.minOrderAmount.toFixed(2) }}</td>
                 <td>{{ rule.startDate }} to {{ rule.endDate }}</td>
                 <td>{{ rule.stackable ? 'Yes' : 'No' }}</td>
                 <td><span class="badge-pill badge-veg">ACTIVE</span></td>

@@ -3,6 +3,7 @@ package lk.supermarket.sales.service;
 import lk.supermarket.sales.dao.OrderDao;
 import lk.supermarket.sales.dto.CheckoutRequest;
 import lk.supermarket.sales.dto.SalesOrderResponse;
+import lk.supermarket.sales.dto.SalesPageResponse;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -55,5 +56,12 @@ public class OrderService {
 
     public java.util.Map<Integer, Integer> getBranchStock(int branchId) {
         return orderDao.getBranchStock(branchId);
+    }
+
+    /**
+     * Retrieves paginated recent sales for sales management dashboard.
+     */
+    public SalesPageResponse getRecentOrders(int page, int size) {
+        return orderDao.findRecentOrders(page, size);
     }
 }

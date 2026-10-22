@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import lk.supermarket.sales.dto.AppliedDiscountDto;
 import lk.supermarket.sales.dto.CheckoutRequest;
 import lk.supermarket.sales.dto.SalesOrderResponse;
+import lk.supermarket.sales.dto.SalesPageResponse;
 import lk.supermarket.sales.service.OrderService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -20,6 +21,17 @@ public class OrderController {
 
     public OrderController(OrderService orderService) {
         this.orderService = orderService;
+    }
+
+    /**
+     * Get Recent Orders with 10-by-10 pagination.
+     * Invoked by SalesManagementComponent.
+     */
+    @GetMapping
+    public ResponseEntity<SalesPageResponse> getRecentOrders(
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "10") int size) {
+        return ResponseEntity.ok(orderService.getRecentOrders(page, size));
     }
 
     /**

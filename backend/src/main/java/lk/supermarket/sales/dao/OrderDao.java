@@ -227,4 +227,58 @@ public class OrderDao {
         }
         return stockMap;
     }
+
+    /**
+     * Retrieves paginated recent sales orders from view v_sales_order_summary.
+     */
+    public SalesPageResponse findRecentOrders(int page, int size) {
+        if (page < 0) page = 0;
+        if (size <= 0) size = 10;
+        int offset = page * size;
+
+        String countSql = "SELECT COUNT(*) FROM sales_order";
+        Long totalCount = jdbcTemplate.queryForObject(countSql, Long.class);
+        long total = totalCount != null ? totalCount : 0L;
+
+        String sql = """
+            SELECT order_id, branch_id, branch_name, customer_id, customer_name, customer_phone,
+                   employee_id, cashier_name, order_date, status, total_items_count,
+                   subtotal, discount_total, total_amount, payment_id, payment_method, paid_at
+            FROM v_sales_order_summary
+            ORDER BY order_date DESC, order_id DESC
+            LIMIT ? OFFSET ?
+        """;
+
+        List<OrderSummaryDto> items = jdbcTemplate.query(sql, (rs, rowNum) -> {
+            OrderSummaryDto dto = new OrderSummaryDto();
+            dto.setOrderId(rs.getInt("order_id"));
+            dto.setBranchId(rs.getInt("branch_id"));
+            dto.setBranchName(rs.getString("branch_name"));
+            int custId = rs.getInt("customer_id");
+            if (!rs.wasNull()) {
+                dto.setCustomerId(custId);
+                dto.setCustomerName(rs.getString("customer_name"));
+                dto.setCustomerPhone(rs.getString("customer_phone"));
+            } else {
+                dto.setCustomerName("Walk-in Shopper");
+            }
+            dto.setEmployeeId(rs.getInt("employee_id"));
+            dto.setCashierName(rs.getString("cashier_name"));
+            dto.setOrderDate(rs.getString("order_date"));
+            dto.setStatus(rs.getString("status"));
+            dto.setTotalItemsCount(rs.getInt("total_items_count"));
+            dto.setSubtotal(rs.getBigDecimal("subtotal"));
+            dto.setDiscountTotal(rs.getBigDecimal("discount_total"));
+            dto.setTotalAmount(rs.getBigDecimal("total_amount"));
+            int payId = rs.getInt("payment_id");
+            if (!rs.wasNull()) {
+                dto.setPaymentId(payId);
+            }
+            dto.setPaymentMethod(rs.getString("payment_method"));
+            dto.setPaidAt(rs.getString("paid_at"));
+            return dto;
+        }, size, offset);
+
+        return new SalesPageResponse(items, total, page, size);
+    }
 }

@@ -11,6 +11,10 @@ export const routes: Routes = [
     loadComponent: () => import('./features/pos/pos.component').then(m => m.PosComponent)
   },
   {
+    path: 'sales-management',
+    loadComponent: () => import('./features/sales-management/sales-management.component').then(m => m.SalesManagementComponent)
+  },
+  {
     path: 'products',
     loadComponent: () => import('./features/products/pages/product-list/product-list.component').then(m => m.ProductListComponent)
   },
