@@ -38,7 +38,7 @@ import { CartService } from '../../../core/services/cart.service';
             </div>
             <div>
               <span class="meta-label">CUSTOMER:</span>
-              <span class="meta-value">{{ order.customerName }} ({{ order.customerTier }})</span>
+              <span class="meta-value">{{ order.customerName }}{{ order.customerTier ? ' (' + order.customerTier + ' Tier)' : '' }}</span>
             </div>
           </div>
 

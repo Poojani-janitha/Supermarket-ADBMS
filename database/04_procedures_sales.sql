@@ -63,6 +63,12 @@ proc_label: BEGIN
   JOIN product p ON p.product_id = j.product_id
   ORDER BY j.product_id ASC;
 
+  -- Calculate and update order subtotal using fn_order_total before discount evaluation
+  UPDATE sales_order 
+  SET subtotal = fn_order_total(p_order_id),
+      total_amount = fn_order_total(p_order_id)
+  WHERE order_id = p_order_id;
+
   -- 4. Apply dynamic promotional rules (invokes Member 3's cursor procedure)
   CALL sp_apply_discounts(p_order_id, p_coupon);
 

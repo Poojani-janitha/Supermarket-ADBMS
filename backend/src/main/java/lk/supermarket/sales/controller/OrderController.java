@@ -65,4 +65,13 @@ public class OrderController {
                 .map(order -> ResponseEntity.ok(order.getDiscounts()))
                 .orElse(ResponseEntity.notFound().build());
     }
+
+    /**
+     * Get Branch Inventory Stock Levels Endpoint for POS screen.
+     */
+    @GetMapping("/stock")
+    public ResponseEntity<Map<Integer, Integer>> getBranchStock(
+            @RequestParam(value = "branchId", defaultValue = "1") int branchId) {
+        return ResponseEntity.ok(orderService.getBranchStock(branchId));
+    }
 }

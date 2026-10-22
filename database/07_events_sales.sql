@@ -16,7 +16,9 @@ SET GLOBAL event_scheduler = ON;
 -- Purpose: Precomputes daily sales aggregates per branch into daily_sales_summary
 --          using atomic ON DUPLICATE KEY UPDATE.
 -- ============================================================================
-DROP EVENT IF EXISTS ev_sales_daily_reconciliation;
+DELIMITER $$
+
+DROP EVENT IF EXISTS ev_sales_daily_reconciliation$$
 
 CREATE EVENT ev_sales_daily_reconciliation
 ON SCHEDULE EVERY 1 DAY 
@@ -38,7 +40,7 @@ BEGIN
   ON DUPLICATE KEY UPDATE
     total_orders = VALUES(total_orders),
     total_sales  = VALUES(total_sales);
-END;
+END$$
 
 -- ============================================================================
 -- MEMBER 1 EVENT 2: Periodic Abandoned Stock Audit Clean-up
@@ -46,7 +48,7 @@ END;
 -- Purpose: Purges sales stock audit log entries older than 24 months to maintain 
 --          optimal B-Tree index performance.
 -- ============================================================================
-DROP EVENT IF EXISTS ev_sales_audit_cleanup;
+DROP EVENT IF EXISTS ev_sales_audit_cleanup$$
 
 CREATE EVENT ev_sales_audit_cleanup
 ON SCHEDULE EVERY 1 MONTH
@@ -57,4 +59,6 @@ BEGIN
   DELETE FROM stock_audit_log 
   WHERE logged_at < NOW() - INTERVAL 24 MONTH 
     AND reason IN ('SALE', 'CANCEL');
-END;
+END$$
+
+DELIMITER ;

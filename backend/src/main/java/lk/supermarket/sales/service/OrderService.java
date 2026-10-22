@@ -52,4 +52,8 @@ public class OrderService {
     public Optional<SalesOrderResponse> getOrder(int orderId) {
         return orderDao.findOrderById(orderId);
     }
+
+    public java.util.Map<Integer, Integer> getBranchStock(int branchId) {
+        return orderDao.getBranchStock(branchId);
+    }
 }

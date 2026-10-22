@@ -28,9 +28,9 @@ public class OrderDao {
     private final SimpleJdbcCall placeOrderCall;
     private final SimpleJdbcCall cancelOrderCall;
 
-    public OrderDao(JdbcTemplate jdbcTemplate, ObjectMapper objectMapper) {
+    public OrderDao(JdbcTemplate jdbcTemplate) {
         this.jdbcTemplate = jdbcTemplate;
-        this.objectMapper = objectMapper;
+        this.objectMapper = new ObjectMapper();
 
         // Configure SimpleJdbcCall for sp_place_order
         this.placeOrderCall = new SimpleJdbcCall(jdbcTemplate)
@@ -127,6 +127,7 @@ public class OrderDao {
         String sqlHeader = """
             SELECT o.order_id, o.branch_id, b.name AS branch_name,
                    o.customer_id, c.full_name AS customer_name, c.phone AS customer_phone,
+                   fn_customer_tier(o.customer_id) AS customer_tier,
                    e.employee_id, e.full_name AS employee_name,
                    o.order_date, o.status, o.subtotal, o.discount_total, o.total_amount,
                    p.method AS payment_method
@@ -148,6 +149,7 @@ public class OrderDao {
                 resp.setCustomerId(custId);
                 resp.setCustomerName(rs.getString("customer_name"));
                 resp.setCustomerPhone(rs.getString("customer_phone"));
+                resp.setCustomerTier(rs.getString("customer_tier"));
             } else {
                 resp.setCustomerName("Walk-in Shopper");
             }
@@ -207,5 +209,22 @@ public class OrderDao {
         order.setTaxAmount(sub.multiply(new BigDecimal("0.05")).setScale(2, java.math.RoundingMode.HALF_UP));
 
         return Optional.of(order);
+    }
+
+    /**
+     * Retrieves current branch inventory stock levels from MySQL inventory table for POS live display.
+     */
+    public Map<Integer, Integer> getBranchStock(int branchId) {
+        String sql = "SELECT product_id, quantity FROM inventory WHERE branch_id = ?";
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, branchId);
+        Map<Integer, Integer> stockMap = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            Number pid = (Number) row.get("product_id");
+            Number qty = (Number) row.get("quantity");
+            if (pid != null && qty != null) {
+                stockMap.put(pid.intValue(), qty.intValue());
+            }
+        }
+        return stockMap;
     }
 }

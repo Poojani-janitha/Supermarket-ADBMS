@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, effect } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
@@ -1696,6 +1696,30 @@ export class PosComponent {
   lookupOrderId: number | null = null;
   foundOrder = signal<{ id: number; customer: string; amount: number; status: 'COMPLETED' | 'CANCELLED' } | null>(null);
 
+  constructor() {
+    this.refreshStock();
+    effect(() => {
+      const prods = this.productService.products();
+      if (prods.length > 0 && prods.some(p => p.stockQty === 0)) {
+        this.refreshStock();
+      }
+    }, { allowSignalWrites: true });
+  }
+
+  refreshStock(): void {
+    this.http.get<Record<string, number>>('/api/orders/stock?branchId=1').subscribe({
+      next: (stockMap) => {
+        if (!stockMap) return;
+        this.productService.products.update(list =>
+          list.map(p => ({
+            ...p,
+            stockQty: stockMap[p.id] !== undefined ? stockMap[p.id] : p.stockQty
+          }))
+        );
+      }
+    });
+  }
+
   openLookupModal(): void {
     this.isLookupOpen.set(true);
     this.foundOrder.set(null);
@@ -1727,6 +1751,7 @@ export class PosComponent {
         this.foundOrder.update(o => o ? { ...o, status: 'CANCELLED' } : null);
         alert(`Order #${this.lookupOrderId} cancelled successfully. Stock restored.`);
         this.productService.loadProducts();
+        this.refreshStock();
       },
       error: (err) => {
         const msg = err?.error?.message || err?.error?.error || 'Cancellation failed';

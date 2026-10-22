@@ -256,6 +256,17 @@ export class CartService {
         this.cartItems.set([]);
         // Reload live inventory from MySQL
         this.productService.loadProducts();
+        this.http.get<Record<string, number>>('/api/orders/stock?branchId=1').subscribe({
+          next: (stockMap) => {
+            if (!stockMap) return;
+            this.productService.products.update(list =>
+              list.map(p => ({
+                ...p,
+                stockQty: stockMap[p.id] !== undefined ? stockMap[p.id] : p.stockQty
+              }))
+            );
+          }
+        });
       },
       error: (err) => {
         this.isSubmitting.set(false);
