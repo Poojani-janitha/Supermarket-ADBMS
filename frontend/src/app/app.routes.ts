@@ -27,8 +27,13 @@ export const routes: Routes = [
     loadComponent: () => import('./features/purchase-orders/pages/purchase-orders/purchase-orders.component').then(m => m.PurchaseOrdersComponent)
   },
   {
-    path: 'supplier-portal',
+    path: 'orders',
     loadComponent: () => import('./features/supplier-portal/pages/supplier-portal/supplier-portal.component').then(m => m.SupplierPortalComponent)
+  },
+  {
+    path: 'supplier-portal',
+    redirectTo: 'orders',
+    pathMatch: 'full'
   },
   {
     path: 'customers',

@@ -167,7 +167,7 @@ import { Customer, Product, SalesOrder } from '../../core/models';
               <span class="status-dot"></span>
               <h2 class="register-name">{{ cartService.registerTitle() }}</h2>
             </div>
-            <span class="cashier-subtitle">Floyd Miles &bull; Colombo Central Branch</span>
+            <span class="cashier-subtitle">{{ authService.currentUser().fullName }} &bull; {{ authService.currentUser().branchName || 'Colombo Central Branch' }}</span>
           </div>
 
           <div class="header-right-btns">
@@ -1699,7 +1699,8 @@ export class PosComponent {
   }
 
   refreshStock(): void {
-    this.http.get<Record<string, number>>('/api/orders/stock?branchId=1').subscribe({
+    const branchId = this.authService.currentUser().branchId || 1;
+    this.http.get<Record<string, number>>(`/api/orders/stock?branchId=${branchId}`).subscribe({
       next: (stockMap) => {
         if (!stockMap) return;
         this.productService.products.update(list =>
