@@ -36,13 +36,27 @@ public class AuthDao {
             @SuppressWarnings("unchecked")
             List<Map<String, Object>> list = (List<Map<String, Object>>) out.get("#result-set-1");
             if (list != null && !list.isEmpty()) {
-                return Optional.of(list.get(0));
+                Map<String, Object> row = list.get(0);
+                // Augment with branch name if missing
+                if (!row.containsKey("branch_name") && row.get("branch_id") != null) {
+                    try {
+                        String bName = jdbcTemplate.queryForObject(
+                                "SELECT name FROM branch WHERE branch_id = ?",
+                                String.class,
+                                row.get("branch_id")
+                        );
+                        row.put("branch_name", bName);
+                    } catch (Exception ignored) {
+                    }
+                }
+                return Optional.of(row);
             }
         } catch (Exception ex) {
-            // Fallback direct query if procedure result set handling differs by driver version
+            // Direct query if procedure result set handling differs by driver version
             List<Map<String, Object>> list = jdbcTemplate.queryForList(
-                    "SELECT employee_id, branch_id, full_name, role, password_hash, is_active " +
-                    "FROM employee WHERE username = ? AND is_active = TRUE",
+                    "SELECT e.employee_id, e.branch_id, b.name AS branch_name, e.full_name, e.role, e.password_hash, e.is_active " +
+                    "FROM employee e LEFT JOIN branch b ON b.branch_id = e.branch_id " +
+                    "WHERE e.username = ? AND e.is_active = TRUE",
                     username
             );
             if (!list.isEmpty()) {

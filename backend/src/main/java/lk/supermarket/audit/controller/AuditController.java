@@ -146,4 +146,42 @@ public class AuditController {
         Map<String, Object> result = auditService.restoreDatabase(fileName, performer);
         return ResponseEntity.ok(result);
     }
+
+    @GetMapping("/roles")
+    public ResponseEntity<List<String>> getRoles() {
+        return ResponseEntity.ok(auditService.getAvailableRoles());
+    }
+
+    @GetMapping("/objects")
+    public ResponseEntity<List<Map<String, Object>>> getDatabaseObjects() {
+        return ResponseEntity.ok(auditService.getDatabaseObjects());
+    }
+
+    @GetMapping("/privileges")
+    public ResponseEntity<List<Map<String, Object>>> getRolePrivileges(@RequestParam(required = false) String role) {
+        return ResponseEntity.ok(auditService.getRolePrivileges(role));
+    }
+
+    @PostMapping("/privileges")
+    public ResponseEntity<Map<String, String>> savePrivileges(
+            @RequestBody Map<String, Object> body,
+            @RequestHeader(value = "Authorization", required = false) String authHeader
+    ) {
+        String role = (String) body.get("role");
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> rules = (List<Map<String, String>>) body.get("rules");
+        String performer = "Admin";
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            try {
+                String username = jwtUtil.extractUsername(authHeader.substring(7));
+                if (username != null && !username.isBlank()) {
+                    performer = username;
+                }
+            } catch (Exception ignored) {}
+        }
+        if (role != null && rules != null) {
+            auditService.saveRolePrivileges(role, rules, performer);
+        }
+        return ResponseEntity.ok(Map.of("message", "Role privileges saved successfully in database"));
+    }
 }

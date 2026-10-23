@@ -18,10 +18,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
             <span class="material-symbols-outlined logo-icon">storefront</span>
           </div>
           <h1 class="brand-title">EMERALD SUPERMARKET</h1>
-          <p class="brand-subtitle">Enterprise ADBMS & B2B Vendor Management System</p>
-          <div class="adbms-tag">
-            <span>ADBMS Modules 2 & 8 &bull; Role-Based Security & Supplier Portal</span>
-          </div>
+          <p class="brand-subtitle">Point of Sale & Retail Management System</p>
         </div>
 
         <!-- Portal Type Selector Tabs -->
@@ -46,70 +43,6 @@ import { InventoryService } from '../../../core/services/inventory.service';
           </button>
         </div>
 
-        <!-- ======================= STAFF VIEW ======================= -->
-        @if (portalType() === 'STAFF') {
-          <!-- Role Demo Quick Selector -->
-          <div class="demo-role-selector">
-            <span class="selector-label">Quick Viva Demo Switcher (sp_get_login):</span>
-            <div class="role-chips">
-              <button
-                type="button"
-                class="role-chip"
-                [class.active]="username === 'cashier_floyd'"
-                (click)="selectQuickUser('cashier_floyd', 'Cashier@2026')"
-              >
-                <span class="material-symbols-outlined">point_of_sale</span>
-                <span>Floyd (cashier)</span>
-              </button>
-              <button
-                type="button"
-                class="role-chip"
-                [class.active]="username === 'manager_arlene'"
-                (click)="selectQuickUser('manager_arlene', 'Manager#Secure9')"
-              >
-                <span class="material-symbols-outlined">badge</span>
-                <span>Arlene (manager)</span>
-              </button>
-              <button
-                type="button"
-                class="role-chip"
-                [class.active]="username === 'admin_kavindu'"
-                (click)="selectQuickUser('admin_kavindu', 'Admin$KeyPass2026!')"
-              >
-                <span class="material-symbols-outlined">admin_panel_settings</span>
-                <span>Kavindu (admin)</span>
-              </button>
-            </div>
-          </div>
-        }
-
-        <!-- ======================= SUPPLIER VIEW ======================= -->
-        @if (portalType() === 'SUPPLIER' && !showSupplierSignUp()) {
-          <div class="demo-role-selector supplier-demo">
-            <span class="selector-label">Vendor Portal Demo Switcher (sp_get_supplier_login):</span>
-            <div class="role-chips">
-              <button
-                type="button"
-                class="role-chip"
-                [class.active]="username === 'supplier_organics'"
-                (click)="selectQuickUser('supplier_organics', 'Supplier$2026')"
-              >
-                <span class="material-symbols-outlined">eco</span>
-                <span>Lanka Fresh Organics</span>
-              </button>
-              <button
-                type="button"
-                class="role-chip"
-                [class.active]="username === 'supplier_agro'"
-                (click)="selectQuickUser('supplier_agro', 'Supplier$2026')"
-              >
-                <span class="material-symbols-outlined">grain</span>
-                <span>Ceylon Agro Mills</span>
-              </button>
-            </div>
-          </div>
-        }
-
         <!-- Error & Success Banners -->
         @if (errorMessage()) {
           <div class="error-banner">
@@ -130,7 +63,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
           <form (ngSubmit)="handleLogin()" class="login-form">
             <div class="form-group">
               <label class="input-label">
-                {{ portalType() === 'STAFF' ? 'Employee Username (MySQL 8 RBAC)' : 'Supplier Account Username (Vendor Portal)' }}
+                {{ portalType() === 'STAFF' ? 'Employee Username' : 'Supplier Account Username' }}
               </label>
               <div class="input-wrapper">
                 <span class="material-symbols-outlined input-icon">person</span>
@@ -138,21 +71,21 @@ import { InventoryService } from '../../../core/services/inventory.service';
                   type="text"
                   [(ngModel)]="username"
                   name="username"
-                  [placeholder]="portalType() === 'STAFF' ? 'e.g. cashier_floyd or manager_arlene' : 'e.g. supplier_organics or supplier_agro'"
+                  placeholder="Enter your username..."
                   required
                 />
               </div>
             </div>
 
             <div class="form-group">
-              <label class="input-label">Password (Verified via BCrypt)</label>
+              <label class="input-label">Password</label>
               <div class="input-wrapper">
                 <span class="material-symbols-outlined input-icon">lock</span>
                 <input
                   type="password"
                   [(ngModel)]="password"
                   name="password"
-                  placeholder="Enter password..."
+                  placeholder="Enter your password..."
                   (ngModelChange)="onPasswordInput($event)"
                   required
                 />
@@ -170,7 +103,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
                     ></div>
                   </div>
                   <div class="strength-labels">
-                    <span class="fn-tag">fn_check_password_strength:</span>
+                    <span class="fn-tag">Password Strength:</span>
                     <strong
                       [class.text-weak]="pwdStrength().score <= 2"
                       [class.text-medium]="pwdStrength().score === 3 || pwdStrength().score === 4"
@@ -253,17 +186,6 @@ import { InventoryService } from '../../../core/services/inventory.service';
             </div>
           </form>
         }
-
-        <!-- Academic & Architecture Footer -->
-        <div class="card-footer-info">
-          <div class="db-object-pill">
-            <span class="material-symbols-outlined">database</span>
-            <span>MySQL 8: sp_get_login &bull; sp_get_supplier_login &bull; RBAC</span>
-          </div>
-          <p class="architecture-note">
-            Role privileges enforced at database level. Suppliers authenticate into their segregated portal with access restricted exclusively to assigned purchase orders.
-          </p>
-        </div>
       </div>
     </div>
   `,
@@ -369,71 +291,6 @@ import { InventoryService } from '../../../core/services/inventory.service';
       }
     }
 
-    .demo-role-selector {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 14px;
-      padding: 10px 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-
-      &.supplier-demo {
-        background: #f0f9ff;
-        border-color: #bae6fd;
-        .role-chip {
-          border-color: #93c5fd;
-          &:hover { background: #e0f2fe; }
-          &.active { background: #0284c7; border-color: #0284c7; }
-        }
-      }
-    }
-
-    .selector-label {
-      font-size: 0.72rem;
-      font-weight: 700;
-      color: #475569;
-      text-transform: uppercase;
-      letter-spacing: 0.3px;
-    }
-
-    .role-chips {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 6px;
-    }
-
-    .supplier-demo .role-chips {
-      grid-template-columns: 1fr 1fr;
-    }
-
-    .role-chip {
-      background: #ffffff;
-      border: 1px solid #cbd5e1;
-      border-radius: 8px;
-      padding: 6px 4px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 2px;
-      cursor: pointer;
-      font-size: 0.7rem;
-      font-weight: 600;
-      color: #334155;
-      transition: all 0.15s;
-
-      .material-symbols-outlined { font-size: 16px; color: #065f46; }
-
-      &:hover { border-color: #065f46; background: #f0fdf4; }
-
-      &.active {
-        background: #065f46;
-        color: #ffffff;
-        border-color: #065f46;
-        .material-symbols-outlined { color: #ffffff; }
-      }
-    }
-
     .login-form, .signup-form {
       display: flex;
       flex-direction: column;
@@ -503,8 +360,8 @@ import { InventoryService } from '../../../core/services/inventory.service';
     .strength-labels {
       display: flex;
       justify-content: space-between;
-      font-size: 0.7rem;
-      .fn-tag { color: #64748b; font-family: monospace; }
+      font-size: 0.72rem;
+      .fn-tag { color: #64748b; font-family: inherit; font-weight: 600; }
       .text-weak { color: #dc2626; }
       .text-medium { color: #d97706; }
       .text-strong { color: #059669; }
@@ -616,39 +473,6 @@ import { InventoryService } from '../../../core/services/inventory.service';
       font-size: 0.8rem;
       font-weight: 600;
     }
-
-    .card-footer-info {
-      border-top: 1px solid #f1f5f9;
-      padding-top: 14px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      text-align: center;
-    }
-
-    .db-object-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      color: #475569;
-      font-size: 0.7rem;
-      font-weight: 600;
-      padding: 4px 12px;
-      border-radius: 20px;
-      margin: 0 auto;
-      font-family: monospace;
-
-      .material-symbols-outlined { font-size: 15px; color: #065f46; }
-    }
-
-    .architecture-note {
-      font-size: 0.7rem;
-      color: #94a3b8;
-      line-height: 1.4;
-      margin: 0;
-    }
   `]
 })
 export class LoginComponent {
@@ -659,14 +483,14 @@ export class LoginComponent {
   portalType = signal<'STAFF' | 'SUPPLIER'>('STAFF');
   showSupplierSignUp = signal(false);
 
-  username = 'cashier_floyd';
-  password = 'Cashier@2026';
+  username = '';
+  password = '';
 
   isLoading = signal(false);
   errorMessage = signal<string | null>(null);
   successMessage = signal<string | null>(null);
 
-  pwdStrength = signal({ score: 4, label: 'Medium', valid: true });
+  pwdStrength = signal({ score: 0, label: '', valid: false });
 
   // Supplier self registration model
   newSupplier = {
@@ -685,12 +509,9 @@ export class LoginComponent {
     this.showSupplierSignUp.set(false);
     this.errorMessage.set(null);
     this.successMessage.set(null);
-
-    if (type === 'STAFF') {
-      this.selectQuickUser('cashier_floyd', 'Cashier@2026');
-    } else {
-      this.selectQuickUser('supplier_organics', 'Supplier$2026');
-    }
+    this.username = '';
+    this.password = '';
+    this.pwdStrength.set({ score: 0, label: '', valid: false });
   }
 
   toggleSignUp(val: boolean): void {
@@ -699,29 +520,30 @@ export class LoginComponent {
     this.successMessage.set(null);
   }
 
-  selectQuickUser(user: string, pass: string): void {
-    this.username = user;
-    this.password = pass;
-    this.errorMessage.set(null);
-    this.successMessage.set(null);
-    this.onPasswordInput(pass);
-  }
-
   onPasswordInput(val: string): void {
+    if (!val) {
+      this.pwdStrength.set({ score: 0, label: '', valid: false });
+      return;
+    }
     const res = this.authService.checkPasswordStrength(val);
     this.pwdStrength.set(res);
   }
 
   handleLogin(): void {
+    if (!this.username.trim() || !this.password) {
+      this.errorMessage.set('Please enter both username and password.');
+      return;
+    }
+
     this.errorMessage.set(null);
     this.successMessage.set(null);
     this.isLoading.set(true);
 
-    this.authService.loginApi(this.username, this.password).subscribe({
+    this.authService.loginApi(this.username.trim(), this.password).subscribe({
       next: (res) => {
         this.isLoading.set(false);
         const user = this.authService.currentUser();
-        this.successMessage.set(`Welcome ${user.fullName}! Authenticated via sp_get_login with role: ${user.role}_role`);
+        this.successMessage.set(`Welcome ${user.fullName}! Logged in as ${user.role}`);
         setTimeout(() => {
           if (user.role === 'ADMIN') {
             this.router.navigate(['/admin']);
@@ -733,26 +555,9 @@ export class LoginComponent {
         }, 500);
       },
       error: (err) => {
-        // Fallback for standalone / offline demo mode
-        const ok = this.authService.login(this.username);
         this.isLoading.set(false);
-        if (ok) {
-          const user = this.authService.currentUser();
-          this.authService.setToken('viva-demo-token-' + user.username);
-          this.successMessage.set(`Welcome ${user.fullName}! (Demo Session) Role: ${user.role}_role`);
-          setTimeout(() => {
-            if (user.role === 'ADMIN') {
-              this.router.navigate(['/admin']);
-            } else if (user.role === 'SUPPLIER') {
-              this.router.navigate(['/supplier-portal']);
-            } else {
-              this.router.navigate(['/pos']);
-            }
-          }, 500);
-        } else {
-          const msg = err?.error?.message || 'Authentication failed: Invalid credentials or inactive account.';
-          this.errorMessage.set(msg);
-        }
+        const msg = err?.error?.message || err?.message || 'Authentication failed: Invalid credentials or inactive account.';
+        this.errorMessage.set(msg);
       }
     });
   }

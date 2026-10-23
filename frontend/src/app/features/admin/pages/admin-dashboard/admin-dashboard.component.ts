@@ -14,9 +14,9 @@ import { Employee, BackupInfo } from '../../../../core/models';
       <!-- Header -->
       <div class="page-header">
         <div>
-          <h1 class="page-title">Enterprise Security & Administration</h1>
+          <h1 class="page-title">Security</h1>
           <p class="page-subtitle">
-            Manage system staff roles, customer data privacy, automated audit trails, and database disaster recovery.
+            Access control, database role privileges, employee permissions, data masking, and audit trails.
           </p>
         </div>
         <div class="role-badge-box">
@@ -331,68 +331,77 @@ import { Employee, BackupInfo } from '../../../../core/models';
       <!-- ================= TAB 4: MYSQL 8 RBAC MATRIX ================= -->
       @if (activeTab() === 'MATRIX') {
         <div class="section-card">
-          <div class="card-title-row">
-            <span class="material-symbols-outlined" style="color: #065f46;">shield_with_house</span>
-            <div>
-              <h3>MySQL 8 Role-Based Access Control (RBAC) Matrix</h3>
-              <p class="card-meta">Configured via CREATE ROLE cashier_role, manager_role, admin_role</p>
+          <div class="card-title-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span class="material-symbols-outlined" style="color: #065f46; font-size: 28px;">shield_with_house</span>
+              <div>
+                <h3>MySQL 8 Role-Based Access Control (RBAC) Matrix</h3>
+                <p class="card-meta">Database level object privileges and procedures enforced across roles</p>
+              </div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button class="btn-pill btn-danger-outline" (click)="testUnauthorizedGuard('inventory', 'EXECUTE')" title="Simulate unauthorized Cashier access on inventory">
+                <span class="material-symbols-outlined">gpp_bad</span> 🚨 Test Unauthorized Action Guard
+              </button>
+              <button class="btn-pill btn-primary" (click)="openAddRuleModal()">
+                <span class="material-symbols-outlined">add_moderator</span> + Add New Rule
+              </button>
             </div>
           </div>
 
-          <table class="data-table rbac-table">
-            <thead>
-              <tr>
-                <th>DATABASE OBJECT / TOPIC</th>
-                <th>CASHIER ROLE (cashier_role)</th>
-                <th>MANAGER ROLE (manager_role)</th>
-                <th>ADMIN ROLE (admin_role)</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>sales_order & order_item</strong></td>
-                <td><span class="grant-badge yes">SELECT, INSERT</span></td>
-                <td><span class="grant-badge yes">ALL PRIVILEGES</span></td>
-                <td><span class="grant-badge yes">ALL PRIVILEGES</span></td>
-              </tr>
-              <tr>
-                <td><strong>v_masked_customer_directory</strong></td>
-                <td><span class="grant-badge yes">SELECT (Masked Phone)</span></td>
-                <td><span class="grant-badge yes">SELECT (Raw Customer)</span></td>
-                <td><span class="grant-badge yes">ALL PRIVILEGES</span></td>
-              </tr>
-              <tr>
-                <td><strong>sp_place_order & sp_cancel_order</strong></td>
-                <td><span class="grant-badge yes">EXECUTE</span></td>
-                <td><span class="grant-badge yes">EXECUTE</span></td>
-                <td><span class="grant-badge yes">EXECUTE</span></td>
-              </tr>
-              <tr>
-                <td><strong>inventory (sp_add_stock, sp_transfer_stock)</strong></td>
-                <td><span class="grant-badge no">DENIED</span></td>
-                <td><span class="grant-badge yes">EXECUTE</span></td>
-                <td><span class="grant-badge yes">EXECUTE</span></td>
-              </tr>
-              <tr>
-                <td><strong>product & discount_rule CRUD</strong></td>
-                <td><span class="grant-badge no">DENIED</span></td>
-                <td><span class="grant-badge yes">SELECT, INSERT, UPDATE</span></td>
-                <td><span class="grant-badge yes">ALL PRIVILEGES</span></td>
-              </tr>
-              <tr>
-                <td><strong>employee_audit_log & security_event_log</strong></td>
-                <td><span class="grant-badge no">DENIED</span></td>
-                <td><span class="grant-badge yes">SELECT</span></td>
-                <td><span class="grant-badge yes">ALL PRIVILEGES</span></td>
-              </tr>
-              <tr>
-                <td><strong>sp_deactivate_employee & sp_change_user_role</strong></td>
-                <td><span class="grant-badge no">DENIED</span></td>
-                <td><span class="grant-badge no">DENIED</span></td>
-                <td><span class="grant-badge yes">EXECUTE</span></td>
-              </tr>
-            </tbody>
-          </table>
+          <!-- Dynamic Interactive RBAC Matrix Table -->
+          <div style="overflow-x: auto; margin-top: 10px;">
+            <table class="data-table rbac-table">
+              <thead>
+                <tr>
+                  <th style="min-width: 220px;">DATABASE OBJECT</th>
+                  <th style="width: 100px;">TYPE</th>
+                  @for (role of matrixRoles(); track role) {
+                    <th style="text-align: center;">{{ role }} ROLE ({{ role.toLowerCase() }}_role)</th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (obj of allDbObjects(); track obj.name) {
+                  <tr>
+                    <td>
+                      <div class="db-obj-col">
+                        <strong class="db-obj-name">{{ obj.name }}</strong>
+                        <span class="db-obj-desc">{{ obj.description }}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span
+                        class="type-pill"
+                        [class.type-table]="obj.type === 'TABLE'"
+                        [class.type-view]="obj.type === 'VIEW'"
+                        [class.type-proc]="obj.type === 'PROCEDURE'"
+                      >
+                        {{ obj.type }}
+                      </span>
+                    </td>
+                    @for (role of matrixRoles(); track role) {
+                      <td style="text-align: center;">
+                        @let privs = getPrivilegesForObject(role, obj.name);
+                        @if (privs === 'DENIED' || !privs) {
+                          <button
+                            type="button"
+                            class="grant-badge no interactive-deny"
+                            (click)="triggerUnauthorizedForUser(role, obj.name)"
+                            title="Click to test database security guard on denied object"
+                          >
+                            DENIED
+                          </button>
+                        } @else {
+                          <span class="grant-badge yes">{{ privs }}</span>
+                        }
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
 
           <div class="db-user-box">
             <h4>Dedicated Least-Privilege Database Accounts:</h4>
@@ -573,9 +582,9 @@ import { Employee, BackupInfo } from '../../../../core/models';
               <div class="form-group">
                 <label>Select New Role:</label>
                 <select [(ngModel)]="newRoleSelection" class="select-input">
-                  <option value="CASHIER">CASHIER (cashier_role)</option>
-                  <option value="MANAGER">MANAGER (manager_role)</option>
-                  <option value="ADMIN">ADMIN (admin_role)</option>
+                  @for (r of availableRoles(); track r) {
+                    <option [value]="r">{{ r }} ({{ r.toLowerCase() }}_role)</option>
+                  }
                 </select>
               </div>
               <div class="info-note">
@@ -615,9 +624,9 @@ import { Employee, BackupInfo } from '../../../../core/models';
               <div class="form-group">
                 <label>Database Role:</label>
                 <select [(ngModel)]="newEmpRole" class="select-input">
-                  <option value="CASHIER">CASHIER (cashier_role)</option>
-                  <option value="MANAGER">MANAGER (manager_role)</option>
-                  <option value="ADMIN">ADMIN (admin_role)</option>
+                  @for (r of availableRoles(); track r) {
+                    <option [value]="r">{{ r }} ({{ r.toLowerCase() }}_role)</option>
+                  }
                 </select>
               </div>
               <div class="form-group">
@@ -625,7 +634,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
                 <input type="text" [(ngModel)]="newEmpUsername" placeholder="e.g. cashier_sunil" class="select-input" />
               </div>
               <div class="form-group">
-                <label>Password (fn_check_password_strength):</label>
+                <label>Password:</label>
                 <input type="password" [(ngModel)]="newEmpPassword" placeholder="Min 8 chars, mixed case, numbers" class="select-input" />
               </div>
               <div class="info-note">
@@ -675,6 +684,212 @@ import { Employee, BackupInfo } from '../../../../core/models';
                 } @else {
                   <span class="material-symbols-outlined">restart_alt</span> Confirm & Rebuild Database
                 }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- MODAL: ADD / CONFIGURE ROLE PRIVILEGE RULE -->
+      @if (isAddRuleModalOpen()) {
+        <div class="modal-backdrop">
+          <div class="modal-card modal-large">
+            <div class="modal-header">
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span class="material-symbols-outlined" style="color: #065f46; font-size: 26px;">security</span>
+                <div>
+                  <h3 style="margin: 0;">Configure Database Role Privilege Rules</h3>
+                  <p class="card-meta" style="margin: 2px 0 0 0;">Define granular SQL action privileges per database object and persist to database</p>
+                </div>
+              </div>
+              <button class="close-btn" (click)="isAddRuleModalOpen.set(false)">&times;</button>
+            </div>
+
+            <div class="modal-body rule-builder-body">
+              <!-- Role Selection / Creation Row -->
+              <div class="role-selection-card">
+                <div class="form-row-compact">
+                  <div class="role-mode-toggle">
+                    <label class="radio-label">
+                      <input type="radio" name="ruleRoleMode" value="EXISTING" [(ngModel)]="ruleRoleMode" (change)="onRuleRoleModeChange()" />
+                      <span>Select Available Role</span>
+                    </label>
+                    <label class="radio-label">
+                      <input type="radio" name="ruleRoleMode" value="NEW" [(ngModel)]="ruleRoleMode" (change)="onRuleRoleModeChange()" />
+                      <span>+ Add New Custom Role</span>
+                    </label>
+                  </div>
+
+                  @if (ruleRoleMode === 'EXISTING') {
+                    <div class="form-group-inline">
+                      <label>Target Role:</label>
+                      <select [(ngModel)]="selectedRuleRole" (change)="onRuleRoleSelected()" class="select-input select-role-input">
+                        @for (r of availableRoles(); track r) {
+                          <option [value]="r">{{ r }} ({{ r.toLowerCase() }}_role)</option>
+                        }
+                      </select>
+                    </div>
+                  } @else {
+                    <div class="form-group-inline">
+                      <label>New Role Name:</label>
+                      <input
+                        type="text"
+                        [(ngModel)]="newCustomRoleName"
+                        placeholder="e.g. INVENTORY_CLERK or AUDITOR"
+                        class="select-input input-role-name"
+                      />
+                    </div>
+                  }
+                </div>
+
+                <!-- Presets Row -->
+                <div class="presets-row">
+                  <span class="presets-label">Quick Presets:</span>
+                  <button type="button" class="btn-preset" (click)="applyRulePreset('READ_ONLY')">Read Only (SELECT / EXECUTE)</button>
+                  <button type="button" class="btn-preset" (click)="applyRulePreset('ALL')">Grant All Privileges</button>
+                  <button type="button" class="btn-preset danger" (click)="applyRulePreset('DENY_ALL')">Deny All</button>
+                </div>
+              </div>
+
+              <!-- Objects & Action Privileges Table -->
+              <div class="rule-table-container">
+                <table class="data-table rule-builder-table">
+                  <thead>
+                    <tr>
+                      <th style="min-width: 180px;">DATABASE OBJECT</th>
+                      <th style="width: 110px;">OBJECT TYPE</th>
+                      <th>ACTIONS / PRIVILEGES (CLICK TO TOGGLE)</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (obj of allDbObjects(); track obj.name) {
+                      <tr>
+                        <td>
+                          <strong>{{ obj.name }}</strong>
+                          <div class="sub-meta">{{ obj.description }}</div>
+                        </td>
+                        <td>
+                          <span
+                            class="type-pill"
+                            [class.type-table]="obj.type === 'TABLE'"
+                            [class.type-view]="obj.type === 'VIEW'"
+                            [class.type-proc]="obj.type === 'PROCEDURE'"
+                          >
+                            {{ obj.type }}
+                          </span>
+                        </td>
+                        <td>
+                          <div class="priv-actions-group">
+                            @if (obj.type === 'PROCEDURE') {
+                              <button
+                                type="button"
+                                class="priv-badge-btn"
+                                [class.active]="isPrivilegeActive(obj.name, 'EXECUTE')"
+                                (click)="togglePrivilege(obj.name, 'EXECUTE')"
+                              >
+                                EXECUTE
+                              </button>
+                            } @else {
+                              <button
+                                type="button"
+                                class="priv-badge-btn"
+                                [class.active]="isPrivilegeActive(obj.name, 'SELECT')"
+                                (click)="togglePrivilege(obj.name, 'SELECT')"
+                              >
+                                SELECT
+                              </button>
+                              <button
+                                type="button"
+                                class="priv-badge-btn"
+                                [class.active]="isPrivilegeActive(obj.name, 'INSERT')"
+                                (click)="togglePrivilege(obj.name, 'INSERT')"
+                              >
+                                INSERT
+                              </button>
+                              <button
+                                type="button"
+                                class="priv-badge-btn"
+                                [class.active]="isPrivilegeActive(obj.name, 'UPDATE')"
+                                (click)="togglePrivilege(obj.name, 'UPDATE')"
+                              >
+                                UPDATE
+                              </button>
+                              <button
+                                type="button"
+                                class="priv-badge-btn"
+                                [class.active]="isPrivilegeActive(obj.name, 'DELETE')"
+                                (click)="togglePrivilege(obj.name, 'DELETE')"
+                              >
+                                DELETE
+                              </button>
+                            }
+                          </div>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="modal-footer">
+              <button class="btn-pill btn-secondary" (click)="isAddRuleModalOpen.set(false)">Cancel</button>
+              <button class="btn-pill btn-primary" [disabled]="isSavingRule()" (click)="saveRule()">
+                @if (isSavingRule()) {
+                  <span class="material-symbols-outlined rotating">progress_activity</span> Saving Rule...
+                } @else {
+                  <span class="material-symbols-outlined">save</span> Save Rule
+                }
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- RED WARNING STYLE POPUP MODAL (SECURITY VIOLATION) -->
+      @if (authService.securityAlert(); as alert) {
+        <div class="modal-backdrop security-alert-backdrop">
+          <div class="modal-card security-alert-card">
+            <div class="security-alert-header">
+              <div class="security-icon-circle">
+                <span class="material-symbols-outlined" style="font-size: 26px;">gpp_bad</span>
+              </div>
+              <div style="flex: 1;">
+                <h3 class="security-alert-title">{{ alert.title }}</h3>
+                <span class="security-alert-badge">RBAC SECURITY VIOLATION</span>
+              </div>
+              <button class="close-btn" (click)="authService.closeSecurityAlert()">&times;</button>
+            </div>
+            <div class="modal-body security-alert-body">
+              <div class="alert-banner-box">
+                <span class="material-symbols-outlined alert-main-icon">report</span>
+                <div class="alert-banner-text">
+                  <strong>{{ alert.message }}</strong>
+                  <p>Attempted Action: <code>{{ alert.action }}</code> on Database Object: <code>{{ alert.objectName }}</code></p>
+                </div>
+              </div>
+              <div class="security-details-grid">
+                <div class="detail-item">
+                  <span class="detail-label">Active User Role:</span>
+                  <span class="detail-val role-highlight">{{ alert.role }}_ROLE</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Target Object:</span>
+                  <span class="detail-val"><code>{{ alert.objectName }}</code></span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Required Privilege:</span>
+                  <span class="detail-val privilege-highlight">{{ alert.action }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Audit Log Status:</span>
+                  <span class="detail-val status-logged">Logged to security_event_log</span>
+                </div>
+              </div>
+            </div>
+            <div class="modal-footer security-alert-footer">
+              <button class="btn-pill btn-danger" (click)="authService.closeSecurityAlert()">
+                <span class="material-symbols-outlined">close</span> Dismiss Security Warning
               </button>
             </div>
           </div>
@@ -1394,6 +1609,393 @@ import { Employee, BackupInfo } from '../../../../core/models';
       from { opacity: 0; transform: translateY(12px) scale(0.97); }
       to { opacity: 1; transform: translateY(0) scale(1); }
     }
+
+    /* Dynamic Role Privilege Matrix Styles */
+    .db-obj-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .db-obj-name {
+      font-family: 'Fira Code', monospace;
+      font-size: 0.82rem;
+      color: #0f172a;
+    }
+
+    .db-obj-desc {
+      font-size: 0.72rem;
+      color: #64748b;
+    }
+
+    .type-pill {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 6px;
+      letter-spacing: 0.03em;
+      display: inline-block;
+
+      &.type-table { background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; }
+      &.type-view { background: #f3e8ff; color: #7e22ce; border: 1px solid #e9d5ff; }
+      &.type-proc { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    }
+
+    .interactive-deny {
+      cursor: pointer;
+      border: 1px dashed #ef4444;
+      background: #fef2f2;
+      color: #dc2626;
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: #dc2626;
+        color: #ffffff;
+        border-style: solid;
+        box-shadow: 0 2px 6px rgba(220, 38, 38, 0.25);
+      }
+    }
+
+    /* Modal Large (Add Rule Builder) */
+    .modal-large {
+      width: 880px;
+      max-width: 95vw;
+      max-height: 90vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .rule-builder-body {
+      overflow-y: auto;
+      max-height: calc(85vh - 140px);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding-right: 4px;
+    }
+
+    .role-selection-card {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .form-row-compact {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .role-mode-toggle {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .radio-label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #334155;
+      cursor: pointer;
+
+      input[type="radio"] {
+        accent-color: var(--primary-green);
+        cursor: pointer;
+      }
+    }
+
+    .form-group-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      label {
+        font-size: 0.8rem;
+        font-weight: 700;
+        color: #475569;
+        white-space: nowrap;
+      }
+    }
+
+    .select-role-input, .input-role-name {
+      padding: 7px 12px;
+      font-size: 0.82rem;
+      min-width: 220px;
+    }
+
+    .presets-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      padding-top: 8px;
+      border-top: 1px solid #edf2f7;
+    }
+
+    .presets-label {
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .btn-preset {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: #334155;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: #f1f5f9;
+        border-color: #94a3b8;
+      }
+
+      &.danger {
+        color: #dc2626;
+        border-color: #fca5a5;
+        background: #fff5f5;
+
+        &:hover {
+          background: #fee2e2;
+        }
+      }
+    }
+
+    .rule-table-container {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .rule-builder-table {
+      margin: 0;
+      width: 100%;
+
+      th {
+        background: #f8fafc;
+        padding: 10px 14px;
+        font-size: 0.76rem;
+      }
+
+      td {
+        padding: 10px 14px;
+        vertical-align: middle;
+      }
+    }
+
+    .priv-actions-group {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .priv-badge-btn {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      border: 1px solid #cbd5e1;
+      background: #f8fafc;
+      color: #64748b;
+      transition: all 0.15s ease;
+
+      &:hover {
+        border-color: #065f46;
+        color: #065f46;
+      }
+
+      &.active {
+        background: #dcfce7;
+        color: #15803d;
+        border-color: #86efac;
+        box-shadow: 0 1px 3px rgba(22, 101, 52, 0.12);
+      }
+    }
+
+    /* Red Warning Style Popup Modal (Security Violation) */
+    .security-alert-backdrop {
+      background: rgba(69, 10, 10, 0.55);
+    }
+
+    .security-alert-card {
+      border: 2px solid #ef4444;
+      box-shadow: 0 25px 50px -12px rgba(220, 38, 38, 0.35);
+      width: 520px;
+      max-width: 95vw;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    .security-alert-header {
+      background: #fef2f2;
+      border-bottom: 1px solid #fee2e2;
+      padding: 18px 22px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .security-icon-circle {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: #fee2e2;
+      color: #dc2626;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .security-alert-title {
+      color: #991b1b;
+      font-weight: 800;
+      font-size: 1.05rem;
+      margin: 0;
+    }
+
+    .security-alert-badge {
+      background: #dc2626;
+      color: #ffffff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      padding: 2px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+    }
+
+    .security-alert-body {
+      padding: 20px 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .alert-banner-box {
+      display: flex;
+      gap: 12px;
+      background: #fff5f5;
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #7f1d1d;
+
+      .alert-main-icon {
+        font-size: 26px;
+        color: #dc2626;
+        flex-shrink: 0;
+      }
+
+      .alert-banner-text {
+        font-size: 0.84rem;
+        line-height: 1.4;
+
+        strong {
+          display: block;
+          margin-bottom: 4px;
+          color: #991b1b;
+        }
+
+        p {
+          margin: 0;
+          font-size: 0.78rem;
+          color: #b91c1c;
+        }
+
+        code {
+          background: #fee2e2;
+          padding: 2px 6px;
+          border-radius: 4px;
+          font-family: 'Fira Code', monospace;
+          color: #991b1b;
+          font-weight: 700;
+        }
+      }
+    }
+
+    .security-details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .detail-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .detail-val {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #1e293b;
+
+      code {
+        font-family: 'Fira Code', monospace;
+        color: #0369a1;
+      }
+
+      &.role-highlight {
+        color: #dc2626;
+      }
+
+      &.privilege-highlight {
+        color: #b91c1c;
+      }
+
+      &.status-logged {
+        color: #059669;
+        font-size: 0.76rem;
+      }
+    }
+
+    .security-alert-footer {
+      padding: 14px 22px;
+      background: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .btn-danger {
+      background: #dc2626;
+      color: #ffffff;
+      border: none;
+      font-weight: 700;
+
+      &:hover {
+        background: #b91c1c;
+      }
+    }
   `]
 })
 export class AdminDashboardComponent implements OnInit {
@@ -1407,13 +2009,112 @@ export class AdminDashboardComponent implements OnInit {
   selectedBackupForRestore = signal<BackupInfo | null>(null);
 
   selectedEmployeeForRole = signal<Employee | null>(null);
-  newRoleSelection: 'ADMIN' | 'MANAGER' | 'CASHIER' = 'CASHIER';
+  newRoleSelection: string = 'CASHIER';
+
+  // Dynamic Role Privilege Matrix and Rules Engine State
+  availableRoles = signal<string[]>(['ADMIN', 'MANAGER', 'CASHIER', 'SUPPLIER']);
+  dbObjects = signal<any[]>([]);
+  customRolePrivileges = signal<{ [role: string]: { [object: string]: string } }>({});
+
+  isAddRuleModalOpen = signal<boolean>(false);
+  isSavingRule = signal<boolean>(false);
+  ruleRoleMode: 'EXISTING' | 'NEW' = 'EXISTING';
+  selectedRuleRole = 'CASHIER';
+  newCustomRoleName = '';
+  ruleBuilderPrivileges = signal<{ [objectName: string]: string[] }>({});
+
+  readonly defaultDbObjects = [
+    { name: 'sales_order', type: 'TABLE', description: 'Order transaction records & checkout receipts' },
+    { name: 'order_item', type: 'TABLE', description: 'Individual line items and scanned quantities' },
+    { name: 'customer', type: 'TABLE', description: 'Shopper directory & accumulated loyalty points' },
+    { name: 'product', type: 'TABLE', description: 'Merchandise catalog, barcodes, and retail pricing' },
+    { name: 'inventory', type: 'TABLE', description: 'Branch stock levels & minimum reorder points' },
+    { name: 'discount_rule', type: 'TABLE', description: 'Promotional rules and active category discounts' },
+    { name: 'purchase_order', type: 'TABLE', description: 'Supplier restock purchase orders & status' },
+    { name: 'employee', type: 'TABLE', description: 'Staff credentials and system role assignments' },
+    { name: 'employee_audit_log', type: 'TABLE', description: 'Trigger-based employee change audit trail' },
+    { name: 'security_event_log', type: 'TABLE', description: 'Administrative security violations & auth logs' },
+    { name: 'v_masked_customer_directory', type: 'VIEW', description: 'PII-masked customer telephone directory' },
+    { name: 'v_active_discounts', type: 'VIEW', description: 'Active promotional discount criteria' },
+    { name: 'v_low_stock', type: 'VIEW', description: 'Products currently below reorder threshold' },
+    { name: 'v_daily_sales', type: 'VIEW', description: 'Daily aggregated revenue & branch sales' },
+    { name: 'sp_place_order', type: 'PROCEDURE', description: 'Transactional multi-item checkout procedure' },
+    { name: 'sp_cancel_order', type: 'PROCEDURE', description: 'Order rollback and stock replenishment' },
+    { name: 'sp_get_login', type: 'PROCEDURE', description: 'Credential verification stored procedure' },
+    { name: 'sp_add_stock', type: 'PROCEDURE', description: 'Inventory replenishment procedure' },
+    { name: 'sp_transfer_stock', type: 'PROCEDURE', description: 'Inter-branch stock transfer procedure' },
+    { name: 'sp_deactivate_employee', type: 'PROCEDURE', description: 'Employee deactivation with self-lockout check' },
+    { name: 'sp_change_user_role', type: 'PROCEDURE', description: 'Role modification procedure firing audit trigger' }
+  ];
+
+  readonly defaultPrivilegesMap: { [role: string]: { [object: string]: string } } = {
+    'CASHIER': {
+      'sales_order': 'SELECT, INSERT',
+      'order_item': 'SELECT, INSERT',
+      'customer': 'SELECT, INSERT',
+      'product': 'SELECT',
+      'v_masked_customer_directory': 'SELECT (Masked)',
+      'v_active_discounts': 'SELECT',
+      'sp_place_order': 'EXECUTE',
+      'sp_cancel_order': 'EXECUTE',
+      'sp_get_login': 'EXECUTE'
+    },
+    'MANAGER': {
+      'sales_order': 'ALL PRIVILEGES',
+      'order_item': 'ALL PRIVILEGES',
+      'customer': 'ALL PRIVILEGES',
+      'product': 'SELECT, INSERT, UPDATE',
+      'inventory': 'SELECT, INSERT, UPDATE',
+      'discount_rule': 'SELECT, INSERT, UPDATE',
+      'purchase_order': 'ALL PRIVILEGES',
+      'employee_audit_log': 'SELECT',
+      'security_event_log': 'SELECT',
+      'v_masked_customer_directory': 'SELECT (Raw)',
+      'v_active_discounts': 'SELECT',
+      'v_low_stock': 'SELECT',
+      'v_daily_sales': 'SELECT',
+      'sp_place_order': 'EXECUTE',
+      'sp_cancel_order': 'EXECUTE',
+      'sp_add_stock': 'EXECUTE',
+      'sp_transfer_stock': 'EXECUTE',
+      'sp_get_login': 'EXECUTE'
+    },
+    'ADMIN': {
+      'sales_order': 'ALL PRIVILEGES',
+      'order_item': 'ALL PRIVILEGES',
+      'customer': 'ALL PRIVILEGES',
+      'product': 'ALL PRIVILEGES',
+      'inventory': 'ALL PRIVILEGES',
+      'discount_rule': 'ALL PRIVILEGES',
+      'purchase_order': 'ALL PRIVILEGES',
+      'employee': 'ALL PRIVILEGES',
+      'employee_audit_log': 'ALL PRIVILEGES',
+      'security_event_log': 'ALL PRIVILEGES',
+      'v_masked_customer_directory': 'ALL PRIVILEGES',
+      'v_active_discounts': 'ALL PRIVILEGES',
+      'v_low_stock': 'ALL PRIVILEGES',
+      'v_daily_sales': 'ALL PRIVILEGES',
+      'sp_place_order': 'EXECUTE',
+      'sp_cancel_order': 'EXECUTE',
+      'sp_add_stock': 'EXECUTE',
+      'sp_transfer_stock': 'EXECUTE',
+      'sp_deactivate_employee': 'EXECUTE',
+      'sp_change_user_role': 'EXECUTE',
+      'sp_get_login': 'EXECUTE'
+    },
+    'SUPPLIER': {
+      'purchase_order': 'SELECT (Assigned)',
+      'product': 'SELECT',
+      'sp_get_login': 'EXECUTE'
+    }
+  };
 
   ngOnInit(): void {
     this.authService.fetchEmployeesHttp().subscribe();
     this.authService.fetchAuditLogsHttp().subscribe();
     this.authService.fetchSecurityLogsHttp().subscribe();
     this.authService.fetchBackupsHttp().subscribe();
+    this.loadRolesAndPrivileges();
   }
 
   triggerBackup(): void {
@@ -1525,7 +2226,7 @@ export class AdminDashboardComponent implements OnInit {
       },
       error: () => {
         // Fallback for standalone demo
-        const res = this.authService.changeUserRole(emp.employeeId, this.newRoleSelection);
+        const res = this.authService.changeUserRole(emp.employeeId, this.newRoleSelection as any);
         this.actionFeedback.set(res);
         this.selectedEmployeeForRole.set(null);
       }
@@ -1560,7 +2261,7 @@ export class AdminDashboardComponent implements OnInit {
   isRegisterModalOpen = signal<boolean>(false);
   newEmpName = '';
   newEmpBranchId = 1;
-  newEmpRole: 'ADMIN' | 'MANAGER' | 'CASHIER' = 'CASHIER';
+  newEmpRole: string = 'CASHIER';
   newEmpUsername = '';
   newEmpPassword = '';
 
@@ -1583,7 +2284,7 @@ export class AdminDashboardComponent implements OnInit {
     const payload = {
       fullName: this.newEmpName,
       branchId: this.newEmpBranchId,
-      role: this.newEmpRole,
+      role: this.newEmpRole as any,
       username: this.newEmpUsername,
       password: this.newEmpPassword
     };
@@ -1607,5 +2308,196 @@ export class AdminDashboardComponent implements OnInit {
         }
       }
     });
+  }
+
+  // Dynamic Privilege Matrix & Rules Engine Helper Methods
+  matrixRoles(): string[] {
+    const list = this.availableRoles();
+    const core = ['CASHIER', 'MANAGER', 'ADMIN'];
+    const others = list.filter(r => !core.includes(r));
+    return [...core, ...others];
+  }
+
+  allDbObjects(): any[] {
+    return this.dbObjects().length > 0 ? this.dbObjects() : this.defaultDbObjects;
+  }
+
+  getPrivilegesForObject(role: string, objectName: string): string {
+    const custom = this.customRolePrivileges()[role]?.[objectName];
+    if (custom) return custom;
+    return this.defaultPrivilegesMap[role]?.[objectName] || 'DENIED';
+  }
+
+  loadRolesAndPrivileges(): void {
+    this.authService.fetchRolesHttp().subscribe({
+      next: (roles) => {
+        if (roles && roles.length > 0) {
+          this.availableRoles.set(roles);
+        }
+      }
+    });
+
+    this.authService.fetchObjectsHttp().subscribe({
+      next: (objs) => {
+        if (objs && objs.length > 0) {
+          this.dbObjects.set(objs);
+        }
+      }
+    });
+
+    this.authService.fetchRolePrivilegesHttp().subscribe({
+      next: (rules) => {
+        if (rules && rules.length > 0) {
+          const map: { [role: string]: { [obj: string]: string } } = {};
+          rules.forEach(r => {
+            const role = (r.role_name || r.roleName || '').toUpperCase();
+            const obj = r.object_name || r.objectName;
+            const priv = r.privileges;
+            if (role && obj) {
+              if (!map[role]) map[role] = {};
+              map[role][obj] = priv;
+            }
+          });
+          this.customRolePrivileges.set(map);
+        }
+      }
+    });
+  }
+
+  openAddRuleModal(): void {
+    this.ruleRoleMode = 'EXISTING';
+    this.selectedRuleRole = this.availableRoles()[0] || 'CASHIER';
+    this.newCustomRoleName = '';
+    this.populateBuilderForRole(this.selectedRuleRole);
+    this.isAddRuleModalOpen.set(true);
+  }
+
+  onRuleRoleSelected(): void {
+    this.populateBuilderForRole(this.selectedRuleRole);
+  }
+
+  onRuleRoleModeChange(): void {
+    if (this.ruleRoleMode === 'EXISTING') {
+      this.populateBuilderForRole(this.selectedRuleRole);
+    } else {
+      this.populateBuilderForRole(this.newCustomRoleName || '');
+    }
+  }
+
+  private populateBuilderForRole(role: string): void {
+    const builderMap: { [obj: string]: string[] } = {};
+    for (const obj of this.allDbObjects()) {
+      const privsStr = this.getPrivilegesForObject(role, obj.name);
+      if (privsStr && privsStr !== 'DENIED') {
+        if (privsStr.includes('ALL PRIVILEGES')) {
+          builderMap[obj.name] = obj.type === 'PROCEDURE' ? ['EXECUTE'] : ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
+        } else {
+          builderMap[obj.name] = privsStr.split(',').map(s => s.trim().toUpperCase());
+        }
+      } else {
+        builderMap[obj.name] = [];
+      }
+    }
+    this.ruleBuilderPrivileges.set(builderMap);
+  }
+
+  togglePrivilege(objectName: string, priv: string): void {
+    const currentMap = { ...this.ruleBuilderPrivileges() };
+    const list = currentMap[objectName] ? [...currentMap[objectName]] : [];
+    const idx = list.indexOf(priv);
+    if (idx >= 0) {
+      list.splice(idx, 1);
+    } else {
+      list.push(priv);
+    }
+    currentMap[objectName] = list;
+    this.ruleBuilderPrivileges.set(currentMap);
+  }
+
+  isPrivilegeActive(objectName: string, priv: string): boolean {
+    return !!this.ruleBuilderPrivileges()[objectName]?.includes(priv);
+  }
+
+  applyRulePreset(preset: 'READ_ONLY' | 'ALL' | 'DENY_ALL'): void {
+    const builderMap: { [obj: string]: string[] } = {};
+    for (const obj of this.allDbObjects()) {
+      if (preset === 'DENY_ALL') {
+        builderMap[obj.name] = [];
+      } else if (preset === 'ALL') {
+        builderMap[obj.name] = obj.type === 'PROCEDURE' ? ['EXECUTE'] : ['SELECT', 'INSERT', 'UPDATE', 'DELETE'];
+      } else if (preset === 'READ_ONLY') {
+        builderMap[obj.name] = obj.type === 'PROCEDURE' ? ['EXECUTE'] : ['SELECT'];
+      }
+    }
+    this.ruleBuilderPrivileges.set(builderMap);
+  }
+
+  saveRule(): void {
+    const targetRole = (this.ruleRoleMode === 'EXISTING'
+      ? this.selectedRuleRole
+      : this.newCustomRoleName.trim()).toUpperCase();
+
+    if (!targetRole) {
+      this.actionFeedback.set({ success: false, message: 'Please specify a valid role name for this rule.' });
+      return;
+    }
+
+    this.isSavingRule.set(true);
+    const rules: any[] = [];
+    for (const obj of this.allDbObjects()) {
+      const active = this.ruleBuilderPrivileges()[obj.name] || [];
+      const privStr = active.length > 0 ? active.join(', ') : 'DENIED';
+      rules.push({
+        objectName: obj.name,
+        objectType: obj.type,
+        privileges: privStr
+      });
+    }
+
+    this.authService.saveRolePrivilegesHttp(targetRole, rules).subscribe({
+      next: (res: any) => {
+        this.isSavingRule.set(false);
+        this.isAddRuleModalOpen.set(false);
+        this.actionFeedback.set({
+          success: true,
+          message: res?.message || `Privilege rules for role '${targetRole}' persisted successfully to database table 'role_privilege_rule'!`
+        });
+
+        if (!this.availableRoles().includes(targetRole)) {
+          this.availableRoles.update(prev => [...prev, targetRole]);
+        }
+
+        const objMap: { [k: string]: string } = {};
+        rules.forEach(r => { objMap[r.objectName] = r.privileges; });
+        this.customRolePrivileges.update(prev => ({ ...prev, [targetRole]: objMap }));
+      },
+      error: () => {
+        this.isSavingRule.set(false);
+        // Local fallback update for viva presentation mode
+        if (!this.availableRoles().includes(targetRole)) {
+          this.availableRoles.update(prev => [...prev, targetRole]);
+        }
+        const objMap: { [k: string]: string } = {};
+        rules.forEach(r => { objMap[r.objectName] = r.privileges; });
+        this.customRolePrivileges.update(prev => ({ ...prev, [targetRole]: objMap }));
+        this.isAddRuleModalOpen.set(false);
+        this.actionFeedback.set({
+          success: true,
+          message: `Privilege rules for role '${targetRole}' updated successfully in local session!`
+        });
+      }
+    });
+  }
+
+  testUnauthorizedGuard(objectName: string, action: string): void {
+    this.authService.triggerSecurityAlert(objectName, action);
+  }
+
+  triggerUnauthorizedForUser(role: string, objectName: string): void {
+    this.authService.triggerSecurityAlert(
+      objectName,
+      'ACCESS',
+      `Security Violation: Role '${role}' has been explicitly DENIED access to '${objectName}'. Operation blocked by MySQL RBAC policy.`
+    );
   }
 }

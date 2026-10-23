@@ -83,7 +83,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
           @if (authService.isAdmin()) {
             <a routerLink="/admin" routerLinkActive="active" class="nav-item">
               <span class="material-symbols-outlined nav-icon">admin_panel_settings</span>
-              <span class="nav-label">Security & RBAC</span>
+              <span class="nav-label">Security</span>
             </a>
           }
         }
@@ -96,7 +96,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
           <span class="branch-text">{{ currentBranchName() }}</span>
         </div>
 
-        <div class="staff-card active-staff" (click)="toggleRole()" title="Click to cycle role">
+        <div class="staff-card active-staff">
           <div class="avatar-circle">
             {{ authService.currentUser().fullName.substring(0, 2).toUpperCase() }}
           </div>
@@ -107,12 +107,9 @@ import { InventoryService } from '../../../core/services/inventory.service';
         </div>
 
         <div class="footer-links-row">
-          <button class="logout-btn" (click)="toggleRole()" title="Cycle Cashier -> Manager -> Admin">
-            <span class="material-symbols-outlined logout-icon">published_with_changes</span>
-            <span>Switch Role</span>
-          </button>
-          <button class="login-link-btn" (click)="signOut()" title="Sign Out & Return to Login">
+          <button class="logout-btn" (click)="signOut()" title="Sign Out & Return to Login">
             <span class="material-symbols-outlined logout-icon">logout</span>
+            <span>Sign Out</span>
           </button>
         </div>
       </div>
@@ -315,21 +312,24 @@ import { InventoryService } from '../../../core/services/inventory.service';
     .logout-btn {
       display: flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
-      background: transparent;
-      border: none;
-      padding: 9px 12px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      padding: 9px 14px;
       color: #64748b;
       font-weight: 600;
       font-size: 0.84rem;
       cursor: pointer;
       border-radius: var(--radius-pill);
       transition: all 0.2s ease;
-    }
+      width: 100%;
 
-    .logout-btn:hover {
-      color: var(--primary-green);
-      background: #f1f5f9;
+      &:hover {
+        color: #dc2626;
+        border-color: #fca5a5;
+        background: #fef2f2;
+      }
     }
 
     .logout-icon {
@@ -339,24 +339,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
     .footer-links-row {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-    }
-
-    .login-link-btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 9px;
-      color: #64748b;
-      border-radius: var(--radius-pill);
-      text-decoration: none;
-      transition: all 0.2s ease;
-
-      &:hover {
-        color: var(--primary-green);
-        background: #f1f5f9;
-      }
+      width: 100%;
     }
   `]
 })
@@ -370,18 +353,6 @@ export class SidebarComponent {
     const branch = this.inventoryService.branches.find(b => b.id === (user.branchId || this.inventoryService.selectedBranchId()));
     return branch ? branch.name : (user.branchName || 'Colombo Central Flagship');
   });
-
-  switchUser(role: 'CASHIER' | 'MANAGER' | 'ADMIN' | 'SUPPLIER'): void {
-    this.authService.switchUser(role);
-  }
-
-  toggleRole(): void {
-    const current = this.authService.currentUser().role;
-    if (current === 'CASHIER') this.switchUser('MANAGER');
-    else if (current === 'MANAGER') this.switchUser('ADMIN');
-    else if (current === 'ADMIN') this.switchUser('SUPPLIER');
-    else this.switchUser('CASHIER');
-  }
 
   signOut(): void {
     this.authService.logout();

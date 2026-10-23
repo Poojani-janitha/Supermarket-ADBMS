@@ -322,5 +322,21 @@ public class AuditService {
         }
         return "Not specified in header";
     }
+
+    public List<String> getAvailableRoles() {
+        return auditDao.getAvailableRoles();
+    }
+
+    public List<Map<String, Object>> getDatabaseObjects() {
+        return auditDao.getDatabaseObjects();
+    }
+
+    public List<Map<String, Object>> getRolePrivileges(String role) {
+        return auditDao.getRolePrivileges(role);
+    }
+
+    public void saveRolePrivileges(String role, List<Map<String, String>> rules, String adminUser) {
+        auditDao.saveRolePrivilegeRules(role, rules, adminUser);
+    }
 }
 

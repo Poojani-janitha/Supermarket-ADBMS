@@ -59,9 +59,9 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Public Endpoints: Pre-flight CORS and Login/Auth
+                        // Public Endpoints: Pre-flight CORS and Login/Auth/Roles
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/admin/roles").permitAll()
                         // Member 5 Admin Endpoints: Restricted strictly to ADMIN
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         // General authenticated API endpoints

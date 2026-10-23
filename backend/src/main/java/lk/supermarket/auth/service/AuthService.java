@@ -54,6 +54,7 @@ public class AuthService {
 
         Long employeeId = ((Number) creds.get("employee_id")).longValue();
         Long branchId = creds.get("branch_id") != null ? ((Number) creds.get("branch_id")).longValue() : 1L;
+        String branchName = creds.get("branch_name") != null ? (String) creds.get("branch_name") : ("Branch #" + branchId);
         String fullName = (String) creds.get("full_name");
         String role = (String) creds.get("role");
         Boolean isActive = (Boolean) creds.get("is_active");
@@ -63,6 +64,7 @@ public class AuthService {
         AuthUserDto userDto = new AuthUserDto(
                 employeeId,
                 branchId,
+                branchName,
                 fullName,
                 request.getUsername(),
                 role,

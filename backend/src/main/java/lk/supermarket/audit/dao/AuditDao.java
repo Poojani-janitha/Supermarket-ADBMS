@@ -144,6 +144,98 @@ public class AuditDao {
         return jdbcTemplate.update(sql, eventType, details, performedBy);
     }
 
+    public List<String> getAvailableRoles() {
+        try {
+            List<String> roles = jdbcTemplate.queryForList(
+                    "SELECT DISTINCT role FROM employee WHERE role IS NOT NULL " +
+                    "UNION SELECT 'ADMIN' UNION SELECT 'MANAGER' UNION SELECT 'CASHIER' " +
+                    "ORDER BY 1 ASC",
+                    String.class
+            );
+            if (roles != null && !roles.isEmpty()) {
+                return roles;
+            }
+        } catch (Exception ex) {
+            // fallback
+        }
+        return List.of("ADMIN", "MANAGER", "CASHIER");
+    }
+
+    public List<Map<String, Object>> getDatabaseObjects() {
+        return List.of(
+            Map.of("name", "sales_order", "type", "TABLE", "description", "Order transaction records"),
+            Map.of("name", "order_item", "type", "TABLE", "description", "Individual line items per order"),
+            Map.of("name", "customer", "type", "TABLE", "description", "Shopper directory & loyalty points"),
+            Map.of("name", "product", "type", "TABLE", "description", "Merchandise catalog & pricing"),
+            Map.of("name", "inventory", "type", "TABLE", "description", "Branch stock quantities & reorder levels"),
+            Map.of("name", "discount_rule", "type", "TABLE", "description", "Promotional and loyalty discount rules"),
+            Map.of("name", "purchase_order", "type", "TABLE", "description", "Supplier restock purchase orders"),
+            Map.of("name", "employee", "type", "TABLE", "description", "Staff credentials and role assignments"),
+            Map.of("name", "employee_audit_log", "type", "TABLE", "description", "Trigger-based role & branch audit log"),
+            Map.of("name", "security_event_log", "type", "TABLE", "description", "Administrative access audit trail"),
+            Map.of("name", "v_masked_customer_directory", "type", "VIEW", "description", "PII-masked customer view"),
+            Map.of("name", "v_active_discounts", "type", "VIEW", "description", "Active promotional discount rules"),
+            Map.of("name", "v_low_stock", "type", "VIEW", "description", "Products below reorder threshold"),
+            Map.of("name", "v_daily_sales", "type", "VIEW", "description", "Daily aggregated revenue metrics"),
+            Map.of("name", "v_product_ranking", "type", "VIEW", "description", "Top selling products by revenue"),
+            Map.of("name", "sp_place_order", "type", "PROCEDURE", "description", "Transactional sales order execution"),
+            Map.of("name", "sp_cancel_order", "type", "PROCEDURE", "description", "Order rollback and stock replenishment"),
+            Map.of("name", "sp_get_login", "type", "PROCEDURE", "description", "Authentication credential verification"),
+            Map.of("name", "sp_add_stock", "type", "PROCEDURE", "description", "Inventory restock procedure"),
+            Map.of("name", "sp_transfer_stock", "type", "PROCEDURE", "description", "Inter-branch stock transfer"),
+            Map.of("name", "sp_receive_purchase", "type", "PROCEDURE", "description", "3-way PO receipt verification"),
+            Map.of("name", "sp_deactivate_employee", "type", "PROCEDURE", "description", "Employee deactivation with self-lockout check"),
+            Map.of("name", "sp_change_user_role", "type", "PROCEDURE", "description", "Dynamic role escalation and audit")
+        );
+    }
+
+    public List<Map<String, Object>> getRolePrivileges(String role) {
+        ensurePrivilegeTable();
+        try {
+            String sql = "SELECT role_name, object_name, object_type, privileges FROM role_privilege_rule";
+            if (role != null && !role.isBlank()) {
+                sql += " WHERE role_name = ?";
+                return jdbcTemplate.queryForList(sql, role.toUpperCase());
+            }
+            return jdbcTemplate.queryForList(sql);
+        } catch (Exception ex) {
+            return List.of();
+        }
+    }
+
+    public void saveRolePrivilegeRules(String role, List<Map<String, String>> rules, String adminUser) {
+        ensurePrivilegeTable();
+        for (Map<String, String> rule : rules) {
+            String obj = rule.get("objectName");
+            String type = rule.getOrDefault("objectType", "TABLE");
+            String privs = rule.getOrDefault("privileges", "DENIED");
+
+            jdbcTemplate.update(
+                "INSERT INTO role_privilege_rule (role_name, object_name, object_type, privileges) " +
+                "VALUES (?, ?, ?, ?) " +
+                "ON DUPLICATE KEY UPDATE privileges = VALUES(privileges), updated_at = NOW()",
+                role.toUpperCase(), obj, type, privs
+            );
+        }
+        logSecurityEvent("PRIVILEGE_RULES_SAVED", "Updated privilege rules for role: " + role + " (" + rules.size() + " objects)", adminUser);
+    }
+
+    private void ensurePrivilegeTable() {
+        try {
+            jdbcTemplate.execute(
+                "CREATE TABLE IF NOT EXISTS role_privilege_rule (" +
+                "id INT AUTO_INCREMENT PRIMARY KEY, " +
+                "role_name VARCHAR(50) NOT NULL, " +
+                "object_name VARCHAR(100) NOT NULL, " +
+                "object_type VARCHAR(30) NOT NULL, " +
+                "privileges VARCHAR(255) NOT NULL, " +
+                "updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP, " +
+                "UNIQUE KEY uq_role_obj (role_name, object_name)" +
+                ") ENGINE=InnoDB"
+            );
+        } catch (Exception ignored) {}
+    }
+
     public Map<String, Integer> verifyTableCounts() {
         Map<String, Integer> counts = new java.util.LinkedHashMap<>();
         List<String> tables = List.of("employee", "branch", "customer", "product", "inventory", "sales_order", "security_event_log");

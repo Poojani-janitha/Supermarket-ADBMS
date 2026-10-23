@@ -91,8 +91,42 @@ export class AuthService {
     }
   ]);
 
-  // Current active user signal (Defaults to Floyd Miles as shown in Pinterest SS)
-  readonly currentUser = signal<Employee>(this.employees()[0]);
+  // Member 5: Security alert modal signal for unauthorized action guard
+  readonly securityAlert = signal<{
+    open: boolean;
+    title: string;
+    message: string;
+    role: string;
+    objectName: string;
+    action: string;
+  } | null>(null);
+
+  private getInitialUser(): Employee {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.username && parsed.role) {
+            return parsed;
+          }
+        } catch (e) {
+          console.error('Failed to parse user from localStorage', e);
+        }
+      }
+    }
+    return this.employees()[0];
+  }
+
+  // Current active user signal (restored from localStorage if available)
+  readonly currentUser = signal<Employee>(this.getInitialUser());
+
+  setCurrentUser(user: Employee): void {
+    this.currentUser.set(user);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('user', JSON.stringify(user));
+    }
+  }
 
   // Member 5: Audit log automatically maintained via trg_employee_audit
   readonly employeeAuditLogs = signal<EmployeeAuditLog[]>([
@@ -150,7 +184,7 @@ export class AuthService {
   switchUser(role: 'CASHIER' | 'MANAGER' | 'ADMIN' | 'SUPPLIER'): void {
     const user = this.employees().find(u => u.role === role);
     if (user) {
-      this.currentUser.set(user);
+      this.setCurrentUser(user);
     }
   }
 
@@ -357,7 +391,7 @@ export class AuthService {
   login(username: string): boolean {
     const user = this.employees().find(u => u.username === username);
     if (user && user.isActive) {
-      this.currentUser.set(user);
+      this.setCurrentUser(user);
       return true;
     }
     return false;
@@ -384,6 +418,9 @@ export class AuthService {
 
   logout(): void {
     this.clearToken();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('user');
+    }
   }
 
   isAuthenticated(): boolean {
@@ -397,20 +434,72 @@ export class AuthService {
         if (res && res.token) {
           this.setToken(res.token);
           if (res.user) {
-            this.currentUser.set({
+            const userObj: Employee = {
               employeeId: res.user.employeeId,
-              branchId: res.user.branchId,
-              branchName: 'Branch #' + res.user.branchId,
+              branchId: res.user.branchId || 1,
+              branchName: res.user.branchName || ('Branch #' + (res.user.branchId || 1)),
               fullName: res.user.fullName,
               role: res.user.role,
               username: res.user.username,
               hireDate: new Date().toISOString().split('T')[0],
               isActive: res.user.isActive
-            });
+            };
+            this.setCurrentUser(userObj);
           }
         }
       })
     );
+  }
+
+  // Member 5: Red Warning Style Security Violation Trigger
+  triggerSecurityAlert(objectName: string, action: string, customMessage?: string): void {
+    const current = this.currentUser();
+    const msg = customMessage || `Action Prohibited: Your active role '${current.role}' is not granted privilege '${action}' on database object '${objectName}'.`;
+    this.securityAlert.set({
+      open: true,
+      title: 'SECURITY VIOLATION: ACCESS DENIED',
+      message: msg,
+      role: current.role,
+      objectName,
+      action
+    });
+
+    const secEntry: SecurityEventLog = {
+      logId: this.securityLogs().length + 1,
+      eventType: 'UNAUTHORIZED_ACCESS',
+      description: `Access violation attempt by user '${current.username}' (${current.role}_ROLE) targeting '${objectName}' with action '${action}'`,
+      username: current.username,
+      ipAddress: '127.0.0.1',
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19)
+    };
+    this.securityLogs.update(prev => [secEntry, ...prev]);
+  }
+
+  closeSecurityAlert(): void {
+    this.securityAlert.set(null);
+  }
+
+  fetchRolesHttp(): Observable<string[]> {
+    return this.http.get<string[]>('/api/admin/roles').pipe(
+      catchError(() => of(['ADMIN', 'MANAGER', 'CASHIER', 'SUPPLIER']))
+    );
+  }
+
+  fetchObjectsHttp(): Observable<any[]> {
+    return this.http.get<any[]>('/api/admin/objects').pipe(
+      catchError(() => of([]))
+    );
+  }
+
+  fetchRolePrivilegesHttp(role?: string): Observable<any[]> {
+    const url = role ? `/api/admin/privileges?role=${role}` : '/api/admin/privileges';
+    return this.http.get<any[]>(url).pipe(
+      catchError(() => of([]))
+    );
+  }
+
+  saveRolePrivilegesHttp(role: string, rules: any[]): Observable<any> {
+    return this.http.post('/api/admin/privileges', { role, rules });
   }
 
   fetchEmployeesHttp(): Observable<Employee[]> {

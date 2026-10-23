@@ -3,6 +3,7 @@ package lk.supermarket.auth.dto;
 public class AuthUserDto {
     private Long employeeId;
     private Long branchId;
+    private String branchName;
     private String fullName;
     private String username;
     private String role;
@@ -12,8 +13,13 @@ public class AuthUserDto {
     }
 
     public AuthUserDto(Long employeeId, Long branchId, String fullName, String username, String role, Boolean isActive) {
+        this(employeeId, branchId, "Branch #" + branchId, fullName, username, role, isActive);
+    }
+
+    public AuthUserDto(Long employeeId, Long branchId, String branchName, String fullName, String username, String role, Boolean isActive) {
         this.employeeId = employeeId;
         this.branchId = branchId;
+        this.branchName = branchName;
         this.fullName = fullName;
         this.username = username;
         this.role = role;
@@ -34,6 +40,14 @@ public class AuthUserDto {
 
     public void setBranchId(Long branchId) {
         this.branchId = branchId;
+    }
+
+    public String getBranchName() {
+        return branchName;
+    }
+
+    public void setBranchName(String branchName) {
+        this.branchName = branchName;
     }
 
     public String getFullName() {
