@@ -3,6 +3,7 @@ export interface Category {
   name: string;
   icon: string;
   itemCount: number;
+  parentId: number | null;
 }
 
 export interface Product {
@@ -13,6 +14,8 @@ export interface Product {
   costPrice: number;
   categoryId: number;
   categoryName: string;
+  categoryParentId?: number | null;
+  categoryParentName?: string | null;
   supplierId?: number;
   supplierName?: string;
   isActive: boolean;
