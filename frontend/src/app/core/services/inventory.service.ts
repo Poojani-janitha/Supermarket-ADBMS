@@ -1,10 +1,16 @@
-import { Injectable, signal } from '@angular/core';
+import { Injectable, signal, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
 import { InventoryItem, LowStockAlert, PurchaseOrder, Supplier } from '../models';
+import { AuthService } from './auth.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class InventoryService {
+  private readonly http = inject(HttpClient);
+  private readonly authService = inject(AuthService);
+  readonly apiUrl = '/api';
+
   readonly branches = [
     { id: 1, name: 'Colombo Central Flagship' },
     { id: 2, name: 'Kandy City Center' },
@@ -12,7 +18,7 @@ export class InventoryService {
     { id: 4, name: 'Negombo Coastal Mart' }
   ];
 
-  readonly selectedBranchId = signal<number>(1);
+  readonly selectedBranchId = signal<number>(this.authService.currentUser()?.branchId || 1);
 
   // Registered Vendors in the B2B Supply Chain
   readonly suppliers = signal<Supplier[]>([
@@ -372,6 +378,21 @@ export class InventoryService {
     };
 
     this.purchaseOrders.update(list => [newPO, ...list]);
+
+    // Dispatch to Spring Boot backend: sp_create_purchase_order
+    this.http.post<{ success: boolean; data: number; message: string }>(`${this.apiUrl}/purchase-orders`, {
+      supplierId: data.supplierId,
+      branchId: data.branchId,
+      employeeId: 101,
+      productId: data.productId,
+      qty: data.requestedQty
+    }).subscribe({
+      next: (res) => {
+        console.log('Backend PO created:', res);
+      },
+      error: (err) => console.debug('Backend offline, simulated PO retained:', err?.status)
+    });
+
     return {
       success: true,
       poId: nextPoId,
@@ -406,6 +427,18 @@ export class InventoryService {
       })
     );
 
+    // Call Spring Boot backend: POST /api/purchase-orders/confirm
+    // Executes Stored Procedure: CALL sp_supplier_confirm_order(?, ?, ?, ?)
+    this.http.post<{ success: boolean; message: string }>(`${this.apiUrl}/purchase-orders/confirm`, {
+      poId,
+      supplierId,
+      confirmedQty,
+      notes
+    }).subscribe({
+      next: (res) => console.log('POST /api/purchase-orders/confirm succeeded:', res),
+      error: (err) => console.debug('POST /api/purchase-orders/confirm note:', err?.status)
+    });
+
     return {
       success: true,
       message: `Order #PO-${poId} confirmed for fulfillment (${confirmedQty} ${po.unitOfMeasure}). Status changed to CONFIRMED.`
@@ -437,6 +470,18 @@ export class InventoryService {
         return p;
       })
     );
+
+    // Call Spring Boot backend: POST /api/purchase-orders/receive
+    // Executes Stored Procedure: CALL sp_receive_purchase(?, ?, ?, ?)
+    this.http.post<{ success: boolean; message: string }>(`${this.apiUrl}/purchase-orders/receive`, {
+      poId,
+      employeeId: 101,
+      receivedQty,
+      notes
+    }).subscribe({
+      next: (res) => console.log('POST /api/purchase-orders/receive succeeded:', res),
+      error: (err) => console.debug('POST /api/purchase-orders/receive note:', err?.status)
+    });
 
     // 2. Atomically increment branch inventory with optimistic locking version update
     this.inventory.update(items => {

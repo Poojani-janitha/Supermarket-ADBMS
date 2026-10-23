@@ -1,8 +1,9 @@
 -- ============================================================================
 -- SUPERMARKET CHAIN MANAGEMENT SYSTEM
 -- ICT3222 Advanced Database Management Systems (ADBMS)
--- Script: 10_seed_reference.sql
+-- Script 10: Reference Seed Data
 -- Master Reference Seed Data for Multi-Branch System
+-- Engine: MySQL 8.0 (InnoDB)
 -- ============================================================================
 
 USE supermarket_db;

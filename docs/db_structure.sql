@@ -109,7 +109,7 @@ CREATE TABLE product (
   cost_price DECIMAL(10,2) NOT NULL CHECK (cost_price >= 0),
   image_url VARCHAR(255) NULL,
   diet_type ENUM('VEG', 'NON_VEG') NULL DEFAULT 'VEG',
-  unit_of_measure ENUM('KG', 'G', 'L', 'ML', 'PACKET', 'PIECE', 'CAN', 'BOTTLE') NOT NULL DEFAULT 'PIECE',
+  unit_of_measure VARCHAR(30) NOT NULL DEFAULT 'PIECE',
   min_order_qty DECIMAL(10,2) NOT NULL DEFAULT 1.00 CHECK (min_order_qty > 0),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   FOREIGN KEY (category_id) REFERENCES category(category_id),
@@ -155,7 +155,7 @@ CREATE TABLE sales_order (
 
 -- ----------------------------------------------------------------------------
 -- 9. ORDER_ITEM
--- Individual items purchased in an order.
+-- Individual items purchased in an ogtrder.
 -- Clustered composite PK (order_id, product_id) enables single range reads for receipts.
 -- line_total is a STORED generated column.
 -- ----------------------------------------------------------------------------

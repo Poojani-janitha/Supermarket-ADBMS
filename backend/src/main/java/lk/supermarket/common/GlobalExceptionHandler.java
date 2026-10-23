@@ -9,7 +9,10 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.sql.SQLException;
+import java.time.Instant;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -27,81 +30,84 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<Map<String, Object>> handleDatabaseException(DataAccessException ex) {
-        String msg = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
-        Map<String, Object> body = new HashMap<>();
+        String msg = rootMessage(ex);
+        String normalized = msg != null ? msg.toLowerCase(Locale.ROOT) : "";
+
+        HttpStatus status;
+        String code;
+        String userMsg = msg;
 
         // Member 5: Security Violations raised by database triggers or procedures
-        if (msg != null && msg.contains("Security Violation")) {
-            body.put("error", "Security Violation");
-            body.put("message", msg);
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+        if (normalized.contains("security violation") || normalized.contains("administrator cannot deactivate own account")) {
+            status = HttpStatus.FORBIDDEN;
+            code = "SECURITY_VIOLATION";
+        } else if (normalized.contains("insufficient stock")) {
+            status = HttpStatus.CONFLICT;
+            code = "INSUFFICIENT_STOCK";
+            userMsg = "One or more cart items exceed available branch inventory.";
+        } else if (normalized.contains("order is already cancelled")) {
+            status = HttpStatus.BAD_REQUEST;
+            code = "ORDER_ALREADY_CANCELLED";
+        } else if (normalized.contains("order not found")) {
+            status = HttpStatus.NOT_FOUND;
+            code = "ORDER_NOT_FOUND";
+        } else if (normalized.contains("already exists") || normalized.contains("duplicate") || normalized.contains("coupon")) {
+            status = HttpStatus.CONFLICT;
+            code = "DUPLICATE_ENTRY";
+        } else {
+            status = HttpStatus.UNPROCESSABLE_ENTITY;
+            code = "DATABASE_VALIDATION_ERROR";
         }
 
-        // Member 1: Stock insufficiency exceptions raised by trg_orderitem_check_stock
-        if (msg != null && msg.contains("Insufficient stock")) {
-            body.put("error", "Insufficient stock");
-            body.put("message", "One or more cart items exceed available branch inventory.");
-            return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
-        }
-
-        // Order cancellation & not found handling
-        if (msg != null && msg.contains("Order is already cancelled")) {
-            body.put("error", "Order already cancelled");
-            body.put("message", msg);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
-        }
-
-        if (msg != null && msg.contains("Order not found")) {
-            body.put("error", "Order not found");
-            body.put("message", msg);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
-        }
-
-        body.put("error", "Database operation failed");
-        body.put("message", msg);
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+        return createResponse(status, code, userMsg);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationException(MethodArgumentNotValidException ex) {
-        Map<String, Object> body = new HashMap<>();
-        String errorMsg = ex.getBindingResult().getAllErrors().isEmpty() 
-                ? "Validation error" 
-                : ex.getBindingResult().getAllErrors().get(0).getDefaultMessage();
-        body.put("error", "Validation error");
-        body.put("message", errorMsg);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        String msg = (ex.getBindingResult().getAllErrors() != null && !ex.getBindingResult().getAllErrors().isEmpty())
+                ? ex.getBindingResult().getAllErrors().get(0).getDefaultMessage()
+                : "Validation error";
+        return createResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", msg);
     }
 
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("error", "Access Denied");
-        body.put("message", "Insufficient role privileges to access this administrative resource.");
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+        return createResponse(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Insufficient role privileges to access this administrative resource.");
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<Map<String, Object>> handleAuthenticationException(AuthenticationException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("error", "Unauthorized");
-        body.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+        return createResponse(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("error", "Invalid request");
-        body.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        return createResponse(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> handleGeneralException(Exception ex) {
+        return createResponse(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR", ex.getMessage());
+    }
+
+    private ResponseEntity<Map<String, Object>> createResponse(HttpStatus status, String code, String message) {
         Map<String, Object> body = new HashMap<>();
-        body.put("error", "Internal server error");
-        body.put("message", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", status.value());
+        body.put("code", code);
+        body.put("error", code);
+        body.put("message", message);
+        return ResponseEntity.status(status).body(body);
+    }
+
+    private String rootMessage(Throwable throwable) {
+        Throwable current = throwable;
+        while (current.getCause() != null && !(current instanceof SQLException) && current.getMessage() == null) {
+            current = current.getCause();
+        }
+        if (current instanceof DataAccessException dae && dae.getMostSpecificCause() != null) {
+            return dae.getMostSpecificCause().getMessage();
+        }
+        return current.getMessage() == null ? "Database operation failed" : current.getMessage();
     }
 }

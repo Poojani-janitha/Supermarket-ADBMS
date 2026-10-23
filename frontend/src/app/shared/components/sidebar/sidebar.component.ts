@@ -1,7 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { InventoryService } from '../../../core/services/inventory.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -24,9 +25,9 @@ import { AuthService } from '../../../core/services/auth.service';
       <nav class="nav-menu">
         @if (authService.isSupplier()) {
           <!-- Supplier Dedicated Links -->
-          <a routerLink="/supplier-portal" routerLinkActive="active" class="nav-item">
+          <a routerLink="/orders" routerLinkActive="active" class="nav-item">
             <span class="material-symbols-outlined nav-icon">local_shipping</span>
-            <span class="nav-label">Vendor Portal</span>
+            <span class="nav-label">My Orders</span>
           </a>
           <a routerLink="/products" routerLinkActive="active" class="nav-item">
             <span class="material-symbols-outlined nav-icon">inventory_2</span>
@@ -37,6 +38,11 @@ import { AuthService } from '../../../core/services/auth.service';
           <a routerLink="/pos" routerLinkActive="active" class="nav-item">
             <span class="material-symbols-outlined nav-icon">point_of_sale</span>
             <span class="nav-label">POS / Checkout</span>
+          </a>
+
+          <a routerLink="/sales-management" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">receipt_long</span>
+            <span class="nav-label">Sales Management</span>
           </a>
 
           <a routerLink="/products" routerLinkActive="active" class="nav-item">
@@ -50,8 +56,13 @@ import { AuthService } from '../../../core/services/auth.service';
           </a>
 
           <a routerLink="/purchase-orders" routerLinkActive="active" class="nav-item">
-            <span class="material-symbols-outlined nav-icon">local_shipping</span>
+            <span class="material-symbols-outlined nav-icon">receipt_long</span>
             <span class="nav-label">Purchase Orders</span>
+          </a>
+
+          <a routerLink="/orders" routerLinkActive="active" class="nav-item">
+            <span class="material-symbols-outlined nav-icon">local_shipping</span>
+            <span class="nav-label">My Orders</span>
           </a>
 
           <a routerLink="/customers" routerLinkActive="active" class="nav-item">
@@ -80,6 +91,11 @@ import { AuthService } from '../../../core/services/auth.service';
 
       <!-- Bottom Staff & Role Switcher -->
       <div class="sidebar-footer">
+        <div class="branch-pill" [title]="currentBranchName()">
+          <span class="material-symbols-outlined branch-icon">store</span>
+          <span class="branch-text">{{ currentBranchName() }}</span>
+        </div>
+
         <div class="staff-card active-staff" (click)="toggleRole()" title="Click to cycle role">
           <div class="avatar-circle">
             {{ authService.currentUser().fullName.substring(0, 2).toUpperCase() }}
@@ -213,6 +229,32 @@ import { AuthService } from '../../../core/services/auth.service';
       border-top: 1px solid #f1f3f5;
     }
 
+    .branch-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      background: #ecfdf5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      border-radius: 20px;
+      font-weight: 700;
+      font-size: 0.82rem;
+      box-sizing: border-box;
+
+      .branch-icon {
+        font-size: 18px;
+        color: #065f46;
+        flex-shrink: 0;
+      }
+
+      .branch-text {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+    }
+
     .staff-card {
       display: flex;
       align-items: center;
@@ -321,6 +363,13 @@ import { AuthService } from '../../../core/services/auth.service';
 export class SidebarComponent {
   readonly authService = inject(AuthService);
   private readonly router = inject(Router);
+  readonly inventoryService = inject(InventoryService);
+
+  readonly currentBranchName = computed(() => {
+    const user = this.authService.currentUser();
+    const branch = this.inventoryService.branches.find(b => b.id === (user.branchId || this.inventoryService.selectedBranchId()));
+    return branch ? branch.name : (user.branchName || 'Colombo Central Flagship');
+  });
 
   switchUser(role: 'CASHIER' | 'MANAGER' | 'ADMIN' | 'SUPPLIER'): void {
     this.authService.switchUser(role);

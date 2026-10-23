@@ -1,17 +1,8 @@
 -- ============================================================================
 -- SUPERMARKET CHAIN MANAGEMENT SYSTEM
--- Coursework: ICT3222 Advanced Database Management Systems (ADBMS)
--- Database Engine: MySQL 8.0 (InnoDB)
--- Character Set: utf8mb4, Collation: utf8mb4_unicode_ci
--- ============================================================================
--- NOTE ON DESIGN & ADBMS TOPICS:
--- 1. All tables use InnoDB for ACID transactions, row-level locks, and FKs.
--- 2. Clustered Primary Keys (PK) physically group contiguous records on disk:
---    - order_item(order_id, product_id): All lines of a sale are clustered together.
---    - inventory(branch_id, product_id): Stock per branch is clustered together.
---    - daily_sales_summary(summary_date, branch_id): Analytical date ranges are contiguous.
--- 3. Deliberate denormalization (documented for 3NF):
---    - order_item.unit_price captures the historical price at the moment of sale.
+-- ICT3222 Advanced Database Management Systems (ADBMS)
+-- Script 01: Core Database Schema & Tables
+-- Engine: MySQL 8.0 (InnoDB)
 -- ============================================================================
 
 DROP DATABASE IF EXISTS supermarket_db;
@@ -23,7 +14,7 @@ USE supermarket_db;
 
 -- ----------------------------------------------------------------------------
 -- 1. BRANCH
--- Represents physical supermarket branch outlets in the chain.
+-- Supermarket branch outlets.
 -- ----------------------------------------------------------------------------
 CREATE TABLE branch (
   branch_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -37,7 +28,7 @@ CREATE TABLE branch (
 
 -- ----------------------------------------------------------------------------
 -- 2. CATEGORY
--- Product categorization tree (supports sub-categories via recursive parent_id).
+-- Product categories hierarchy.
 -- ----------------------------------------------------------------------------
 CREATE TABLE category (
   category_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -50,7 +41,7 @@ CREATE TABLE category (
 
 -- ----------------------------------------------------------------------------
 -- 3. SUPPLIER
--- Wholesale vendors supplying merchandise to the supermarket chain.
+-- Wholesale vendors supplying stock.
 -- ----------------------------------------------------------------------------
 CREATE TABLE supplier (
   supplier_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -58,17 +49,13 @@ CREATE TABLE supplier (
   contact_person VARCHAR(100) NULL,
   phone VARCHAR(20) NOT NULL,
   email VARCHAR(100) NULL,
-  username VARCHAR(50) NULL UNIQUE,
-  password_hash VARCHAR(255) NULL,
   city VARCHAR(50) NOT NULL,
-  tax_number VARCHAR(50) NULL,
-  is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  status ENUM('PENDING_APPROVAL', 'ACTIVE', 'SUSPENDED') NOT NULL DEFAULT 'ACTIVE'
+  is_active BOOLEAN NOT NULL DEFAULT TRUE
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
 -- 4. EMPLOYEE
--- System users with role-based access control (ADMIN, MANAGER, CASHIER).
+-- Staff users with role-based access (ADMIN, MANAGER, CASHIER).
 -- ----------------------------------------------------------------------------
 CREATE TABLE employee (
   employee_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -84,7 +71,7 @@ CREATE TABLE employee (
 
 -- ----------------------------------------------------------------------------
 -- 5. CUSTOMER
--- Registered loyalty program shoppers.
+-- Shoppers participating in loyalty discounts.
 -- ----------------------------------------------------------------------------
 CREATE TABLE customer (
   customer_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -97,7 +84,7 @@ CREATE TABLE customer (
 
 -- ----------------------------------------------------------------------------
 -- 6. PRODUCT
--- Product catalog items. SKU has a UNIQUE secondary index.
+-- Product catalog items.
 -- ----------------------------------------------------------------------------
 CREATE TABLE product (
   product_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -109,24 +96,21 @@ CREATE TABLE product (
   cost_price DECIMAL(10,2) NOT NULL CHECK (cost_price >= 0),
   image_url VARCHAR(255) NULL,
   diet_type ENUM('VEG', 'NON_VEG') NULL DEFAULT 'VEG',
-  unit_of_measure ENUM('KG', 'G', 'L', 'ML', 'PACKET', 'PIECE', 'CAN', 'BOTTLE') NOT NULL DEFAULT 'PIECE',
-  min_order_qty DECIMAL(10,2) NOT NULL DEFAULT 1.00 CHECK (min_order_qty > 0),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
   FOREIGN KEY (category_id) REFERENCES category(category_id),
   FOREIGN KEY (supplier_id) REFERENCES supplier(supplier_id)
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 7. INVENTORY
--- Per-branch physical stock levels.
--- Clustered composite PK (branch_id, product_id) stores branch items contiguously.
--- Version column supports optimistic locking. Quantity supports UoM decimals.
+-- 7. INVENTORY (Member 2)
+-- Branch stock levels. Clustered composite PK (branch_id, product_id).
+-- Version column supports optimistic locking.
 -- ----------------------------------------------------------------------------
 CREATE TABLE inventory (
   branch_id INT NOT NULL,
   product_id INT NOT NULL,
-  quantity DECIMAL(10,2) NOT NULL DEFAULT 0.00 CHECK (quantity >= 0),
-  reorder_level DECIMAL(10,2) NOT NULL DEFAULT 10.00 CHECK (reorder_level >= 0),
+  quantity INT NOT NULL DEFAULT 0 CHECK (quantity >= 0),
+  reorder_level INT NOT NULL DEFAULT 10 CHECK (reorder_level >= 0),
   version INT NOT NULL DEFAULT 0,
   PRIMARY KEY (branch_id, product_id),
   FOREIGN KEY (branch_id) REFERENCES branch(branch_id),
@@ -134,9 +118,8 @@ CREATE TABLE inventory (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 8. SALES_ORDER
--- Customer checkout transactions.
--- total_amount = subtotal - discount_total (calculated inside sp_place_order).
+-- 8. SALES_ORDER (Member 1)
+-- Checkout transactions.
 -- ----------------------------------------------------------------------------
 CREATE TABLE sales_order (
   order_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -154,9 +137,8 @@ CREATE TABLE sales_order (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 9. ORDER_ITEM
--- Individual items purchased in an order.
--- Clustered composite PK (order_id, product_id) enables single range reads for receipts.
+-- 9. ORDER_ITEM (Member 1)
+-- Clustered composite PK (order_id, product_id) enables single sequential range scans.
 -- line_total is a STORED generated column.
 -- ----------------------------------------------------------------------------
 CREATE TABLE order_item (
@@ -171,8 +153,8 @@ CREATE TABLE order_item (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 10. PAYMENT
--- Payment records associated with sales orders.
+-- 10. PAYMENT (Member 1)
+-- Payment records for orders.
 -- ----------------------------------------------------------------------------
 CREATE TABLE payment (
   payment_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -184,48 +166,35 @@ CREATE TABLE payment (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 11. PURCHASE_ORDER
--- Restock orders placed to suppliers.
+-- 11. PURCHASE_ORDER (Member 2)
 -- ----------------------------------------------------------------------------
 CREATE TABLE purchase_order (
   po_id INT AUTO_INCREMENT PRIMARY KEY,
   supplier_id INT NOT NULL,
   branch_id INT NOT NULL,
-  requested_by INT NULL,
-  received_by INT NULL,
   order_date DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  confirmed_at DATETIME NULL,
-  received_at DATETIME NULL,
-  status ENUM('REQUESTED', 'CONFIRMED', 'RECEIVED', 'CANCELLED') NOT NULL DEFAULT 'REQUESTED',
+  status ENUM('PENDING', 'RECEIVED', 'CANCELLED') NOT NULL DEFAULT 'PENDING',
   total_cost DECIMAL(12,2) NOT NULL DEFAULT 0.00 CHECK (total_cost >= 0),
-  supplier_notes TEXT NULL,
-  receiving_notes TEXT NULL,
   FOREIGN KEY (supplier_id) REFERENCES supplier(supplier_id),
-  FOREIGN KEY (branch_id) REFERENCES branch(branch_id),
-  FOREIGN KEY (requested_by) REFERENCES employee(employee_id),
-  FOREIGN KEY (received_by) REFERENCES employee(employee_id)
+  FOREIGN KEY (branch_id) REFERENCES branch(branch_id)
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 12. PURCHASE_ORDER_ITEM
--- Items requested in a purchase order with 3-way quantity matching.
+-- 12. PURCHASE_ORDER_ITEM (Member 2)
 -- ----------------------------------------------------------------------------
 CREATE TABLE purchase_order_item (
   po_id INT NOT NULL,
   product_id INT NOT NULL,
-  requested_qty DECIMAL(10,2) NOT NULL CHECK (requested_qty > 0),
-  confirmed_qty DECIMAL(10,2) NULL CHECK (confirmed_qty IS NULL OR confirmed_qty >= 0),
-  received_qty DECIMAL(10,2) NULL CHECK (received_qty IS NULL OR received_qty >= 0),
+  quantity INT NOT NULL CHECK (quantity > 0),
   unit_cost DECIMAL(10,2) NOT NULL CHECK (unit_cost >= 0),
-  line_cost DECIMAL(12,2) AS (COALESCE(received_qty, confirmed_qty, requested_qty) * unit_cost) STORED,
+  line_cost DECIMAL(12,2) AS (quantity * unit_cost) STORED,
   PRIMARY KEY (po_id, product_id),
   FOREIGN KEY (po_id) REFERENCES purchase_order(po_id) ON DELETE CASCADE,
   FOREIGN KEY (product_id) REFERENCES product(product_id)
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 13. HOLIDAY
--- National and public holidays used by the discount engine (Member 3).
+-- 13. HOLIDAY (Member 3)
 -- ----------------------------------------------------------------------------
 CREATE TABLE holiday (
   holiday_date DATE PRIMARY KEY,
@@ -233,8 +202,7 @@ CREATE TABLE holiday (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 14. DISCOUNT_RULE
--- Promotional rules evaluated by Cursor in sp_apply_discounts.
+-- 14. DISCOUNT_RULE (Member 3)
 -- ----------------------------------------------------------------------------
 CREATE TABLE discount_rule (
   rule_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -254,8 +222,7 @@ CREATE TABLE discount_rule (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 15. COUPON
--- Voucher codes tied to discount rules with expiration and usage limits.
+-- 15. COUPON (Member 3)
 -- ----------------------------------------------------------------------------
 CREATE TABLE coupon (
   code VARCHAR(20) PRIMARY KEY,
@@ -267,8 +234,7 @@ CREATE TABLE coupon (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 16. ORDER_DISCOUNT
--- Junction table recording which discounts applied to an order.
+-- 16. ORDER_DISCOUNT (Member 3)
 -- ----------------------------------------------------------------------------
 CREATE TABLE order_discount (
   order_id INT NOT NULL,
@@ -280,8 +246,7 @@ CREATE TABLE order_discount (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 17. PRICE_AUDIT_LOG
--- Immutable audit log populated exclusively by trg_product_price_audit.
+-- 17. PRICE_AUDIT_LOG (Member 3)
 -- ----------------------------------------------------------------------------
 CREATE TABLE price_audit_log (
   log_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -295,8 +260,7 @@ CREATE TABLE price_audit_log (
 
 -- ----------------------------------------------------------------------------
 -- 18. STOCK_AUDIT_LOG
--- Complete history of stock movements (SALE, RESTOCK, CANCEL, TRANSFER).
--- Target for RANGE Table Partitioning (Member 4 extra feature).
+-- Partitionable audit trail for inventory movements.
 -- ----------------------------------------------------------------------------
 CREATE TABLE stock_audit_log (
   log_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -311,8 +275,7 @@ CREATE TABLE stock_audit_log (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 19. LOW_STOCK_ALERT
--- Reorder alerts created by trg_inventory_low_stock and ev_weekly_low_stock_scan.
+-- 19. LOW_STOCK_ALERT (Member 2)
 -- ----------------------------------------------------------------------------
 CREATE TABLE low_stock_alert (
   alert_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -326,9 +289,7 @@ CREATE TABLE low_stock_alert (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 20. DAILY_SALES_SUMMARY
--- Precomputed analytics aggregated nightly by ev_daily_sales_summary.
--- Clustered composite PK (summary_date, branch_id) for rapid date scans.
+-- 20. DAILY_SALES_SUMMARY (Member 4)
 -- ----------------------------------------------------------------------------
 CREATE TABLE daily_sales_summary (
   summary_date DATE NOT NULL,
@@ -340,8 +301,7 @@ CREATE TABLE daily_sales_summary (
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
--- 21. DISCOUNT_RULE_AUDIT
--- Tracks changes to promotional discount rules (trg_rule_audit).
+-- 21. DISCOUNT_RULE_AUDIT (Member 3)
 -- ----------------------------------------------------------------------------
 CREATE TABLE discount_rule_audit (
   log_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -354,7 +314,6 @@ CREATE TABLE discount_rule_audit (
 
 -- ----------------------------------------------------------------------------
 -- 22. EMPLOYEE_AUDIT_LOG (Member 5)
--- Immutable audit log populated by trg_employee_audit on role/branch changes.
 -- ----------------------------------------------------------------------------
 CREATE TABLE employee_audit_log (
   log_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -370,7 +329,6 @@ CREATE TABLE employee_audit_log (
 
 -- ----------------------------------------------------------------------------
 -- 23. SECURITY_EVENT_LOG (Member 5)
--- Logs privileged actions like account deactivations and role reassignments.
 -- ----------------------------------------------------------------------------
 CREATE TABLE security_event_log (
   log_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -379,29 +337,3 @@ CREATE TABLE security_event_log (
   performed_by VARCHAR(100) NOT NULL,
   logged_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
-
--- ============================================================================
--- SECONDARY & COVERING INDEXES
--- Designed for query execution optimization (EXPLAIN evidence with 50k rows)
--- ============================================================================
-
--- Fast lookup for orders by date
-CREATE INDEX idx_order_date ON sales_order (order_date);
-
--- Composite covering index for branch monthly and date-range queries
-CREATE INDEX idx_order_branch_date ON sales_order (branch_id, order_date);
-
--- Fast lookup of customer order history
-CREATE INDEX idx_order_customer ON sales_order (customer_id);
-
--- Standard product name index for catalog browsing
-CREATE INDEX idx_product_name ON product (name);
-
--- MySQL 8 FULLTEXT index for high-speed keyword search (Member 3 extra feature)
-CREATE FULLTEXT INDEX idx_product_ft ON product (name);
-
--- Reverse lookup index for order lines by product
-CREATE INDEX idx_order_item_prod ON order_item (product_id);
-
--- Rapid lookup for audit log date scans
-CREATE INDEX idx_stock_audit_logged ON stock_audit_log (logged_at);

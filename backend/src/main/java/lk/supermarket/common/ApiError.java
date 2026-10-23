@@ -1,7 +1,6 @@
 package lk.supermarket.common;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-
 import java.time.LocalDateTime;
 
 /**
@@ -13,6 +12,7 @@ public class ApiError {
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime timestamp;
     private int status;
+    private String code;
     private String error;
     private String message;
     private String path;
@@ -25,11 +25,20 @@ public class ApiError {
         this.timestamp = LocalDateTime.now();
         this.status = status;
         this.error = error;
+        this.code = error;
         this.message = message;
         this.path = path;
     }
 
-    // Getters and Setters
+    public ApiError(java.time.Instant instant, int status, String code, String message) {
+        this.timestamp = LocalDateTime.now();
+        this.status = status;
+        this.code = code;
+        this.error = code;
+        this.message = message;
+        this.path = "";
+    }
+
     public LocalDateTime getTimestamp() {
         return timestamp;
     }
@@ -44,6 +53,14 @@ public class ApiError {
 
     public void setStatus(int status) {
         this.status = status;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
     }
 
     public String getError() {
