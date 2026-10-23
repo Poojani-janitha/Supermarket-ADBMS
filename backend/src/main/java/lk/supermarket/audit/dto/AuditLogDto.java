@@ -123,7 +123,7 @@ public class AuditLogDto {
 
     public String getOldValue() {
         if (Boolean.TRUE.equals(isActiveChanged)) {
-            return "ACTIVE (1)";
+            return "Active";
         }
         if (oldRole != null && newRole != null && !oldRole.equalsIgnoreCase(newRole)) {
             return oldRole;
@@ -131,12 +131,12 @@ public class AuditLogDto {
         if (oldBranchName != null) {
             return oldBranchName;
         }
-        return "NONE";
+        return "Active";
     }
 
     public String getNewValue() {
         if (Boolean.TRUE.equals(isActiveChanged)) {
-            return "DEACTIVATED (0)";
+            return "Deactivated";
         }
         if (oldRole != null && newRole != null && !oldRole.equalsIgnoreCase(newRole)) {
             return newRole;
@@ -144,11 +144,20 @@ public class AuditLogDto {
         if (newBranchName != null) {
             return newBranchName;
         }
-        return "NONE";
+        return "Deactivated";
     }
 
     public String getModifiedBy() {
-        return changedBy != null ? changedBy : "SYSTEM";
+        if (changedBy == null || changedBy.isBlank()) {
+            return "System Admin";
+        }
+        if (changedBy.contains("root@") || changedBy.equalsIgnoreCase("root")) {
+            return "System Admin";
+        }
+        if (changedBy.contains("app_user@") || changedBy.equalsIgnoreCase("app_user")) {
+            return "System App";
+        }
+        return changedBy;
     }
 
     public String getModifiedAt() {

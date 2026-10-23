@@ -56,6 +56,21 @@ export const routes: Routes = [
     canActivate: [authGuard, adminRoleGuard]
   },
   {
+    path: 'admin/backups',
+    loadComponent: () => import('./features/backups/pages/database-backups-page/database-backups-page.component').then(m => m.DatabaseBackupsPage),
+    canActivate: [authGuard, adminRoleGuard]
+  },
+  {
+    path: 'backup-recovery',
+    redirectTo: 'admin/backups',
+    pathMatch: 'full'
+  },
+  {
+    path: 'backup',
+    redirectTo: 'admin/backups',
+    pathMatch: 'full'
+  },
+  {
     path: 'login',
     loadComponent: () => import('./features/auth/login/login.component').then(m => m.LoginComponent)
   },

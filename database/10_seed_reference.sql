@@ -31,17 +31,26 @@ INSERT INTO supplier (supplier_id, name, contact_person, phone, email, city) VAL
 (3, 'Ceylon Tea Exports Ltd', 'Nimal Silva', '0776655333', 'nimal@ceylontea.lk', 'Kandy')
 ON DUPLICATE KEY UPDATE name=VALUES(name);
 
+-- 3b. Roles
+INSERT INTO roles (role_id, role_name, description) VALUES
+(1, 'ADMIN', 'Full system and database administrative access'),
+(2, 'MANAGER', 'Branch management, inventory, reports, and staff supervision'),
+(3, 'CASHIER', 'POS billing, customer checkout, and sales transactions'),
+(4, 'DB_MANAGER', 'Database schema, backups, indexes, and performance management'),
+(5, 'HR', 'Human resources, staff records, and organizational administration')
+ON DUPLICATE KEY UPDATE role_name=VALUES(role_name);
+
 -- 4. Employees (BCrypt hashes for 'Password123!')
--- BCrypt: $2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi
-INSERT INTO employee (employee_id, branch_id, full_name, role, username, password_hash) VALUES
-(1,   1, 'System Administrator', 'ADMIN',   'admin',           '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
-(2,   1, 'Arlene McCoy (Manager)', 'MANAGER', 'manager1',      '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
-(3,   1, 'Floyd Miles (Cashier)', 'CASHIER', 'cashier1',       '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
-(100, 1, 'Kavindu Perera (Admin)', 'ADMIN',  'admin_kavindu',  '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
-(101, 1, 'Floyd Miles',            'CASHIER','cashier_floyd',  '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
-(102, 1, 'Arlene McCoy',           'MANAGER','manager_arlene', '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
-(103, 2, 'Kamal Gunaratne',        'CASHIER','cashier_kamal',  '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi'),
-(104, 3, 'Nimal Silva',            'MANAGER','manager_nimal',  '$2a$10$k4W9LDVKtmPEVd4jd36lFefCxn94jzlkEWHYFV1YKkRlLVtlK1EXi')
+-- BCrypt: 
+INSERT INTO employee (employee_id, branch_id, role_id, full_name, username, password_hash) VALUES
+(1,   1, 1, 'System Administrator', 'admin',           ''),
+(2,   1, 2, 'Arlene McCoy (Manager)', 'manager1',      ''),
+(3,   1, 3, 'Floyd Miles (Cashier)', 'cashier1',       ''),
+(100, 1, 1, 'Kavindu Perera (Admin)', 'admin_kavindu',  ''),
+(101, 1, 3, 'Floyd Miles',            'cashier_floyd',  ''),
+(102, 1, 2, 'Arlene McCoy',           'manager_arlene', ''),
+(103, 2, 3, 'Kamal Gunaratne',        'cashier_kamal',  ''),
+(104, 3, 2, 'Nimal Silva',            'manager_nimal',  '')
 ON DUPLICATE KEY UPDATE full_name=VALUES(full_name), password_hash=VALUES(password_hash);
 
 -- 5. Customers

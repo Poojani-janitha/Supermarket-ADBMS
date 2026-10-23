@@ -81,9 +81,13 @@ import { InventoryService } from '../../../core/services/inventory.service';
           </a>
 
           @if (authService.isAdmin()) {
-            <a routerLink="/admin" routerLinkActive="active" class="nav-item">
+            <a routerLink="/admin" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }" class="nav-item">
               <span class="material-symbols-outlined nav-icon">admin_panel_settings</span>
               <span class="nav-label">Security</span>
+            </a>
+                        <a routerLink="/admin/backups" routerLinkActive="active" class="nav-item nav-item-backups">
+              <span class="material-symbols-outlined nav-icon">settings_backup_restore</span>
+              <span class="nav-label">Database Backups & DR</span>
             </a>
           }
         }
@@ -216,6 +220,19 @@ import { InventoryService } from '../../../core/services/inventory.service';
 
     .nav-item.active .nav-icon {
       color: #ffffff;
+    }
+
+    /* Requirement 1: Database Backups & DR active-state styling */
+    .nav-item-backups.active {
+      background: #ecfdf5 !important; /* emerald-50 */
+      color: #047857 !important; /* emerald-700 */
+      border-left: 4px solid #059669; /* emerald-600 */
+      border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+      box-shadow: 0 1px 3px rgba(5, 150, 105, 0.12);
+    }
+
+    .nav-item-backups.active .nav-icon {
+      color: #047857 !important; /* emerald-700 */
     }
 
     .sidebar-footer {

@@ -340,3 +340,25 @@ export interface FinancialReconciliation {
   isBalanced: boolean;
   tenders: PaymentTenderSummary[];
 }
+
+
+export interface DatabaseUserAccount {
+  username: string;
+  host: string;
+  assignedRole: string;
+  status: 'ACTIVE' | 'LOCKED' | string;
+  purpose: string;
+  authPlugin: string;
+  privilegesSummary: string;
+}
+
+export interface DatabaseAccount {
+  id: string | number;
+  username: string;
+  role: string;
+  host: string;
+  status: 'active' | 'disabled';
+  privilegeCount: number;
+  createdAt: string;
+  lastUsedAt: string;
+}

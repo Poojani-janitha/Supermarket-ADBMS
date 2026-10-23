@@ -1,14 +1,16 @@
-import { Component, inject, signal, OnInit } from '@angular/core';
+import { Component, inject, signal, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../../../core/services/auth.service';
 import { CustomerService } from '../../../../core/services/customer.service';
-import { Employee, BackupInfo } from '../../../../core/models';
+import { Employee, DatabaseAccount } from '../../../../core/models';
+import { DatabaseAccountGridComponent } from '../../components/database-account-grid/database-account-grid.component';
+import { useDatabaseAccounts } from '../../services/use-database-accounts.service';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, DatabaseAccountGridComponent],
   template: `
     <div class="page-container">
       <!-- Header -->
@@ -69,14 +71,6 @@ import { Employee, BackupInfo } from '../../../../core/models';
         >
           <span class="material-symbols-outlined">table_view</span>
           <span>Role Privilege Matrix</span>
-        </button>
-        <button
-          class="tab-btn"
-          [class.active]="activeTab() === 'BACKUP'"
-          (click)="activeTab.set('BACKUP')"
-        >
-          <span class="material-symbols-outlined">settings_backup_restore</span>
-          <span>Disaster Recovery & Backup</span>
         </button>
       </div>
 
@@ -231,99 +225,166 @@ import { Employee, BackupInfo } from '../../../../core/models';
         </div>
       }
 
-      <!-- ================= TAB 3: AUDIT & TRIGGER LOGS ================= -->
+      <!-- ================= TAB 3: AUDIT & TRIGGER LOGS (FULL-WIDTH RESPONSIVE) ================= -->
       @if (activeTab() === 'AUDIT') {
-        <div class="grid-2-col">
-          <!-- Employee Audit Log (Triggered by trg_employee_audit) -->
-          <div class="section-card">
-            <div class="card-title-row">
-              <span class="material-symbols-outlined" style="color: #065f46;">security_update_good</span>
-              <div>
-                <h3>Employee Audit Log</h3>
-                <p class="card-meta">Automated record of role changes, branch transfers, and deactivations</p>
-              </div>
-            </div>
-
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>ACTION</th>
-                  <th>EMPLOYEE</th>
-                  <th>OLD &rarr; NEW VALUE</th>
-                  <th>MODIFIED BY</th>
-                  <th>TIME</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (log of authService.employeeAuditLogs(); track log.logId) {
-                  <tr>
-                    <td>
-                      <span
-                        class="badge-pill"
-                        [class.badge-admin]="log.action === 'ROLE_CHANGE'"
-                        [class.badge-danger]="log.action === 'DEACTIVATE'"
-                        [class.badge-mgr]="log.action === 'BRANCH_TRANSFER'"
-                        [class.badge-active]="log.action === 'REACTIVATE'"
-                      >
-                        {{ log.action }}
-                      </span>
-                    </td>
-                    <td><strong>{{ log.employeeName }}</strong></td>
-                    <td>
-                      <span class="audit-change-val">{{ log.oldValue }}</span>
-                      &rarr;
-                      <span class="audit-change-val highlight">{{ log.newValue }}</span>
-                    </td>
-                    <td><span class="username-pill">{{ log.modifiedBy }}</span></td>
-                    <td class="time-meta">{{ log.modifiedAt }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+        <div class="audit-layout-container">
+          <!-- Sub-Tab Filter Toggle (Direct 2-Way Switcher) -->
+          <div class="audit-subtabs-bar">
+            <button
+              type="button"
+              class="subtab-pill"
+              [class.active]="subAuditTab() === 'EMPLOYEE'"
+              (click)="subAuditTab.set('EMPLOYEE')"
+            >
+              <span class="material-symbols-outlined">badge</span>
+              <span>Employee Lifecycle Audit ({{ authService.employeeAuditLogs().length }})</span>
+            </button>
+            <button
+              type="button"
+              class="subtab-pill"
+              [class.active]="subAuditTab() === 'SECURITY'"
+              (click)="subAuditTab.set('SECURITY')"
+            >
+              <span class="material-symbols-outlined">shield</span>
+              <span>System Security Events ({{ authService.securityLogs().length }})</span>
+            </button>
           </div>
 
-          <!-- Security Event Log -->
-          <div class="section-card">
-            <div class="card-title-row">
-              <span class="material-symbols-outlined" style="color: #dc2626;">crisis_alert</span>
-              <div>
-                <h3>Security Event Log</h3>
-                <p class="card-meta">High-priority authentication, authorization, and backup events</p>
-              </div>
-            </div>
+          <div class="audit-stack">
+            <!-- 1. Employee Audit Log (Triggered by trg_employee_audit) -->
+            @if (subAuditTab() === 'EMPLOYEE') {
+              <div class="section-card full-width-audit-card">
+                <div class="card-title-row">
+                  <div class="audit-header-icon-box bg-emerald">
+                    <span class="material-symbols-outlined">security_update_good</span>
+                  </div>
+                  <div style="flex: 1;">
+                    <h3 class="audit-title">Employee Audit Log</h3>
+                    <p class="card-meta">Automated trigger audit (trg_employee_audit) capturing role adjustments, transfers, and activation status</p>
+                  </div>
+                  <span class="record-counter">{{ authService.employeeAuditLogs().length }} entries</span>
+                </div>
 
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>EVENT</th>
-                  <th>DETAILS</th>
-                  <th>USER & IP</th>
-                  <th>TIME</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (sec of authService.securityLogs(); track sec.logId) {
-                  <tr>
-                    <td>
-                      <span
-                        class="badge-pill"
-                        [class.badge-active]="sec.eventType === 'LOGIN_SUCCESS'"
-                        [class.badge-admin]="sec.eventType === 'ROLE_ASSIGN'"
-                        [class.badge-danger]="sec.eventType === 'EMPLOYEE_DEACTIVATED' || sec.eventType === 'UNAUTHORIZED_ACCESS'"
-                      >
-                        {{ sec.eventType }}
-                      </span>
-                    </td>
-                    <td>{{ sec.description }}</td>
-                    <td>
-                      <span class="username-pill">{{ sec.username }}</span><br>
-                      <span class="time-meta">{{ sec.ipAddress }}</span>
-                    </td>
-                    <td class="time-meta">{{ sec.createdAt }}</td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+                <div class="table-responsive audit-table-wrapper">
+                  <table class="data-table audit-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 140px; white-space: nowrap;">ACTION</th>
+                        <th scope="col" style="width: 180px; white-space: nowrap;">EMPLOYEE</th>
+                        <th scope="col" style="min-width: 250px; white-space: nowrap;">OLD &rarr; NEW VALUE</th>
+                        <th scope="col" style="width: 170px; white-space: nowrap;">MODIFIED BY</th>
+                        <th scope="col" style="width: 180px; white-space: nowrap;">TIMESTAMP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (log of authService.employeeAuditLogs(); track log.logId) {
+                        <tr>
+                          <td>
+                            <span
+                              class="badge-pill"
+                              [class.badge-role-change]="log.action === 'ROLE_CHANGE'"
+                              [class.badge-danger]="log.action === 'DEACTIVATE'"
+                              [class.badge-mgr]="log.action === 'BRANCH_TRANSFER'"
+                              [class.badge-active]="log.action === 'REACTIVATE' || log.action === 'REGISTER'"
+                            >
+                              {{ log.action }}
+                            </span>
+                          </td>
+                          <td class="emp-name-col">
+                            <strong>{{ log.employeeName }}</strong>
+                            <span class="emp-id-sub">ID #{{ log.employeeId }}</span>
+                          </td>
+                          <td>
+                            <div class="change-flow-container">
+                              <span class="val-pill" [class.val-pill-active]="log.oldValue === 'Active'">{{ log.oldValue }}</span>
+                              <span class="material-symbols-outlined flow-arrow">arrow_forward</span>
+                              <span
+                                class="val-pill"
+                                [class.val-pill-deactivated]="log.newValue === 'Deactivated'"
+                                [class.val-pill-highlight]="log.newValue !== 'Deactivated'"
+                              >
+                                {{ log.newValue }}
+                              </span>
+                            </div>
+                          </td>
+                          <td>
+                            <div class="user-pill-container">
+                              <span class="material-symbols-outlined user-pill-icon">verified_user</span>
+                              <span class="user-pill-name">{{ cleanUserDisplay(log.modifiedBy) }}</span>
+                            </div>
+                          </td>
+                          <td class="time-meta-cell">
+                            <span class="time-meta-nowrap">
+                              <span class="material-symbols-outlined time-glyph">schedule</span>
+                              {{ log.modifiedAt }}
+                            </span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
+
+            <!-- 2. Security Event Log -->
+            @if (subAuditTab() === 'SECURITY') {
+              <div class="section-card full-width-audit-card">
+                <div class="card-title-row">
+                  <div class="audit-header-icon-box bg-red">
+                    <span class="material-symbols-outlined">crisis_alert</span>
+                  </div>
+                  <div style="flex: 1;">
+                    <h3 class="audit-title">Security Event Log</h3>
+                    <p class="card-meta">Real-time system events, role permissions enforcement, and administrative safeguards</p>
+                  </div>
+                  <span class="record-counter">{{ authService.securityLogs().length }} entries</span>
+                </div>
+
+                <div class="table-responsive audit-table-wrapper">
+                  <table class="data-table audit-data-table">
+                    <thead>
+                      <tr>
+                        <th scope="col" style="width: 170px; white-space: nowrap;">EVENT TYPE</th>
+                        <th scope="col" style="min-width: 280px;">EVENT DETAILS</th>
+                        <th scope="col" style="width: 180px; white-space: nowrap;">USER & IP</th>
+                        <th scope="col" style="width: 180px; white-space: nowrap;">TIMESTAMP</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      @for (sec of authService.securityLogs(); track sec.logId) {
+                        <tr>
+                          <td>
+                            <span
+                              class="badge-pill"
+                              [class.badge-active]="sec.eventType === 'LOGIN_SUCCESS'"
+                              [class.badge-role-change]="sec.eventType === 'ROLE_ASSIGN'"
+                              [class.badge-danger]="sec.eventType === 'EMPLOYEE_DEACTIVATED' || sec.eventType === 'UNAUTHORIZED_ACCESS'"
+                            >
+                              {{ sec.eventType }}
+                            </span>
+                          </td>
+                          <td class="event-desc-cell">{{ sec.description }}</td>
+                          <td>
+                            <div class="user-pill-container">
+                              <span class="material-symbols-outlined user-pill-icon">person</span>
+                              <span class="user-pill-name">{{ cleanUserDisplay(sec.username) }}</span>
+                            </div>
+                            <div class="ip-sub">{{ sec.ipAddress }}</div>
+                          </td>
+                          <td class="time-meta-cell">
+                            <span class="time-meta-nowrap">
+                              <span class="material-symbols-outlined time-glyph">schedule</span>
+                              {{ sec.createdAt }}
+                            </span>
+                          </td>
+                        </tr>
+                      }
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            }
           </div>
         </div>
       }
@@ -357,7 +418,7 @@ import { Employee, BackupInfo } from '../../../../core/models';
                   <th style="min-width: 220px;">DATABASE OBJECT</th>
                   <th style="width: 100px;">TYPE</th>
                   @for (role of matrixRoles(); track role) {
-                    <th style="text-align: center;">{{ role }} ROLE ({{ role.toLowerCase() }}_role)</th>
+                    <th style="text-align: center;">{{ formatRoleDisplayName(role) }} ROLE ({{ role.toLowerCase() }}_role)</th>
                   }
                 </tr>
               </thead>
@@ -403,198 +464,67 @@ import { Employee, BackupInfo } from '../../../../core/models';
             </table>
           </div>
 
-          <div class="db-user-box">
-            <h4>Dedicated Least-Privilege Database Accounts:</h4>
-            <div class="db-users-grid">
-              <div class="db-user-card">
-                <strong>app_user</strong>
-                <span>Backend Spring Boot connection pool (HikariCP)</span>
-              </div>
-              <div class="db-user-card">
-                <strong>report_user</strong>
-                <span>Read-only analytics and BI reporting queries</span>
-              </div>
-              <div class="db-user-card">
-                <strong>etl_user</strong>
-                <span>50,000+ orders bulk seeder & scheduled nightly events</span>
-              </div>
-              <div class="db-user-card">
-                <strong>admin_user</strong>
-                <span>Full DBA privileges, Point-in-time recovery, user creation</span>
-              </div>
-            </div>
-          </div>
+                    <app-database-account-grid
+            [accounts]="dbAccountsApi.accounts()"
+            [isLoading]="dbAccountsApi.isLoading()"
+            [error]="dbAccountsApi.error()"
+            (onRefresh)="dbAccountsApi.refetch()"
+            (onConfigure)="configureAccountRole($event)"
+            (openProvisionModal)="openAccountProvisionModal()"
+          ></app-database-account-grid>
         </div>
       }
 
-      <!-- ================= TAB 5: DISASTER RECOVERY & BACKUP (PITR) ================= -->
-      @if (activeTab() === 'BACKUP') {
-        <div class="dr-container">
-          <!-- Architecture Metrics Grid -->
-          <div class="metrics-summary-grid">
-            <div class="metric-summary-card">
-              <div class="metric-icon-box" style="background: #ecfdf5; color: #059669;">
-                <span class="material-symbols-outlined">timer</span>
-              </div>
-              <div class="metric-text-box">
-                <span class="metric-label">Recovery Point Objective (RPO)</span>
-                <span class="metric-value">~ 0 Seconds</span>
-                <span class="metric-sub">Continuous Binary Logging (sync_binlog=1)</span>
-              </div>
-            </div>
-
-            <div class="metric-summary-card">
-              <div class="metric-icon-box" style="background: #eff6ff; color: #2563eb;">
-                <span class="material-symbols-outlined">speed</span>
-              </div>
-              <div class="metric-text-box">
-                <span class="metric-label">Recovery Time Objective (RTO)</span>
-                <span class="metric-value">&lt; 5 Minutes</span>
-                <span class="metric-sub">Automated Snapshot & Table Integrity Checks</span>
-              </div>
-            </div>
-
-            <div class="metric-summary-card">
-              <div class="metric-icon-box" style="background: #fef3c7; color: #d97706;">
-                <span class="material-symbols-outlined">lock_open_right</span>
-              </div>
-              <div class="metric-text-box">
-                <span class="metric-label">InnoDB MVCC Isolation</span>
-                <span class="metric-value">Non-Blocking</span>
-                <span class="metric-sub">--single-transaction (Zero POS Lock Contention)</span>
-              </div>
-            </div>
-
-            <div class="metric-summary-card">
-              <div class="metric-icon-box" style="background: #f3e8ff; color: #9333ea;">
-                <span class="material-symbols-outlined">history_toggle_off</span>
-              </div>
-              <div class="metric-text-box">
-                <span class="metric-label">Point-in-Time Recovery</span>
-                <span class="metric-value">Coordinate Bound</span>
-                <span class="metric-sub">--source-data=2 Replication Header</span>
-              </div>
-            </div>
-          </div>
-
-          <!-- Backup Management Card -->
-          <div class="table-card">
-            <div class="card-inner-header">
-              <div>
-                <h3>Database Backup Snapshots</h3>
-                <p class="card-meta">
-                  Consistent full database snapshots with transactional isolation and point-in-time recovery capability
-                </p>
-              </div>
-              <div style="display: flex; gap: 8px;">
-                <button class="btn-pill btn-secondary" (click)="refreshBackups()">
-                  <span class="material-symbols-outlined">refresh</span> Refresh Catalog
-                </button>
-                <button
-                  class="btn-pill btn-primary"
-                  [disabled]="isBackingUp()"
-                  (click)="triggerBackup()"
-                >
-                  @if (isBackingUp()) {
-                    <span class="material-symbols-outlined rotating">progress_activity</span> Generating Snapshot...
-                  } @else {
-                    <span class="material-symbols-outlined">database</span> Take Consistent Snapshot
-                  }
-                </button>
-              </div>
-            </div>
-
-            @if (authService.backups().length === 0) {
-              <div class="empty-backups-box">
-                <span class="material-symbols-outlined empty-icon">folder_zip</span>
-                <p>No snapshots found on disk. Click <strong>Take Consistent Snapshot</strong> to execute non-blocking backup.</p>
-              </div>
-            } @else {
-              <table class="data-table">
-                <thead>
-                  <tr>
-                    <th>SNAPSHOT FILENAME</th>
-                    <th>FILE SIZE</th>
-                    <th>CREATED TIMESTAMP</th>
-                    <th>PITR BINLOG COORDINATE</th>
-                    <th>STATUS</th>
-                    <th style="text-align: right;">RECOVERY CAPABILITY</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  @for (b of authService.backups(); track b.fileName) {
-                    <tr>
-                      <td>
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                          <span class="material-symbols-outlined" style="color: #0284c7; font-size: 20px;">description</span>
-                          <span class="backup-filename">{{ b.fileName }}</span>
-                        </div>
-                      </td>
-                      <td>
-                        <span class="code-sku">{{ b.fileSizeKb }} KB</span>
-                      </td>
-                      <td>
-                        <span class="time-meta" style="font-weight: 600; color: #334155;">{{ b.createdAt }}</span>
-                      </td>
-                      <td>
-                        <code class="binlog-pill">{{ b.binlogCoordinate }}</code>
-                      </td>
-                      <td>
-                        <span class="badge-pill badge-active">{{ b.status }}</span>
-                      </td>
-                      <td style="text-align: right;">
-                        <div class="action-buttons-group">
-                          <button
-                            class="btn-pill btn-sm btn-outline"
-                            (click)="downloadSnapshot(b.fileName)"
-                            title="Download SQL Snapshot File"
-                          >
-                            <span class="material-symbols-outlined">download</span> Download
-                          </button>
-                          <button
-                            class="btn-pill btn-sm btn-danger-outline"
-                            (click)="openRestoreModal(b)"
-                            title="Restore database from this point-in-time snapshot"
-                          >
-                            <span class="material-symbols-outlined">restore</span> Restore
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  }
-                </tbody>
-              </table>
-            }
-          </div>
-        </div>
-      }
-
-      <!-- MODAL: CHANGE ROLE -->
-      @if (selectedEmployeeForRole()) {
-        <div class="modal-backdrop">
+      <!-- MODAL: PROVISION NEW DATABASE USER ACCOUNT -->
+      @if (isProvisionModalOpen()) {
+        <div class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="provisionModalTitle">
           <div class="modal-card">
             <div class="modal-header">
-              <h3>Change Employee Role</h3>
-              <button class="close-btn" (click)="selectedEmployeeForRole.set(null)">&times;</button>
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <div style="width: 36px; height: 36px; border-radius: 8px; background: #ecfdf5; display: flex; align-items: center; justify-content: center; color: #059669;">
+                  <span class="material-symbols-outlined">person_add</span>
+                </div>
+                <div>
+                  <h3 id="provisionModalTitle" style="margin: 0; font-size: 1.1rem; color: #111827;">Provision MySQL Database User</h3>
+                  <p style="margin: 0; font-size: 0.76rem; color: #6b7280;">Create a live MySQL engine-level account and assign RBAC role privileges</p>
+                </div>
+              </div>
+              <button class="close-btn" (click)="isProvisionModalOpen.set(false)">&times;</button>
             </div>
             <div class="modal-body">
-              <p>Updating role for <strong>{{ selectedEmployeeForRole()!.fullName }}</strong> ({{ selectedEmployeeForRole()!.username }}).</p>
               <div class="form-group">
-                <label>Select New Role:</label>
-                <select [(ngModel)]="newRoleSelection" class="select-input">
+                <label>Database Username:</label>
+                <input type="text" [(ngModel)]="newProvisionUsername" placeholder="e.g. audit_clerk or db_admin" class="select-input" />
+              </div>
+              <div class="form-group">
+                <label>Connection Host:</label>
+                <select [(ngModel)]="newProvisionHost" class="select-input">
+                  <option value="%">% (Wildcard / Remote Network)</option>
+                  <option value="localhost">localhost (Restricted Local Only)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Assigned Database Role:</label>
+                <select [(ngModel)]="newProvisionRole" class="select-input">
                   @for (r of availableRoles(); track r) {
-                    <option [value]="r">{{ r }} ({{ r.toLowerCase() }}_role)</option>
+                    <option [value]="r">{{ formatRoleDisplayName(r) }} ({{ r.toLowerCase() }}_role)</option>
                   }
                 </select>
               </div>
+              <div class="form-group">
+                <label>Account Password:</label>
+                <input type="password" [(ngModel)]="newProvisionPassword" placeholder="Default: Pass!2026" class="select-input" />
+              </div>
               <div class="info-note">
-                <span class="material-symbols-outlined">info</span>
-                <span>This procedure will automatically fire <code>trg_employee_audit</code> and log old vs new role in <code>employee_audit_log</code>.</span>
+                <span class="material-symbols-outlined">shield</span>
+                <span>Directly provisions an active MySQL 8 account, grants role privileges, sets default role, and creates an audit trail entry.</span>
               </div>
             </div>
             <div class="modal-footer">
-              <button class="btn-pill btn-secondary" (click)="selectedEmployeeForRole.set(null)">Cancel</button>
-              <button class="btn-pill btn-primary" (click)="confirmRoleChange()">Confirm & Execute</button>
+              <button class="btn-pill btn-secondary" (click)="isProvisionModalOpen.set(false)">Cancel</button>
+              <button class="btn-pill btn-primary" [disabled]="isProvisioningAccount()" (click)="confirmProvisionAccount()">
+                {{ isProvisioningAccount() ? 'Provisioning...' : 'Provision & Activate' }}
+              </button>
             </div>
           </div>
         </div>
@@ -650,115 +580,114 @@ import { Employee, BackupInfo } from '../../../../core/models';
         </div>
       }
 
-      <!-- MODAL: CONFIRM RESTORE SNAPSHOT (DISASTER RECOVERY) -->
-      @if (selectedBackupForRestore()) {
-        <div class="modal-backdrop">
-          <div class="modal-card">
-            <div class="modal-header">
-              <h3 style="color: #b91c1c; display: flex; align-items: center; gap: 8px;">
-                <span class="material-symbols-outlined" style="color: #b91c1c;">warning</span>
-                Confirm Disaster Recovery Restore
-              </h3>
-              <button class="close-btn" (click)="selectedBackupForRestore.set(null)">&times;</button>
-            </div>
-            <div class="modal-body">
-              <p>
-                You are about to rebuild <strong>supermarket_db</strong> from the snapshot:
-              </p>
-              <div class="backup-modal-details">
-                <div><strong>File:</strong> <code>{{ selectedBackupForRestore()!.fileName }}</code></div>
-                <div><strong>Size:</strong> {{ selectedBackupForRestore()!.fileSizeKb }} KB</div>
-                <div><strong>Snapshot Time:</strong> {{ selectedBackupForRestore()!.createdAt }}</div>
-                <div><strong>PITR Coordinate:</strong> <code>{{ selectedBackupForRestore()!.binlogCoordinate }}</code></div>
-              </div>
-              <div class="info-note" style="border-left: 3px solid #b91c1c; background: #fef2f2; color: #991b1b;">
-                <span class="material-symbols-outlined" style="color: #b91c1c;">error</span>
-                <span><strong>CRITICAL WARNING:</strong> Existing schema and tables will be dropped and re-created to this exact snapshot point. Automated table row-count audit will run post-recovery.</span>
-              </div>
-            </div>
-            <div class="modal-footer">
-              <button class="btn-pill btn-secondary" [disabled]="isRestoring()" (click)="selectedBackupForRestore.set(null)">Cancel</button>
-              <button class="btn-pill btn-primary" style="background: #dc2626;" [disabled]="isRestoring()" (click)="executeRestore()">
-                @if (isRestoring()) {
-                  <span class="material-symbols-outlined rotating">progress_activity</span> Restoring Database...
-                } @else {
-                  <span class="material-symbols-outlined">restart_alt</span> Confirm & Rebuild Database
-                }
-              </button>
-            </div>
-          </div>
-        </div>
-      }
-
-      <!-- MODAL: ADD / CONFIGURE ROLE PRIVILEGE RULE -->
+      <!-- MODAL: ADD / CONFIGURE ROLE PRIVILEGE RULE (3-ZONE RESTRUCTURE) -->
       @if (isAddRuleModalOpen()) {
-        <div class="modal-backdrop">
-          <div class="modal-card modal-large">
-            <div class="modal-header">
-              <div style="display: flex; align-items: center; gap: 10px;">
-                <span class="material-symbols-outlined" style="color: #065f46; font-size: 26px;">security</span>
-                <div>
-                  <h3 style="margin: 0;">Configure Database Role Privilege Rules</h3>
-                  <p class="card-meta" style="margin: 2px 0 0 0;">Define granular SQL action privileges per database object and persist to database</p>
+        <div
+          class="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="ruleModalTitle"
+        >
+          <div class="modal-card modal-large modal-flex-column">
+            <!-- ZONE 1: FIXED HEADER (Title, Close Button, Role Selector & Presets) -->
+            <div class="modal-header-fixed">
+              <div class="header-main-bar">
+                <div class="modal-header-brand">
+                  <div class="shield-avatar">
+                    <span class="material-symbols-outlined">security</span>
+                  </div>
+                  <div>
+                    <h3 id="ruleModalTitle" class="modal-main-title">Configure Database Role Privilege Rules</h3>
+                    <p class="modal-sub-meta">Define granular SQL action privileges per database object and persist to database</p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  class="close-btn"
+                  (click)="isAddRuleModalOpen.set(false)"
+                  aria-label="Close privilege rules modal"
+                >&times;</button>
               </div>
-              <button class="close-btn" (click)="isAddRuleModalOpen.set(false)">&times;</button>
-            </div>
 
-            <div class="modal-body rule-builder-body">
-              <!-- Role Selection / Creation Row -->
-              <div class="role-selection-card">
-                <div class="form-row-compact">
-                  <div class="role-mode-toggle">
-                    <label class="radio-label">
-                      <input type="radio" name="ruleRoleMode" value="EXISTING" [(ngModel)]="ruleRoleMode" (change)="onRuleRoleModeChange()" />
-                      <span>Select Available Role</span>
-                    </label>
-                    <label class="radio-label">
-                      <input type="radio" name="ruleRoleMode" value="NEW" [(ngModel)]="ruleRoleMode" (change)="onRuleRoleModeChange()" />
-                      <span>+ Add New Custom Role</span>
-                    </label>
+              <!-- Role Selection / Account Context Row -->
+              @if (configuringAccount()) {
+                <div class="account-config-banner">
+                  <div class="banner-left">
+                    <div class="banner-avatar">
+                      <span class="material-symbols-outlined">dns</span>
+                    </div>
+                    <div class="banner-info">
+                      <div class="banner-account-name">
+                        <span class="user-name-hl">{{ configuringAccount()?.username }}</span>
+                        <span class="host-pill">{{ '@' + configuringAccount()?.host }}</span>
+                        <span class="status-dot-inline" [class.active]="configuringAccount()?.status === 'active'"></span>
+                      </div>
+                      <p class="banner-desc">Configuring MySQL engine object privilege rules for provisioned account</p>
+                    </div>
                   </div>
 
-                  @if (ruleRoleMode === 'EXISTING') {
-                    <div class="form-group-inline">
-                      <label>Target Role:</label>
-                      <select [(ngModel)]="selectedRuleRole" (change)="onRuleRoleSelected()" class="select-input select-role-input">
-                        @for (r of availableRoles(); track r) {
-                          <option [value]="r">{{ r }} ({{ r.toLowerCase() }}_role)</option>
-                        }
-                      </select>
-                    </div>
-                  } @else {
-                    <div class="form-group-inline">
-                      <label>New Role Name:</label>
-                      <input
-                        type="text"
-                        [(ngModel)]="newCustomRoleName"
-                        placeholder="e.g. INVENTORY_CLERK or AUDITOR"
-                        class="select-input input-role-name"
-                      />
-                    </div>
-                  }
+                  <div class="banner-role-badge">
+                    <span class="role-caption">Active Role:</span>
+                    <span class="role-pill-lg">{{ formatRoleDisplayName(selectedRuleRole) }}</span>
+                  </div>
                 </div>
+              } @else {
+                <div class="role-selection-card">
+                  <div class="form-row-compact">
+                    <div class="role-mode-toggle">
+                      <label class="radio-label">
+                        <input type="radio" name="ruleRoleMode" value="EXISTING" [(ngModel)]="ruleRoleMode" (change)="onRuleRoleModeChange()" />
+                        <span>Select Available Role</span>
+                      </label>
+                      <label class="radio-label">
+                        <input type="radio" name="ruleRoleMode" value="NEW" [(ngModel)]="ruleRoleMode" (change)="onRuleRoleModeChange()" />
+                        <span>+ Add New Custom Role</span>
+                      </label>
+                    </div>
 
-                <!-- Presets Row -->
-                <div class="presets-row">
-                  <span class="presets-label">Quick Presets:</span>
-                  <button type="button" class="btn-preset" (click)="applyRulePreset('READ_ONLY')">Read Only (SELECT / EXECUTE)</button>
-                  <button type="button" class="btn-preset" (click)="applyRulePreset('ALL')">Grant All Privileges</button>
-                  <button type="button" class="btn-preset danger" (click)="applyRulePreset('DENY_ALL')">Deny All</button>
+                    @if (ruleRoleMode === 'EXISTING') {
+                      <div class="form-group-inline">
+                        <label for="targetRoleSelect">Target Role:</label>
+                        <select id="targetRoleSelect" [(ngModel)]="selectedRuleRole" (change)="onRuleRoleSelected()" class="select-input select-role-input">
+                          @for (r of availableRoles(); track r) {
+                            <option [value]="r">{{ formatRoleDisplayName(r) }} ({{ r.toLowerCase() }}_role)</option>
+                          }
+                        </select>
+                      </div>
+                    } @else {
+                      <div class="form-group-inline">
+                        <label for="customRoleInput">New Role Name:</label>
+                        <input
+                          id="customRoleInput"
+                          type="text"
+                          [(ngModel)]="newCustomRoleName"
+                          placeholder="e.g. INVENTORY_CLERK or AUDITOR"
+                          class="select-input input-role-name"
+                        />
+                      </div>
+                    }
+                  </div>
                 </div>
+              }
+
+              <!-- Presets Row (Applied in both modes) -->
+              <div class="presets-row">
+                <span class="presets-label">Quick Presets:</span>
+                <button type="button" class="btn-preset" (click)="applyRulePreset('READ_ONLY')">Read Only (SELECT / EXECUTE)</button>
+                <button type="button" class="btn-preset" (click)="applyRulePreset('ALL')">Grant All Privileges</button>
+                <button type="button" class="btn-preset danger" (click)="applyRulePreset('DENY_ALL')">Deny All</button>
               </div>
+            </div>
 
-              <!-- Objects & Action Privileges Table -->
+            <!-- ZONE 2: SCROLLABLE BODY (Objects & Action Privileges Table) -->
+            <div class="modal-body-scrollable max-h-[450px] overflow-y-auto scroll-smooth overscroll-contain">
               <div class="rule-table-container">
                 <table class="data-table rule-builder-table">
-                  <thead>
+                  <thead class="sticky top-0 bg-gray-50 z-10 sticky-thead">
                     <tr>
-                      <th style="min-width: 180px;">DATABASE OBJECT</th>
-                      <th style="width: 110px;">OBJECT TYPE</th>
-                      <th>ACTIONS / PRIVILEGES (CLICK TO TOGGLE)</th>
+                      <th scope="col" style="min-width: 180px;">DATABASE OBJECT</th>
+                      <th scope="col" style="width: 110px;">OBJECT TYPE</th>
+                      <th scope="col">ACTIONS / PRIVILEGES (CLICK TO TOGGLE)</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -832,13 +761,27 @@ import { Employee, BackupInfo } from '../../../../core/models';
               </div>
             </div>
 
-            <div class="modal-footer">
-              <button class="btn-pill btn-secondary" (click)="isAddRuleModalOpen.set(false)">Cancel</button>
-              <button class="btn-pill btn-primary" [disabled]="isSavingRule()" (click)="saveRule()">
+            <!-- ZONE 3: FIXED FOOTER (Cancel ghost/grey & Save Rule emerald solid) -->
+            <div class="modal-footer-fixed">
+              <button
+                type="button"
+                class="btn-footer-ghost"
+                (click)="isAddRuleModalOpen.set(false)"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                class="btn-footer-emerald"
+                [disabled]="isSavingRule()"
+                (click)="saveRule()"
+              >
                 @if (isSavingRule()) {
-                  <span class="material-symbols-outlined rotating">progress_activity</span> Saving Rule...
+                  <span class="material-symbols-outlined rotating">progress_activity</span>
+                  <span>Saving Rule...</span>
                 } @else {
-                  <span class="material-symbols-outlined">save</span> Save Rule
+                  <span class="material-symbols-outlined">save</span>
+                  <span>Save Rule</span>
                 }
               </button>
             </div>
@@ -1479,112 +1422,6 @@ import { Employee, BackupInfo } from '../../../../core/models';
       }
     }
 
-    .metric-summary-card {
-      background: #ffffff;
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 16px 18px;
-      display: flex;
-      gap: 14px;
-      align-items: center;
-      box-shadow: var(--shadow-card);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-
-      &:hover {
-        transform: translateY(-2px);
-        box-shadow: var(--shadow-card-hover);
-      }
-    }
-
-    .metric-icon-box {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-
-      .material-symbols-outlined { font-size: 24px; }
-    }
-
-    .metric-text-box {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-    }
-
-    .metric-label {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-    }
-
-    .metric-value {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: var(--text-main);
-    }
-
-    .metric-sub {
-      font-size: 0.68rem;
-      color: #64748b;
-    }
-
-    .backup-filename {
-      font-family: 'Fira Code', monospace;
-      font-weight: 700;
-      color: #1e293b;
-      font-size: 0.85rem;
-    }
-
-    .binlog-pill {
-      font-family: 'Fira Code', monospace;
-      font-size: 0.73rem;
-      background: #f0fdfa;
-      padding: 3px 8px;
-      border-radius: 6px;
-      border: 1px solid #99f6e4;
-      color: #0f766e;
-      display: inline-block;
-      max-width: 320px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .empty-backups-box {
-      text-align: center;
-      padding: 36px 20px;
-      color: var(--text-muted);
-      font-size: 0.88rem;
-
-      .empty-icon {
-        font-size: 48px;
-        color: #94a3b8;
-        display: block;
-        margin-bottom: 8px;
-      }
-    }
-
-    .backup-modal-details {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 8px;
-      padding: 12px;
-      font-size: 0.8rem;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-
-      code {
-        font-family: 'Fira Code', monospace;
-        color: #0f766e;
-      }
-    }
-
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
@@ -1672,6 +1509,102 @@ import { Employee, BackupInfo } from '../../../../core/models';
       flex-direction: column;
       gap: 16px;
       padding-right: 4px;
+    }
+
+        .account-config-banner {
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      border-radius: 12px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+
+      .banner-left {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .banner-avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 10px;
+        background: #059669;
+        color: #ffffff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 20px;
+      }
+
+      .banner-info {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .banner-account-name {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+
+        .user-name-hl {
+          font-weight: 800;
+          font-size: 0.95rem;
+          color: #065f46;
+          font-family: monospace;
+        }
+
+        .host-pill {
+          background: #dcfce7;
+          color: #166534;
+          font-size: 0.72rem;
+          font-weight: 700;
+          padding: 2px 7px;
+          border-radius: 6px;
+        }
+
+        .status-dot-inline {
+          width: 8px;
+          height: 8px;
+          border-radius: 50%;
+          background: #10b981;
+          display: inline-block;
+        }
+      }
+
+      .banner-desc {
+        margin: 0;
+        font-size: 0.76rem;
+        color: #047857;
+      }
+
+      .banner-role-badge {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        background: #ffffff;
+        padding: 6px 14px;
+        border-radius: 8px;
+        border: 1px solid #bbf7d0;
+
+        .role-caption {
+          font-size: 0.75rem;
+          font-weight: 700;
+          color: #64748b;
+          text-transform: uppercase;
+        }
+
+        .role-pill-lg {
+          font-size: 0.8rem;
+          font-weight: 800;
+          color: #059669;
+          letter-spacing: 0.03em;
+        }
+      }
     }
 
     .role-selection-card {
@@ -1996,23 +1929,519 @@ import { Employee, BackupInfo } from '../../../../core/models';
         background: #b91c1c;
       }
     }
+
+    /* 3-Zone Restructured Modal Styles */
+    .modal-flex-column {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #ffffff;
+      border-radius: 0.75rem;
+      border: 1px solid #e5e7eb;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    .modal-header-fixed {
+      flex-shrink: 0;
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid #e5e7eb;
+      background: #ffffff;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .header-main-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header-brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .shield-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 0.5rem;
+      background: #ecfdf5;
+      color: #059669;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-main-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: #111827;
+      margin: 0;
+    }
+
+    .modal-sub-meta {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin: 2px 0 0 0;
+    }
+
+    /* Zone 2: Scrollable Body with overscroll-contain & thin scrollbar */
+    .modal-body-scrollable {
+      padding: 1.25rem 1.5rem;
+      max-height: 450px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+
+      &::-webkit-scrollbar {
+        width: 6px;
+      }
+      &::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 9999px;
+      }
+      &::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
+    }
+
+    /* Sticky Table thead in Zone 2 */
+    .sticky-thead th {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: #f9fafb !important; /* bg-gray-50 */
+      border-bottom: 1px solid #e5e7eb;
+      box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    /* Zone 3: Fixed Footer */
+    .modal-footer-fixed {
+      flex-shrink: 0;
+      padding: 1rem 1.5rem;
+      background: #f9fafb; /* bg-gray-50 */
+      border-top: 1px solid #e5e7eb; /* border-gray-200 */
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .btn-footer-ghost {
+      background: transparent;
+      border: 1px solid #e5e7eb;
+      color: #374151;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 7px 16px;
+      border-radius: 0.5rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover {
+        background: #f3f4f6;
+        border-color: #d1d5db;
+        color: #111827;
+      }
+    }
+
+    .btn-footer-emerald {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #059669; /* emerald-600 */
+      color: #ffffff;
+      font-size: 0.82rem;
+      font-weight: 600;
+      padding: 7px 18px;
+      border-radius: 0.5rem;
+      border: none;
+      cursor: pointer;
+      transition: background-color 0.15s ease;
+
+      .material-symbols-outlined {
+        font-size: 18px;
+      }
+
+      &:hover:not(:disabled) {
+        background: #047857; /* emerald-700 */
+      }
+
+      &:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+    }
+
+    /* Audit Stream Redesign Styles */
+    .audit-layout-container {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .audit-subtabs-bar {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      background: #ffffff;
+      padding: 6px;
+      border-radius: 10px;
+      border: 1px solid #e5e7eb;
+      width: fit-content;
+    }
+
+    .subtab-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #4b5563;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      .material-symbols-outlined {
+        font-size: 16px;
+      }
+
+      &:hover {
+        background: #f3f4f6;
+        color: #111827;
+      }
+
+      &.active {
+        background: #ecfdf5;
+        color: #047857;
+        font-weight: 700;
+      }
+    }
+
+    .audit-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .full-width-audit-card {
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+    }
+
+    .audit-header-icon-box {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+
+      .material-symbols-outlined {
+        font-size: 22px;
+      }
+
+      &.bg-emerald {
+        background: #ecfdf5;
+        color: #059669;
+      }
+
+      &.bg-red {
+        background: #fef2f2;
+        color: #dc2626;
+      }
+    }
+
+    .audit-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #111827;
+      margin: 0;
+    }
+
+    .record-counter {
+      font-size: 0.74rem;
+      color: #6b7280;
+      background: #f3f4f6;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-weight: 600;
+    }
+
+    .audit-table-wrapper {
+      margin-top: 14px;
+      overflow-x: auto;
+      border-radius: 8px;
+      border: 1px solid #f3f4f6;
+    }
+
+    .audit-data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.84rem;
+
+      th {
+        background: #f9fafb;
+        color: #4b5563;
+        font-weight: 700;
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        padding: 10px 14px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      td {
+        padding: 12px 14px;
+        border-bottom: 1px solid #f3f4f6;
+        vertical-align: middle;
+      }
+
+      tbody tr:hover {
+        background: #f9fafb;
+      }
+    }
+
+    /* Badge Role Change (Soft Blue) */
+    .badge-role-change {
+      background: #eff6ff !important;
+      color: #1d4ed8 !important;
+      border: 1px solid #bfdbfe !important;
+    }
+
+    .emp-name-col {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+
+      strong {
+        color: #111827;
+      }
+    }
+
+    .emp-id-sub {
+      font-size: 0.7rem;
+      color: #6b7280;
+      font-family: monospace;
+    }
+
+    /* Value Flow: Single line with arrow */
+    .change-flow-container {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+
+    .flow-arrow {
+      font-size: 15px;
+      color: #94a3b8;
+    }
+
+    .val-pill {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: #f3f4f6;
+      color: #374151;
+      border: 1px solid #e5e7eb;
+      white-space: nowrap;
+
+      &.val-pill-active {
+        background: #ecfdf5;
+        color: #047857;
+        border-color: #a7f3d0;
+      }
+
+      &.val-pill-highlight {
+        background: #ecfdf5;
+        color: #047857;
+        border-color: #a7f3d0;
+        font-weight: 700;
+      }
+
+      &.val-pill-deactivated {
+        background: #fef2f2;
+        color: #b91c1c;
+        border-color: #fecaca;
+        font-weight: 700;
+      }
+    }
+
+    /* Sanitized Modifier Pill */
+    .user-pill-container {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #f0fdf4;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 3px 9px;
+      border-radius: 20px;
+      white-space: nowrap;
+    }
+
+    .user-pill-icon {
+      font-size: 15px;
+      color: #059669;
+    }
+
+    .user-pill-name {
+      font-size: 0.74rem;
+    }
+
+    .ip-sub {
+      font-size: 0.68rem;
+      color: #94a3b8;
+      margin-top: 2px;
+      font-family: monospace;
+    }
+
+    .event-desc-cell {
+      color: #374151;
+      line-height: 1.4;
+    }
+
+    /* Timestamp NEVER wraps onto multiple lines */
+    .time-meta-cell {
+      white-space: nowrap;
+    }
+
+    .time-meta-nowrap {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 0.76rem;
+      color: #64748b;
+      white-space: nowrap !important;
+    }
+
+    .time-glyph {
+      font-size: 14px;
+      color: #9ca3af;
+    }
   `]
 })
 export class AdminDashboardComponent implements OnInit {
+  readonly dbAccountsApi = useDatabaseAccounts();
+  readonly subAuditTab = signal<'EMPLOYEE' | 'SECURITY'>('EMPLOYEE');
+  configuringAccount = signal<DatabaseAccount | null>(null);
+
+  isProvisionModalOpen = signal<boolean>(false);
+  isProvisioningAccount = signal<boolean>(false);
+  newProvisionUsername = '';
+  newProvisionHost = '%';
+  newProvisionRole = 'CASHIER';
+  newProvisionPassword = '';
+
+  formatRoleDisplayName(role: string): string {
+    if (!role) return '';
+    return role.replace(/_/g, ' ');
+  }
+
+  openAccountProvisionModal(): void {
+    this.newProvisionUsername = '';
+    this.newProvisionHost = '%';
+    this.newProvisionRole = this.availableRoles()[0] || 'CASHIER';
+    this.newProvisionPassword = '';
+    this.isProvisionModalOpen.set(true);
+  }
+
+  confirmProvisionAccount(): void {
+    if (!this.newProvisionUsername || !this.newProvisionUsername.trim()) {
+      this.actionFeedback.set({ success: false, message: 'Please provide a valid database username.' });
+      return;
+    }
+    this.isProvisioningAccount.set(true);
+    this.authService.provisionDatabaseAccountHttp({
+      username: this.newProvisionUsername.trim(),
+      host: this.newProvisionHost,
+      role: this.newProvisionRole,
+      password: this.newProvisionPassword || 'Pass!2026'
+    }).subscribe({
+      next: (res: any) => {
+        this.isProvisioningAccount.set(false);
+        this.isProvisionModalOpen.set(false);
+        this.actionFeedback.set({
+          success: true,
+          message: 'Database account ' + res.username + '@' + res.host + ' provisioned successfully with role ' + res.role + '!'
+        });
+        this.dbAccountsApi.refetch();
+      },
+      error: (err: any) => {
+        this.isProvisioningAccount.set(false);
+        this.actionFeedback.set({
+          success: false,
+          message: 'Failed to provision database account: ' + (err?.error?.message || err?.message || 'Server error')
+        });
+      }
+    });
+  }
+
+  cleanUserDisplay(user: string | null | undefined): string {
+    if (!user || user.trim() === '' || user.toLowerCase() === 'system') return 'System Administrator';
+    if (user.includes('root@') || user.toLowerCase() === 'root') return 'System Administrator';
+    if (user.includes('app_user@') || user.toLowerCase() === 'app_user') return 'Application Service';
+    return user;
+  }
+
+  @HostListener('document:keydown.escape', ['$event'])
+  onKeydownEscape(event: Event) {
+    if (this.isAddRuleModalOpen()) {
+      this.isAddRuleModalOpen.set(false);
+    }
+    if (this.isProvisionModalOpen()) {
+      this.isProvisionModalOpen.set(false);
+    }
+    if (this.isRegisterModalOpen()) {
+      this.isRegisterModalOpen.set(false);
+    }
+    if (this.selectedEmployeeForRole()) {
+      this.selectedEmployeeForRole.set(null);
+    }
+  }
+
+  configureAccountRole(account: DatabaseAccount): void {
+    this.configuringAccount.set(account);
+    this.ruleRoleMode = 'EXISTING';
+    const accRoleNorm = account.role.toUpperCase().replace(/ /g, '_');
+    const matchedRole = this.availableRoles().find(r => {
+      const rNorm = r.toUpperCase().replace(/ /g, '_');
+      return accRoleNorm.includes(rNorm) || rNorm.includes(accRoleNorm);
+    });
+    this.selectedRuleRole = matchedRole || (this.availableRoles()[0] || 'CASHIER');
+    this.onRuleRoleSelected();
+    this.isAddRuleModalOpen.set(true);
+  }
+
   readonly authService = inject(AuthService);
   readonly customerService = inject(CustomerService);
 
-  activeTab = signal<'EMPLOYEES' | 'MASKING' | 'AUDIT' | 'MATRIX' | 'BACKUP'>('EMPLOYEES');
+  activeTab = signal<'EMPLOYEES' | 'MASKING' | 'AUDIT' | 'MATRIX'>('EMPLOYEES');
   actionFeedback = signal<{ success: boolean; message: string } | null>(null);
-  isBackingUp = signal<boolean>(false);
-  isRestoring = signal<boolean>(false);
-  selectedBackupForRestore = signal<BackupInfo | null>(null);
 
   selectedEmployeeForRole = signal<Employee | null>(null);
   newRoleSelection: string = 'CASHIER';
 
   // Dynamic Role Privilege Matrix and Rules Engine State
-  availableRoles = signal<string[]>(['ADMIN', 'MANAGER', 'CASHIER', 'SUPPLIER']);
+  availableRoles = signal<string[]>(['ADMIN', 'MANAGER', 'CASHIER', 'DB_MANAGER', 'HR', 'SUPPLIER']);
   dbObjects = signal<any[]>([]);
   customRolePrivileges = signal<{ [role: string]: { [object: string]: string } }>({});
 
@@ -2102,6 +2531,56 @@ export class AdminDashboardComponent implements OnInit {
       'sp_change_user_role': 'EXECUTE',
       'sp_get_login': 'EXECUTE'
     },
+        'DB_MANAGER': {
+      'sales_order': 'SELECT, INSERT',
+      'order_item': 'DENIED',
+      'customer': 'DENIED',
+      'product': 'DENIED',
+      'inventory': 'DENIED',
+      'discount_rule': 'DENIED',
+      'purchase_order': 'DENIED',
+      'employee': 'DENIED',
+      'employee_audit_log': 'DENIED',
+      'security_event_log': 'DENIED',
+      'v_masked_customer_directory': 'DENIED',
+      'v_active_discounts': 'DENIED',
+      'v_low_stock': 'DENIED',
+      'v_daily_sales': 'DENIED',
+      'v_product_ranking': 'DENIED',
+      'sp_place_order': 'DENIED',
+      'sp_cancel_order': 'DENIED',
+      'sp_get_login': 'DENIED',
+      'sp_add_stock': 'DENIED',
+      'sp_transfer_stock': 'DENIED',
+      'sp_receive_purchase': 'DENIED',
+      'sp_deactivate_employee': 'DENIED',
+      'sp_change_user_role': 'DENIED'
+    },
+        'HR': {
+      'sales_order': 'DENIED',
+      'order_item': 'SELECT, INSERT, UPDATE, DELETE',
+      'customer': 'DENIED',
+      'product': 'DENIED',
+      'inventory': 'DENIED',
+      'discount_rule': 'DENIED',
+      'purchase_order': 'DENIED',
+      'employee': 'DENIED',
+      'employee_audit_log': 'DENIED',
+      'security_event_log': 'DENIED',
+      'v_masked_customer_directory': 'DENIED',
+      'v_active_discounts': 'DENIED',
+      'v_low_stock': 'DENIED',
+      'v_daily_sales': 'DENIED',
+      'v_product_ranking': 'DENIED',
+      'sp_place_order': 'DENIED',
+      'sp_cancel_order': 'DENIED',
+      'sp_get_login': 'DENIED',
+      'sp_add_stock': 'DENIED',
+      'sp_transfer_stock': 'DENIED',
+      'sp_receive_purchase': 'DENIED',
+      'sp_deactivate_employee': 'DENIED',
+      'sp_change_user_role': 'DENIED'
+    },
     'SUPPLIER': {
       'purchase_order': 'SELECT (Assigned)',
       'product': 'SELECT',
@@ -2113,99 +2592,7 @@ export class AdminDashboardComponent implements OnInit {
     this.authService.fetchEmployeesHttp().subscribe();
     this.authService.fetchAuditLogsHttp().subscribe();
     this.authService.fetchSecurityLogsHttp().subscribe();
-    this.authService.fetchBackupsHttp().subscribe();
     this.loadRolesAndPrivileges();
-  }
-
-  triggerBackup(): void {
-    this.isBackingUp.set(true);
-    this.authService.createBackupHttp().subscribe({
-      next: (res) => {
-        this.isBackingUp.set(false);
-        this.actionFeedback.set({
-          success: true,
-          message: `Database backup snapshot '${res.fileName}' (${res.fileSizeKb} KB) generated successfully with MVCC single-transaction! PITR: ${res.binlogCoordinate}`
-        });
-        this.authService.fetchSecurityLogsHttp().subscribe();
-        this.authService.fetchBackupsHttp().subscribe();
-      },
-      error: (err) => {
-        this.isBackingUp.set(false);
-        this.actionFeedback.set({
-          success: false,
-          message: 'Database backup failed: ' + (err?.error?.message || err?.message || 'Server error')
-        });
-      }
-    });
-  }
-
-  refreshBackups(): void {
-    this.authService.fetchBackupsHttp().subscribe({
-      next: () => {
-        this.actionFeedback.set({
-          success: true,
-          message: 'Backup snapshot catalog refreshed from disk.'
-        });
-      }
-    });
-  }
-
-  openRestoreModal(backup: BackupInfo): void {
-    this.selectedBackupForRestore.set(backup);
-  }
-
-  downloadSnapshot(fileName: string): void {
-    this.authService.downloadBackup(fileName).subscribe({
-      next: (blob) => {
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = fileName;
-        a.click();
-        window.URL.revokeObjectURL(url);
-        this.actionFeedback.set({
-          success: true,
-          message: `Snapshot file '${fileName}' downloaded successfully.`
-        });
-      },
-      error: () => {
-        this.actionFeedback.set({
-          success: false,
-          message: `Failed to download snapshot file '${fileName}'.`
-        });
-      }
-    });
-  }
-
-  executeRestore(): void {
-    const backup = this.selectedBackupForRestore();
-    if (!backup) return;
-
-    this.isRestoring.set(true);
-    this.authService.restoreBackupHttp(backup.fileName).subscribe({
-      next: (res: any) => {
-        this.isRestoring.set(false);
-        this.selectedBackupForRestore.set(null);
-        const countsSummary = res?.tableCounts
-          ? Object.entries(res.tableCounts).map(([k, v]) => `${k}: ${v}`).join(', ')
-          : 'Verified';
-        this.actionFeedback.set({
-          success: true,
-          message: `Disaster Recovery Successful! Database restored from '${backup.fileName}'. Verified row counts: [${countsSummary}]`
-        });
-        this.authService.fetchEmployeesHttp().subscribe();
-        this.authService.fetchAuditLogsHttp().subscribe();
-        this.authService.fetchSecurityLogsHttp().subscribe();
-        this.authService.fetchBackupsHttp().subscribe();
-      },
-      error: (err: any) => {
-        this.isRestoring.set(false);
-        this.actionFeedback.set({
-          success: false,
-          message: 'Database restoration failed: ' + (err?.error?.message || err?.message || 'Server error')
-        });
-      }
-    });
   }
 
   openRoleModal(emp: Employee): void {
@@ -2312,9 +2699,10 @@ export class AdminDashboardComponent implements OnInit {
 
   // Dynamic Privilege Matrix & Rules Engine Helper Methods
   matrixRoles(): string[] {
-    const list = this.availableRoles();
-    const core = ['CASHIER', 'MANAGER', 'ADMIN'];
-    const others = list.filter(r => !core.includes(r));
+    const list = this.availableRoles().map(r => r.toUpperCase().replace(/ /g, '_'));
+    const unique = Array.from(new Set(list));
+    const core = ['CASHIER', 'MANAGER', 'DB_MANAGER', 'HR', 'ADMIN'];
+    const others = unique.filter(r => !core.includes(r));
     return [...core, ...others];
   }
 
@@ -2323,16 +2711,24 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   getPrivilegesForObject(role: string, objectName: string): string {
-    const custom = this.customRolePrivileges()[role]?.[objectName];
+    const norm = role.toUpperCase().replace(/ /g, '_');
+    const space = role.toUpperCase().replace(/_/g, ' ');
+    const custom = this.customRolePrivileges()[role]?.[objectName]
+      || this.customRolePrivileges()[norm]?.[objectName]
+      || this.customRolePrivileges()[space]?.[objectName];
     if (custom) return custom;
-    return this.defaultPrivilegesMap[role]?.[objectName] || 'DENIED';
+    return this.defaultPrivilegesMap[norm]?.[objectName]
+      || this.defaultPrivilegesMap[space]?.[objectName]
+      || this.defaultPrivilegesMap[role]?.[objectName]
+      || 'DENIED';
   }
 
   loadRolesAndPrivileges(): void {
     this.authService.fetchRolesHttp().subscribe({
       next: (roles) => {
         if (roles && roles.length > 0) {
-          this.availableRoles.set(roles);
+          const normRoles = roles.map(r => r.toUpperCase().replace(/ /g, '_'));
+          this.availableRoles.update(prev => Array.from(new Set([...prev, ...normRoles])));
         }
       }
     });
@@ -2349,22 +2745,29 @@ export class AdminDashboardComponent implements OnInit {
       next: (rules) => {
         if (rules && rules.length > 0) {
           const map: { [role: string]: { [obj: string]: string } } = {};
+          const detectedRoles = new Set<string>();
           rules.forEach(r => {
-            const role = (r.role_name || r.roleName || '').toUpperCase();
+            const rawRole = (r.role_name || r.roleName || '').toUpperCase();
+            const normRole = rawRole.replace(/ /g, '_');
             const obj = r.object_name || r.objectName;
             const priv = r.privileges;
-            if (role && obj) {
-              if (!map[role]) map[role] = {};
-              map[role][obj] = priv;
+            if (rawRole && obj) {
+              detectedRoles.add(normRole);
+              if (!map[normRole]) map[normRole] = {};
+              map[normRole][obj] = priv;
+              if (!map[rawRole]) map[rawRole] = {};
+              map[rawRole][obj] = priv;
             }
           });
           this.customRolePrivileges.set(map);
+          this.availableRoles.update(prev => Array.from(new Set([...prev, ...detectedRoles])));
         }
       }
     });
   }
 
   openAddRuleModal(): void {
+    this.configuringAccount.set(null);
     this.ruleRoleMode = 'EXISTING';
     this.selectedRuleRole = this.availableRoles()[0] || 'CASHIER';
     this.newCustomRoleName = '';
@@ -2470,6 +2873,7 @@ export class AdminDashboardComponent implements OnInit {
         const objMap: { [k: string]: string } = {};
         rules.forEach(r => { objMap[r.objectName] = r.privileges; });
         this.customRolePrivileges.update(prev => ({ ...prev, [targetRole]: objMap }));
+        this.dbAccountsApi.refetch();
       },
       error: () => {
         this.isSavingRule.set(false);

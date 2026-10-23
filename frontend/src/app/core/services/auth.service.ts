@@ -1,7 +1,7 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, tap, catchError, of, map } from 'rxjs';
-import { Employee, EmployeeAuditLog, SecurityEventLog, BackupInfo } from '../models';
+import { Employee, EmployeeAuditLog, SecurityEventLog, BackupInfo, DatabaseAccount } from '../models';
 
 @Injectable({
   providedIn: 'root'
@@ -496,6 +496,10 @@ export class AuthService {
     return this.http.get<any[]>(url).pipe(
       catchError(() => of([]))
     );
+  }
+
+    provisionDatabaseAccountHttp(payload: { username: string; host?: string; role?: string; password?: string }): Observable<DatabaseAccount> {
+    return this.http.post<DatabaseAccount>('/api/admin/database-accounts', payload);
   }
 
   saveRolePrivilegesHttp(role: string, rules: any[]): Observable<any> {

@@ -54,8 +54,10 @@ public class AuthDao {
         } catch (Exception ex) {
             // Direct query if procedure result set handling differs by driver version
             List<Map<String, Object>> list = jdbcTemplate.queryForList(
-                    "SELECT e.employee_id, e.branch_id, b.name AS branch_name, e.full_name, e.role, e.password_hash, e.is_active " +
-                    "FROM employee e LEFT JOIN branch b ON b.branch_id = e.branch_id " +
+                    "SELECT e.employee_id, e.branch_id, b.name AS branch_name, e.full_name, r.role_name AS role, e.password_hash, e.is_active " +
+                    "FROM employee e " +
+                    "JOIN roles r ON r.role_id = e.role_id " +
+                    "LEFT JOIN branch b ON b.branch_id = e.branch_id " +
                     "WHERE e.username = ? AND e.is_active = TRUE",
                     username
             );

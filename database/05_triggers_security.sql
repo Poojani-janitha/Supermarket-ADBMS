@@ -19,7 +19,7 @@ CREATE TRIGGER trg_employee_audit
 AFTER UPDATE ON employee
 FOR EACH ROW
 BEGIN
-  IF OLD.role <> NEW.role 
+  IF OLD.role_id <> NEW.role_id 
      OR OLD.branch_id <> NEW.branch_id 
      OR OLD.is_active <> NEW.is_active THEN
     INSERT INTO employee_audit_log (
@@ -33,8 +33,8 @@ BEGIN
       changed_at
     ) VALUES (
       NEW.employee_id, 
-      OLD.role, 
-      NEW.role, 
+      (SELECT role_name FROM roles WHERE role_id = OLD.role_id), 
+      (SELECT role_name FROM roles WHERE role_id = NEW.role_id), 
       OLD.branch_id, 
       NEW.branch_id,
       (OLD.is_active <> NEW.is_active), 
@@ -53,9 +53,12 @@ CREATE TRIGGER trg_security_alert
 BEFORE UPDATE ON employee
 FOR EACH ROW
 BEGIN
+  DECLARE v_admin_role_id INT;
+  SELECT role_id INTO v_admin_role_id FROM roles WHERE role_name = 'ADMIN' LIMIT 1;
+
   -- Prevent demotion or deactivation of the primary system administrator accounts
   IF (OLD.employee_id IN (1, 100) OR OLD.username IN ('admin', 'admin_kavindu')) 
-     AND (NEW.role <> 'ADMIN' OR NEW.is_active = FALSE) THEN
+     AND (NEW.role_id <> v_admin_role_id OR NEW.is_active = FALSE) THEN
     SIGNAL SQLSTATE '45000' 
       SET MESSAGE_TEXT = 'Security Violation: Primary root administrator account cannot be deactivated or demoted';
   END IF;

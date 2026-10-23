@@ -184,4 +184,33 @@ public class AuditController {
         }
         return ResponseEntity.ok(Map.of("message", "Role privileges saved successfully in database"));
     }
+
+    @GetMapping("/database-users")
+    public ResponseEntity<List<DatabaseUserDto>> getDatabaseUsers() {
+        return ResponseEntity.ok(auditService.getDatabaseUsers());
+    }
+
+    @GetMapping("/database-accounts")
+    public ResponseEntity<List<DatabaseAccountDto>> getDatabaseAccounts() {
+        return ResponseEntity.ok(auditService.getDatabaseAccounts());
+    }
+
+    @PostMapping("/database-accounts")
+    public ResponseEntity<DatabaseAccountDto> provisionDatabaseAccount(
+            @RequestBody Map<String, String> body,
+            @RequestHeader(value = "Authorization", required = false) String authHeader
+    ) {
+        String username = body.get("username");
+        String host = body.getOrDefault("host", "%");
+        String role = body.getOrDefault("role", "cashier_role");
+        String password = body.getOrDefault("password", "Pass!2026");
+        String performer = "Admin";
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            try {
+                String u = jwtUtil.extractUsername(authHeader.substring(7));
+                if (u != null && !u.isBlank()) performer = u;
+            } catch (Exception ignored) {}
+        }
+        return ResponseEntity.ok(auditService.provisionDatabaseAccount(username, host, role, password, performer));
+    }
 }

@@ -16,9 +16,10 @@ DELIMITER $$
 DROP PROCEDURE IF EXISTS sp_get_login$$
 CREATE PROCEDURE sp_get_login(IN p_username VARCHAR(50))
 BEGIN
-  SELECT employee_id, branch_id, full_name, role, password_hash, is_active
-  FROM employee 
-  WHERE username = p_username AND is_active = TRUE;
+  SELECT e.employee_id, e.branch_id, e.full_name, r.role_name AS role, e.password_hash, e.is_active
+  FROM employee e
+  JOIN roles r ON e.role_id = r.role_id
+  WHERE e.username = p_username AND e.is_active = TRUE;
 END$$
 
 -- ----------------------------------------------------------------------------
@@ -70,19 +71,21 @@ END$$
 DROP PROCEDURE IF EXISTS sp_change_user_role$$
 CREATE PROCEDURE sp_change_user_role(
   IN p_emp_id INT, 
-  IN p_new_role VARCHAR(20)
+  IN p_new_role VARCHAR(50)
 )
 BEGIN
+  DECLARE v_role_id INT;
   DECLARE EXIT HANDLER FOR SQLEXCEPTION 
   BEGIN 
     ROLLBACK; 
     RESIGNAL; 
   END;
 
-  -- Validate role
-  IF p_new_role NOT IN ('ADMIN', 'MANAGER', 'CASHIER') THEN
-    SIGNAL SQLSTATE '45000'
-      SET MESSAGE_TEXT = 'Invalid role: must be ADMIN, MANAGER, or CASHIER';
+  -- Look up or dynamically register role in roles table
+  SELECT role_id INTO v_role_id FROM roles WHERE UPPER(role_name) = UPPER(p_new_role) LIMIT 1;
+  IF v_role_id IS NULL THEN
+    INSERT INTO roles (role_name, description) VALUES (UPPER(p_new_role), CONCAT('Custom role: ', UPPER(p_new_role)));
+    SET v_role_id = LAST_INSERT_ID();
   END IF;
 
   -- Check if employee exists
@@ -94,7 +97,7 @@ BEGIN
   START TRANSACTION;
 
   UPDATE employee 
-  SET role = p_new_role 
+  SET role_id = v_role_id 
   WHERE employee_id = p_emp_id;
 
   INSERT INTO security_event_log (event_type, details, performed_by)

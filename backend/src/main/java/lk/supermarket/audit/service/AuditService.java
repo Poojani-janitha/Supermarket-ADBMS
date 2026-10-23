@@ -338,5 +338,17 @@ public class AuditService {
     public void saveRolePrivileges(String role, List<Map<String, String>> rules, String adminUser) {
         auditDao.saveRolePrivilegeRules(role, rules, adminUser);
     }
+
+    public List<DatabaseUserDto> getDatabaseUsers() {
+        return auditDao.getDatabaseUsers();
+    }
+
+    public List<DatabaseAccountDto> getDatabaseAccounts() {
+        return auditDao.getDatabaseAccounts();
+    }
+
+    public DatabaseAccountDto provisionDatabaseAccount(String username, String host, String role, String password, String adminUser) {
+        return auditDao.provisionDatabaseAccount(username, host, role, password, adminUser);
+    }
 }
 
