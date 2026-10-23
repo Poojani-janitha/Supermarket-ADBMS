@@ -17,7 +17,7 @@ import { CartService } from '../../../core/services/cart.service';
             </div>
             <h2 class="store-title">EMERALD SUPERMARKET</h2>
             <p class="store-sub">{{ order.branchName || 'Colombo Central Flagship' }}</p>
-            <p class="store-meta">Register #02 &bull; Tax Reg: VAT-981244-ADBMS</p>
+            <p class="store-meta">Register #02 &bull; Customer Invoice</p>
           </div>
 
           <div class="receipt-divider"></div>
@@ -78,17 +78,19 @@ import { CartService } from '../../../core/services/cart.service';
               <span>Rs. {{ order.subtotal.toFixed(2) }}</span>
             </div>
 
-            @for (disc of order.discounts; track disc.ruleId) {
-              <div class="calc-row discount-row">
-                <span>{{ disc.ruleName }}:</span>
-                <span>&minus;Rs. {{ disc.amount.toFixed(2) }}</span>
+            @if (order.discounts && order.discounts.length > 0) {
+              @for (disc of order.discounts; track disc.ruleId) {
+                <div class="calc-row discount-row" style="color: #15803d; font-weight: 600;">
+                  <span>{{ disc.ruleName }}:</span>
+                  <span>&minus;Rs. {{ disc.amount.toFixed(2) }}</span>
+                </div>
+              }
+            } @else if (order.discountTotal && order.discountTotal > 0) {
+              <div class="calc-row discount-row" style="color: #15803d; font-weight: 600;">
+                <span>Discounts Applied:</span>
+                <span>&minus;Rs. {{ order.discountTotal.toFixed(2) }}</span>
               </div>
             }
-
-            <div class="calc-row">
-              <span>VAT (5%):</span>
-              <span>Rs. {{ order.taxAmount.toFixed(2) }}</span>
-            </div>
 
             <div class="calc-row total-row">
               <span>NET PAYABLE:</span>
@@ -101,14 +103,8 @@ import { CartService } from '../../../core/services/cart.service';
             </div>
           </div>
 
-          <div class="barcode-box">
-            <div class="barcode-stripes"></div>
-            <span class="barcode-number">*{{ order.orderId }}*</span>
-          </div>
-
           <p class="receipt-footer-text">
-            Thank you for shopping at Emerald Supermarket!<br>
-            Database transaction committed via <code>sp_place_order</code> with ACID durability.
+            Thank you for shopping at Emerald Supermarket!
           </p>
 
           <!-- Actions -->

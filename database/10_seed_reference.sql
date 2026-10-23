@@ -76,7 +76,7 @@ ON DUPLICATE KEY UPDATE quantity=VALUES(quantity);
 
 -- 8. Discount Rules
 INSERT INTO discount_rule (rule_id, name, rule_type, kind, value, min_order_amount, max_discount, tier, start_date, end_date, priority, stackable, is_active) VALUES
-(1, 'First Purchase Welcome Discount', 'FIRST_PURCHASE', 'PERCENT', 10.00, 20.00, 15.00, NULL,     '2020-01-01', '2030-12-31', 10, TRUE,  TRUE),
+(1, 'First Purchase Welcome Discount', 'FIRST_PURCHASE', 'PERCENT', 10.00, 0.00, 15.00, NULL,     '2020-01-01', '2030-12-31', 10, TRUE,  TRUE),
 (2, 'Gold Tier Loyalty Reward',       'LOYALTY',        'PERCENT', 10.00, 25.00, 20.00, 'GOLD',   '2020-01-01', '2030-12-31', 20, TRUE,  TRUE),
 (3, 'Special Holiday Promotion',      'HOLIDAY',        'PERCENT',  5.00, 15.00, 10.00, NULL,     '2020-01-01', '2030-12-31', 30, TRUE,  TRUE),
 (4, 'New Year Festive Coupon Voucher', 'COUPON',         'FIXED',   10.00, 30.00, 10.00, NULL,     '2020-01-01', '2030-12-31',  5, FALSE, TRUE)

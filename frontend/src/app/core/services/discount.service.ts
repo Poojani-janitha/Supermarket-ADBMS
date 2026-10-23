@@ -25,6 +25,11 @@ interface CouponRow {
   max_uses: number;
   used_count: number;
   expires_on: string;
+  kind?: 'PERCENT' | 'FIXED';
+  value?: number;
+  min_order_amount?: number;
+  max_discount?: number | null;
+  is_active?: boolean;
 }
 
 interface HolidayRow {
@@ -78,7 +83,12 @@ export class DiscountService {
         ruleName: row.rule_name,
         maxUses: row.max_uses,
         usedCount: row.used_count,
-        expiresOn: row.expires_on
+        expiresOn: row.expires_on,
+        kind: row.kind,
+        value: row.value !== undefined && row.value !== null ? Number(row.value) : undefined,
+        minOrderAmount: row.min_order_amount !== undefined && row.min_order_amount !== null ? Number(row.min_order_amount) : undefined,
+        maxDiscount: row.max_discount !== undefined && row.max_discount !== null ? Number(row.max_discount) : undefined,
+        isActive: row.is_active !== undefined ? Boolean(row.is_active) : true
       }))),
       error: () => this.loadError.set('Unable to load coupons.')
     });

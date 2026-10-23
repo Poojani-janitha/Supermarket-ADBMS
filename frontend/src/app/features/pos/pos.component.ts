@@ -164,9 +164,8 @@ import { Customer, Product, SalesOrder } from '../../core/models';
           <div class="header-titles">
             <div class="register-tag-row">
               <span class="status-dot"></span>
-              <h2 class="register-name">{{ cartService.registerTitle() }}</h2>
+              <h2 class="register-name">Current Order</h2>
             </div>
-            <span class="cashier-subtitle">{{ authService.currentUser().fullName }} &bull; {{ authService.currentUser().branchName || 'Colombo Central Branch' }}</span>
           </div>
 
           <div class="header-right-btns">
@@ -291,7 +290,7 @@ import { Customer, Product, SalesOrder } from '../../core/models';
           @if (cartService.discountTotal() > 0) {
             <div class="bill-line discount-line">
               <span class="label">
-                Discounts Applied (sp_apply_discounts)
+                Discounts Applied
                 <span class="rule-hint">
                   @for (d of cartService.discounts(); track d.ruleId) {
                     &bull; {{ d.ruleName }}
@@ -302,10 +301,6 @@ import { Customer, Product, SalesOrder } from '../../core/models';
             </div>
           }
 
-          <div class="bill-line">
-            <span class="label">VAT (5% Standard)</span>
-            <span class="val">Rs. {{ cartService.taxAmount().toFixed(2) }}</span>
-          </div>
 
           <div class="bill-divider"></div>
 
@@ -315,62 +310,30 @@ import { Customer, Product, SalesOrder } from '../../core/models';
           </div>
         </div>
 
-        <!-- 6. Payment Method Cards (Cash, Card, QR) -->
-        <div class="payment-methods-grid">
-          <button
-            class="pay-card"
-            [class.active]="cartService.paymentMethod() === 'CASH'"
-            (click)="cartService.setPaymentMethod('CASH')"
-          >
-            <span class="material-symbols-outlined pay-icon">payments</span>
-            <span class="pay-text">Cash</span>
-          </button>
-
-          <button
-            class="pay-card"
-            [class.active]="cartService.paymentMethod() === 'CARD'"
-            (click)="cartService.setPaymentMethod('CARD')"
-          >
-            <span class="material-symbols-outlined pay-icon">credit_card</span>
-            <span class="pay-text">Credit / Debit</span>
-          </button>
-
-          <button
-            class="pay-card"
-            [class.active]="cartService.paymentMethod() === 'QR'"
-            (click)="cartService.setPaymentMethod('QR')"
-          >
-            <span class="material-symbols-outlined pay-icon">qr_code_2</span>
-            <span class="pay-text">QR / LankaPay</span>
-          </button>
-        </div>
-
-        <!-- 7. Interactive Cash Tendered & Change Row (Only when CASH selected) -->
-        @if (cartService.paymentMethod() === 'CASH') {
-          <div class="cash-tendered-box">
-            <div class="tender-calc-row">
-              <div class="tender-box-card tender-input-card">
-                <label for="cash-tendered-input">Enter Amount</label>
-                <div class="tender-input-field">
-                  <span class="prefix">Rs.</span>
-                  <input
-                    id="cash-tendered-input"
-                    type="number"
-                    min="0"
-                    step="any"
-                    placeholder="0.00"
-                    [ngModel]="cartService.cashTendered()"
-                    (ngModelChange)="cartService.setCashTendered($event)"
-                  />
-                </div>
-              </div>
-              <div class="tender-box-card change-due-card">
-                <span class="change-label">Change Due</span>
-                <span class="change-val">Rs. {{ cartService.changeDue().toFixed(2) }}</span>
+        <!-- 6. Cash Tender & Change Due (Option 2 Minimal Dual-Box) -->
+        <div class="cash-tendered-box">
+          <div class="tender-calc-row">
+            <div class="tender-box-card tender-input-card">
+              <label for="cash-tendered-input">Cash Tendered</label>
+              <div class="tender-input-field">
+                <span class="prefix">Rs.</span>
+                <input
+                  id="cash-tendered-input"
+                  type="number"
+                  min="0"
+                  step="any"
+                  placeholder="0.00"
+                  [ngModel]="cartService.cashTendered()"
+                  (ngModelChange)="cartService.setCashTendered($event)"
+                />
               </div>
             </div>
+            <div class="tender-box-card change-due-card">
+              <span class="change-label">Change Due</span>
+              <span class="change-val">Rs. {{ cartService.changeDue().toFixed(2) }}</span>
+            </div>
           </div>
-        }
+        </div>
 
         <!-- 8. Complete Sale Button -->
         <button
@@ -458,12 +421,14 @@ import { Customer, Product, SalesOrder } from '../../core/models';
                 </div>
 
                 <div class="form-group">
-                  <label>Phone Number <span class="required">*</span></label>
+                  <label>Phone Number <span class="required">*</span> (Numbers Only)</label>
                   <input
                     type="tel"
+                    maxlength="10"
                     placeholder="e.g. 0771234567"
                     [ngModel]="newCustPhone()"
-                    (ngModelChange)="newCustPhone.set($event)"
+                    (keypress)="allowNumbersOnly($event)"
+                    (ngModelChange)="onPosPhoneChange($event)"
                   />
                 </div>
 
@@ -1483,54 +1448,9 @@ import { Customer, Product, SalesOrder } from '../../core/models';
     }
 
     /* 6. Payment Method Cards */
-    .payment-methods-grid {
-      margin: 6px 20px;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
-
-    .pay-card {
-      background: #f8fafc;
-      border: 1.5px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 8px 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-
-      .pay-icon {
-        font-size: 20px;
-        color: #64748b;
-      }
-
-      .pay-text {
-        font-size: 0.72rem;
-        font-weight: 700;
-        color: #334155;
-      }
-
-      &:hover {
-        background: #f0fdf4;
-        border-color: #a7f3d0;
-      }
-
-      &.active {
-        background: #ecfdf5;
-        border-color: var(--primary-green);
-
-        .pay-icon, .pay-text {
-          color: var(--primary-green);
-        }
-      }
-    }
-
-    /* 7. Cash Tendered Calculator (Simplified to 2 boxes) */
+    /* 6. Cash Tendered Calculator (Option 2 Minimal Dual-Box) */
     .cash-tendered-box {
-      margin: 0 20px 8px;
+      margin: 8px 20px 10px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 12px;
@@ -2012,6 +1932,23 @@ export class PosComponent {
     this.newCustError.set(null);
   }
 
+  allowNumbersOnly(event: KeyboardEvent): void {
+    const charCode = event.which ? event.which : event.keyCode;
+    if (charCode < 48 || charCode > 57) {
+      event.preventDefault();
+    }
+  }
+
+  onPosPhoneChange(val: string): void {
+    const digits = val.replace(/\D/g, '');
+    this.newCustPhone.set(digits);
+    if (digits.length > 0 && digits.length < 10) {
+      this.newCustError.set(`Phone number must be 10 digits (${digits.length}/10 digits).`);
+    } else {
+      this.newCustError.set(null);
+    }
+  }
+
   submitNewCustomer(): void {
     const name = this.newCustName().trim();
     const phone = this.newCustPhone().trim();
@@ -2019,6 +1956,11 @@ export class PosComponent {
 
     if (!name || !phone) {
       this.newCustError.set('Name and phone number are required.');
+      return;
+    }
+
+    if (phone.length < 10) {
+      this.newCustError.set('Please enter a valid 10-digit phone number (e.g. 0771234567).');
       return;
     }
 
@@ -2064,8 +2006,14 @@ export class PosComponent {
   }
 
   applyCouponCode(): void {
-    if (!this.couponInput.trim()) return;
-    this.cartService.setCoupon(this.couponInput.trim());
+    const raw = this.couponInput.trim();
+    if (!raw) return;
+    const validation = this.cartService.validateCoupon(raw);
+    if (!validation.valid) {
+      alert(validation.reason || 'Invalid coupon code');
+      return;
+    }
+    this.cartService.setCoupon(raw);
     this.couponInput = '';
   }
 

@@ -57,11 +57,8 @@ export class CustomerService {
     this.isDataMasked.update(value => !value);
   }
 
-  registerCustomer(customer: Omit<Customer, 'id' | 'loyaltyPoints' | 'tier' | 'registeredDate'>): void {
-    this.http.post(`${this.apiUrl}/customers`, customer).subscribe({
-      next: () => this.loadCustomers(),
-      error: () => this.loadError.set('Unable to register customer.')
-    });
+  registerCustomer(customer: Omit<Customer, 'id' | 'loyaltyPoints' | 'tier' | 'registeredDate'>) {
+    return this.http.post<any>(`${this.apiUrl}/customers`, customer);
   }
 
   updateCustomer(customerId: number, customer: { fullName: string; phone: string; email: string }) {

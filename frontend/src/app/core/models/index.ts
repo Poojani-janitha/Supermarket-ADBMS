@@ -101,6 +101,11 @@ export interface Coupon {
   maxUses: number;
   usedCount: number;
   expiresOn: string;
+  kind?: 'PERCENT' | 'FIXED';
+  value?: number;
+  minOrderAmount?: number;
+  maxDiscount?: number;
+  isActive?: boolean;
 }
 
 export interface Holiday {

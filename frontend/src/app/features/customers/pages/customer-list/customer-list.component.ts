@@ -15,7 +15,7 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
         <div>
           <h1 class="page-title">Customer Loyalty & Registration</h1>
         </div>
-        <button class="btn-pill btn-primary" (click)="isRegisterOpen.set(true)">
+        <button class="btn-pill btn-primary" (click)="openRegistrationModal()">
           <span class="material-symbols-outlined">person_add</span> Register Customer
         </button>
       </div>
@@ -126,14 +126,39 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
               Executes <strong>sp_register_customer</strong> with phone deduplication. Enforces eligibility for the <strong>Welcome 10% First Purchase discount</strong>.
             </p>
 
+            @if (registrationError()) {
+              <div class="form-error-banner" style="background: rgba(239, 68, 68, 0.12); border: 1px solid #ef4444; color: #f87171; padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; font-size: 0.85rem; display: flex; align-items: flex-start; gap: 8px;">
+                <span class="material-symbols-outlined" style="font-size: 1.2rem; color: #ef4444;">error</span>
+                <span>{{ registrationError() }}</span>
+              </div>
+            }
+
             <div class="form-group">
               <label>Full Name *</label>
               <input type="text" [(ngModel)]="newCustName" placeholder="e.g. Kasun Chamara" class="form-control" />
             </div>
 
             <div class="form-group">
-              <label>Phone Number * (Unique Secondary Index)</label>
-              <input type="text" [(ngModel)]="newCustPhone" placeholder="e.g. 0779988776" class="form-control" />
+              <label>Phone Number * (Numbers Only)</label>
+              <input
+                type="tel"
+                maxlength="10"
+                [(ngModel)]="newCustPhone"
+                (keypress)="allowNumbersOnly($event)"
+                (input)="onPhoneInput()"
+                placeholder="e.g. 0779988776"
+                class="form-control"
+                [style.border-color]="phoneError() ? '#ef4444' : null"
+              />
+              @if (phoneError()) {
+                <small style="color: #f87171; font-size: 0.8rem; margin-top: 4px; display: block; font-weight: 500;">
+                  ⚠️ {{ phoneError() }}
+                </small>
+              } @else {
+                <small style="color: #94a3b8; font-size: 0.75rem; margin-top: 4px; display: block;">
+                  Only digits (0-9) allowed. Enforces unique phone index & Welcome 10% bonus.
+                </small>
+              }
             </div>
 
             <div class="form-group">
@@ -142,8 +167,14 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
             </div>
 
             <div class="modal-actions">
-              <button class="btn-pill btn-outline" (click)="isRegisterOpen.set(false)">Cancel</button>
-              <button class="btn-pill btn-primary" (click)="submitRegistration()">Register (sp_register_customer)</button>
+              <button class="btn-pill btn-outline" (click)="isRegisterOpen.set(false)" [disabled]="isSubmittingCustomer()">Cancel</button>
+              <button
+                class="btn-pill btn-primary"
+                (click)="submitRegistration()"
+                [disabled]="isSubmittingCustomer() || phoneError() !== null"
+              >
+                {{ isSubmittingCustomer() ? 'Registering...' : 'Register (sp_register_customer)' }}
+              </button>
             </div>
           </div>
         </div>
@@ -182,8 +213,15 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
               <input class="form-control" [(ngModel)]="editCustName" />
             </div>
             <div class="form-group">
-              <label>Phone Number *</label>
-              <input class="form-control" [(ngModel)]="editCustPhone" />
+              <label>Phone Number * (Numbers Only)</label>
+              <input
+                class="form-control"
+                type="tel"
+                maxlength="10"
+                (keypress)="allowNumbersOnly($event)"
+                (input)="editCustPhone = editCustPhone.replace(/\D/g, '')"
+                [(ngModel)]="editCustPhone"
+              />
             </div>
             <div class="form-group">
               <label>Email Address</label>
@@ -606,6 +644,9 @@ export class CustomerListComponent {
   readonly orders = signal<SalesOrder[]>([]);
   readonly selectedOrder = signal<SalesOrderDetails | null>(null);
   readonly ordersError = signal<string | null>(null);
+  readonly phoneError = signal<string | null>(null);
+  readonly registrationError = signal<string | null>(null);
+  readonly isSubmittingCustomer = signal<boolean>(false);
   selectedCustomer: Customer | null = null;
   editOrderStatus: SalesOrder['status'] = 'COMPLETED';
   searchQuery: string = '';
@@ -625,23 +666,104 @@ export class CustomerListComponent {
     );
   }
 
-  submitRegistration(): void {
-    if (!this.newCustName || !this.newCustPhone) {
-      alert('Please provide name and phone number.');
-      return;
-    }
-
-    this.customerService.registerCustomer({
-      fullName: this.newCustName,
-      phone: this.newCustPhone,
-      email: this.newCustEmail
-    });
-
-    this.isRegisterOpen.set(false);
+  openRegistrationModal(): void {
     this.newCustName = '';
     this.newCustPhone = '';
     this.newCustEmail = '';
-    alert('Customer registered successfully via sp_register_customer!');
+    this.phoneError.set(null);
+    this.registrationError.set(null);
+    this.isRegisterOpen.set(true);
+  }
+
+  allowNumbersOnly(event: KeyboardEvent): void {
+    const charCode = event.which ? event.which : event.keyCode;
+    // Allow only numeric digits 0-9 (ASCII 48 to 57)
+    if (charCode < 48 || charCode > 57) {
+      event.preventDefault();
+    }
+  }
+
+  onPhoneInput(): void {
+    this.registrationError.set(null);
+    // Automatically strip any non-digit character (e.g. if pasted)
+    this.newCustPhone = this.newCustPhone.replace(/\D/g, '');
+    const val = this.newCustPhone;
+
+    if (!val) {
+      this.phoneError.set(null);
+      return;
+    }
+    if (val.length < 10) {
+      this.phoneError.set(`Phone number must be 10 digits (currently ${val.length}/10 digits). e.g. 0771234567.`);
+      return;
+    }
+    const duplicate = this.customerService.customers().find(c => {
+      const p1 = c.phone.replace(/\D/g, '');
+      return p1 === val;
+    });
+    if (duplicate) {
+      this.phoneError.set(`Phone number is already registered to ${duplicate.fullName}. Welcome bonus is only eligible for new customers.`);
+      return;
+    }
+    this.phoneError.set(null);
+  }
+
+  submitRegistration(): void {
+    this.registrationError.set(null);
+    const name = this.newCustName.trim();
+    const phone = this.newCustPhone.trim();
+    const email = this.newCustEmail.trim();
+
+    if (!name) {
+      this.registrationError.set('Please provide customer full name.');
+      return;
+    }
+    if (!phone) {
+      this.phoneError.set('Phone number is required.');
+      return;
+    }
+
+    const digits = phone.replace(/\D/g, '');
+    if (digits.length < 9 || digits.length > 12) {
+      this.phoneError.set('Please enter a valid phone number (e.g. 0771234567).');
+      return;
+    }
+
+    const duplicate = this.customerService.customers().find(c => {
+      const p1 = c.phone.replace(/\D/g, '');
+      return (p1 && p1 === digits) || c.phone.trim() === phone;
+    });
+    if (duplicate) {
+      this.phoneError.set(`Customer already exists with this phone (${duplicate.fullName}). New customer welcome bonus is only valid once per phone number.`);
+      return;
+    }
+
+    this.isSubmittingCustomer.set(true);
+
+    this.customerService.registerCustomer({
+      fullName: name,
+      phone: phone,
+      email: email || undefined
+    }).subscribe({
+      next: () => {
+        this.isSubmittingCustomer.set(false);
+        this.customerService.loadCustomers();
+        this.isRegisterOpen.set(false);
+        this.newCustName = '';
+        this.newCustPhone = '';
+        this.newCustEmail = '';
+        this.phoneError.set(null);
+        alert('Customer registered successfully via sp_register_customer! Eligible for Welcome 10% First Purchase discount.');
+      },
+      error: (err) => {
+        this.isSubmittingCustomer.set(false);
+        const errMsg = err?.error?.message || err?.error?.error || 'Registration failed. The phone number may already be registered in the database.';
+        this.registrationError.set(errMsg);
+        if (errMsg.toLowerCase().includes('phone') || errMsg.toLowerCase().includes('already exists') || errMsg.toLowerCase().includes('duplicate')) {
+          this.phoneError.set('Database duplicate protection: This phone number is already registered. Welcome bonus is only eligible for new customers.');
+        }
+      }
+    });
   }
 
   viewHistory(c: Customer): void {
