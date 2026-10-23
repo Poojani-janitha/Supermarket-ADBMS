@@ -11,6 +11,8 @@ SELECT
   p.name AS product_name,
   p.category_id,
   c.name AS category_name,
+  c.parent_id AS category_parent_id,
+  parent.name AS category_parent_name,
   p.supplier_id,
   s.name AS supplier_name,
   p.unit_price,
@@ -22,6 +24,7 @@ SELECT
   p.is_active
 FROM product p
 JOIN category c ON c.category_id = p.category_id
+LEFT JOIN category parent ON parent.category_id = c.parent_id
 JOIN supplier s ON s.supplier_id = p.supplier_id;
 
 -- Category list with the number of currently active products.
