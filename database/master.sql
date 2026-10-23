@@ -912,7 +912,7 @@ BEGIN
   END IF;
 
   SET v_tier = fn_customer_tier(v_customer_id);
-  SET v_first_purchase = fn_is_first_purchase(v_customer_id, p_order_id);
+  SET v_first_purchase = fn_is_first_purchase(v_customer_id, p_order_id) OR (v_customer_id IS NOT NULL AND v_tier = 'BRONZE');
 
   DELETE FROM order_discount WHERE order_id = p_order_id;
 

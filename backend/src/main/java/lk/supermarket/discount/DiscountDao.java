@@ -31,7 +31,8 @@ public class DiscountDao {
     public List<Map<String, Object>> findCoupons() {
         return jdbcTemplate.queryForList("""
                 SELECT c.code, c.rule_id, r.name AS rule_name, c.max_uses,
-                       c.used_count, c.expires_on
+                       c.used_count, c.expires_on,
+                       r.kind, r.value, r.min_order_amount, r.max_discount, r.is_active
                 FROM coupon c
                 JOIN discount_rule r ON r.rule_id = c.rule_id
                 ORDER BY c.expires_on, c.code

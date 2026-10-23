@@ -204,9 +204,8 @@ public class OrderDao {
         );
         order.setDiscounts(discounts);
 
-        // Calculate taxAmount (e.g. 5% VAT included/calculated for UI receipt)
-        BigDecimal sub = order.getSubtotal() != null ? order.getSubtotal() : BigDecimal.ZERO;
-        order.setTaxAmount(sub.multiply(new BigDecimal("0.05")).setScale(2, java.math.RoundingMode.HALF_UP));
+        // VAT removed per requirement: Net Payable is strictly Subtotal minus Discounts
+        order.setTaxAmount(BigDecimal.ZERO);
 
         return Optional.of(order);
     }

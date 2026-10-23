@@ -20,10 +20,9 @@ import { Customer, Product, SalesOrder } from '../../core/models';
         <!-- 1. PINNED TOP BAR (Never scrolls out of view) -->
         <header class="pos-topbar-pinned">
           <div class="search-input-pill">
-            <span class="material-symbols-outlined search-icon">barcode_scanner</span>
             <input
               type="text"
-              placeholder="Scan barcode or search grocery items by name, SKU..."
+              placeholder="Search grocery items by name, SKU..."
               [ngModel]="productService.searchQuery()"
               (ngModelChange)="productService.setSearchQuery($event)"
             />
@@ -165,9 +164,8 @@ import { Customer, Product, SalesOrder } from '../../core/models';
           <div class="header-titles">
             <div class="register-tag-row">
               <span class="status-dot"></span>
-              <h2 class="register-name">{{ cartService.registerTitle() }}</h2>
+              <h2 class="register-name">Current Order</h2>
             </div>
-            <span class="cashier-subtitle">{{ authService.currentUser().fullName }} &bull; {{ authService.currentUser().branchName || 'Colombo Central Branch' }}</span>
           </div>
 
           <div class="header-right-btns">
@@ -210,9 +208,19 @@ import { Customer, Product, SalesOrder } from '../../core/models';
             </div>
           }
 
-          <button class="switch-cust-btn" title="Change Customer">
-            <span class="material-symbols-outlined">sync_alt</span>
-          </button>
+          <div class="cust-action-buttons">
+            <button
+              type="button"
+              class="add-cust-btn"
+              (click)="$event.stopPropagation(); openNewCustomerModal()"
+              title="Add New Customer"
+            >
+              <span class="material-symbols-outlined">person_add</span>
+            </button>
+            <button type="button" class="switch-cust-btn" title="Change Customer">
+              <span class="material-symbols-outlined">sync_alt</span>
+            </button>
+          </div>
         </div>
 
         <!-- 3. Scrollable Cart Items List -->
@@ -282,7 +290,7 @@ import { Customer, Product, SalesOrder } from '../../core/models';
           @if (cartService.discountTotal() > 0) {
             <div class="bill-line discount-line">
               <span class="label">
-                Discounts Applied (sp_apply_discounts)
+                Discounts Applied
                 <span class="rule-hint">
                   @for (d of cartService.discounts(); track d.ruleId) {
                     &bull; {{ d.ruleName }}
@@ -293,10 +301,6 @@ import { Customer, Product, SalesOrder } from '../../core/models';
             </div>
           }
 
-          <div class="bill-line">
-            <span class="label">VAT (5% Standard)</span>
-            <span class="val">Rs. {{ cartService.taxAmount().toFixed(2) }}</span>
-          </div>
 
           <div class="bill-divider"></div>
 
@@ -306,63 +310,30 @@ import { Customer, Product, SalesOrder } from '../../core/models';
           </div>
         </div>
 
-        <!-- 6. Payment Method Cards (Cash, Card, QR) -->
-        <div class="payment-methods-grid">
-          <button
-            class="pay-card"
-            [class.active]="cartService.paymentMethod() === 'CASH'"
-            (click)="cartService.setPaymentMethod('CASH')"
-          >
-            <span class="material-symbols-outlined pay-icon">payments</span>
-            <span class="pay-text">Cash</span>
-          </button>
-
-          <button
-            class="pay-card"
-            [class.active]="cartService.paymentMethod() === 'CARD'"
-            (click)="cartService.setPaymentMethod('CARD')"
-          >
-            <span class="material-symbols-outlined pay-icon">credit_card</span>
-            <span class="pay-text">Credit / Debit</span>
-          </button>
-
-          <button
-            class="pay-card"
-            [class.active]="cartService.paymentMethod() === 'QR'"
-            (click)="cartService.setPaymentMethod('QR')"
-          >
-            <span class="material-symbols-outlined pay-icon">qr_code_2</span>
-            <span class="pay-text">QR / LankaPay</span>
-          </button>
-        </div>
-
-        <!-- 7. Interactive Cash Tendered & Change Row (Only when CASH selected) -->
-        @if (cartService.paymentMethod() === 'CASH') {
-          <div class="cash-tendered-box">
-            <div class="tender-quick-chips">
-              <button class="chip-btn" (click)="cartService.setCashTendered(cartService.totalAmount())">
-                Exact (Rs. {{ cartService.totalAmount().toFixed(2) }})
-              </button>
-              <button class="chip-btn" (click)="cartService.setCashTendered(30)">Rs. 30</button>
-              <button class="chip-btn" (click)="cartService.setCashTendered(50)">Rs. 50</button>
-              <button class="chip-btn" (click)="cartService.setCashTendered(100)">Rs. 100</button>
-            </div>
-            <div class="tender-calc-row">
-              <div class="tender-input-wrap">
-                <label>Tendered:</label>
+        <!-- 6. Cash Tender & Change Due (Option 2 Minimal Dual-Box) -->
+        <div class="cash-tendered-box">
+          <div class="tender-calc-row">
+            <div class="tender-box-card tender-input-card">
+              <label for="cash-tendered-input">Cash Tendered</label>
+              <div class="tender-input-field">
+                <span class="prefix">Rs.</span>
                 <input
+                  id="cash-tendered-input"
                   type="number"
+                  min="0"
+                  step="any"
+                  placeholder="0.00"
                   [ngModel]="cartService.cashTendered()"
                   (ngModelChange)="cartService.setCashTendered($event)"
                 />
               </div>
-              <div class="change-due-wrap">
-                <span class="change-label">Change Due:</span>
-                <span class="change-val">Rs. {{ cartService.changeDue().toFixed(2) }}</span>
-              </div>
+            </div>
+            <div class="tender-box-card change-due-card">
+              <span class="change-label">Change Due</span>
+              <span class="change-val">Rs. {{ cartService.changeDue().toFixed(2) }}</span>
             </div>
           </div>
-        }
+        </div>
 
         <!-- 8. Complete Sale Button -->
         <button
@@ -415,6 +386,85 @@ import { Customer, Product, SalesOrder } from '../../core/models';
                     </div>
                   </button>
                 }
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- ================= MODAL: REGISTER NEW CUSTOMER ================= -->
+      @if (isNewCustomerModalOpen()) {
+        <div class="modal-backdrop" (click)="closeNewCustomerModal()">
+          <div class="modal-card" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="material-symbols-outlined" style="color: var(--primary-green, #065f46);">person_add</span>
+                <h3>Add New Customer</h3>
+              </div>
+              <button class="close-btn" (click)="closeNewCustomerModal()">&times;</button>
+            </div>
+
+            <div class="modal-body">
+              <p class="modal-hint">
+                Enter customer details below. Loyalty tier will be assigned automatically.
+              </p>
+
+              <div class="new-cust-form">
+                <div class="form-group">
+                  <label>Full Name <span class="required">*</span></label>
+                  <input
+                    type="text"
+                    placeholder="e.g. John Doe"
+                    [ngModel]="newCustName()"
+                    (ngModelChange)="newCustName.set($event)"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>Phone Number <span class="required">*</span> (Numbers Only)</label>
+                  <input
+                    type="tel"
+                    maxlength="10"
+                    placeholder="e.g. 0771234567"
+                    [ngModel]="newCustPhone()"
+                    (keypress)="allowNumbersOnly($event)"
+                    (ngModelChange)="onPosPhoneChange($event)"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label>Email Address (Optional)</label>
+                  <input
+                    type="email"
+                    placeholder="e.g. john@example.com"
+                    [ngModel]="newCustEmail()"
+                    (ngModelChange)="newCustEmail.set($event)"
+                  />
+                </div>
+
+                @if (newCustError()) {
+                  <div class="form-error-msg">
+                    <span class="material-symbols-outlined" style="font-size: 16px;">error</span>
+                    <span>{{ newCustError() }}</span>
+                  </div>
+                }
+
+                <div class="modal-actions-row">
+                  <button type="button" class="btn-cancel" (click)="closeNewCustomerModal()">Cancel</button>
+                  <button
+                    type="button"
+                    class="btn-submit-cust"
+                    [disabled]="isRegisteringCustomer() || !newCustName().trim() || !newCustPhone().trim()"
+                    (click)="submitNewCustomer()"
+                  >
+                    @if (isRegisteringCustomer()) {
+                      <span>Registering...</span>
+                    } @else {
+                      <span class="material-symbols-outlined" style="font-size: 18px;">how_to_reg</span>
+                      <span>Register & Select</span>
+                    }
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1094,16 +1144,51 @@ import { Customer, Product, SalesOrder } from '../../core/models';
         }
       }
 
-      .switch-cust-btn {
-        background: none;
-        border: none;
-        color: #94a3b8;
-        cursor: pointer;
+      .cust-action-buttons {
         display: flex;
         align-items: center;
-        justify-content: center;
+        gap: 6px;
 
-        .material-symbols-outlined { font-size: 18px; }
+        .add-cust-btn {
+          background: #ecfdf5;
+          border: 1px solid #a7f3d0;
+          color: var(--primary-green, #065f46);
+          border-radius: 8px;
+          width: 32px;
+          height: 32px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.15s;
+
+          .material-symbols-outlined { font-size: 18px; }
+          &:hover {
+            background: var(--primary-green, #065f46);
+            color: #ffffff;
+            border-color: var(--primary-green, #065f46);
+          }
+        }
+
+        .switch-cust-btn {
+          background: none;
+          border: none;
+          color: #94a3b8;
+          width: 30px;
+          height: 30px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 6px;
+          transition: all 0.15s;
+
+          .material-symbols-outlined { font-size: 18px; }
+          &:hover {
+            background: #e2e8f0;
+            color: #334155;
+          }
+        }
       }
     }
 
@@ -1363,107 +1448,89 @@ import { Customer, Product, SalesOrder } from '../../core/models';
     }
 
     /* 6. Payment Method Cards */
-    .payment-methods-grid {
-      margin: 6px 20px;
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 8px;
-    }
-
-    .pay-card {
-      background: #f8fafc;
-      border: 1.5px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 8px 6px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 4px;
-      cursor: pointer;
-      transition: all 0.15s ease;
-
-      .pay-icon {
-        font-size: 20px;
-        color: #64748b;
-      }
-
-      .pay-text {
-        font-size: 0.72rem;
-        font-weight: 700;
-        color: #334155;
-      }
-
-      &:hover {
-        background: #f0fdf4;
-        border-color: #a7f3d0;
-      }
-
-      &.active {
-        background: #ecfdf5;
-        border-color: var(--primary-green);
-
-        .pay-icon, .pay-text {
-          color: var(--primary-green);
-        }
-      }
-    }
-
-    /* 7. Cash Tendered Calculator */
+    /* 6. Cash Tendered Calculator (Option 2 Minimal Dual-Box) */
     .cash-tendered-box {
-      margin: 0 20px 8px;
+      margin: 8px 20px 10px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 12px;
       padding: 8px 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-
-      .tender-quick-chips {
-        display: flex;
-        gap: 6px;
-
-        .chip-btn {
-          flex: 1;
-          padding: 3px 0;
-          background: #ffffff;
-          border: 1px solid #cbd5e1;
-          border-radius: 6px;
-          font-size: 0.68rem;
-          font-weight: 700;
-          cursor: pointer;
-          &:hover { background: #f1f5f9; }
-        }
-      }
 
       .tender-calc-row {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        width: 100%;
 
-        .tender-input-wrap {
+        .tender-box-card {
+          border-radius: 10px;
+          padding: 8px 12px;
           display: flex;
-          align-items: center;
-          gap: 6px;
-          font-size: 0.75rem;
+          flex-direction: column;
+          justify-content: center;
+          min-height: 52px;
+          transition: all 0.15s;
 
-          input {
-            width: 70px;
-            padding: 3px 6px;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: 700;
+          &.tender-input-card {
+            background: #ffffff;
+            border: 1.5px solid #cbd5e1;
+
+            &:focus-within {
+              border-color: var(--primary-green, #065f46);
+              box-shadow: 0 0 0 2px rgba(6, 95, 70, 0.12);
+            }
+
+            label {
+              font-size: 0.68rem;
+              font-weight: 800;
+              color: #64748b;
+              text-transform: uppercase;
+              letter-spacing: 0.03em;
+              margin-bottom: 2px;
+            }
+
+            .tender-input-field {
+              display: flex;
+              align-items: center;
+              gap: 4px;
+
+              .prefix {
+                font-size: 0.85rem;
+                font-weight: 700;
+                color: #94a3b8;
+              }
+
+              input {
+                width: 100%;
+                border: none;
+                outline: none;
+                background: transparent;
+                font-size: 0.95rem;
+                font-weight: 800;
+                color: #0f172a;
+              }
+            }
           }
-        }
 
-        .change-due-wrap {
-          display: flex;
-          align-items: center;
-          gap: 6px;
+          &.change-due-card {
+            background: #f0fdf4;
+            border: 1.5px solid #bbf7d0;
 
-          .change-label { font-size: 0.75rem; color: #64748b; }
-          .change-val { font-size: 0.95rem; font-weight: 800; color: #15803d; }
+            .change-label {
+              font-size: 0.68rem;
+              font-weight: 800;
+              color: #15803d;
+              text-transform: uppercase;
+              letter-spacing: 0.03em;
+              margin-bottom: 2px;
+            }
+
+            .change-val {
+              font-size: 1.05rem;
+              font-weight: 900;
+              color: #15803d;
+            }
+          }
         }
       }
     }
@@ -1668,6 +1735,94 @@ import { Customer, Product, SalesOrder } from '../../core/models';
       text-align: center;
       margin-top: 6px;
     }
+    .new-cust-form {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      margin-top: 4px;
+
+      .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+
+        label {
+          font-size: 0.78rem;
+          font-weight: 700;
+          color: #475569;
+
+          .required { color: #ef4444; }
+        }
+
+        input {
+          border: 1.5px solid #cbd5e1;
+          border-radius: 8px;
+          padding: 8px 12px;
+          font-size: 0.88rem;
+          outline: none;
+          transition: border-color 0.15s;
+
+          &:focus {
+            border-color: var(--primary-green, #065f46);
+          }
+        }
+      }
+
+      .form-error-msg {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        background: #fef2f2;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        color: #b91c1c;
+        font-size: 0.78rem;
+        font-weight: 600;
+      }
+
+      .modal-actions-row {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 8px;
+
+        .btn-cancel {
+          padding: 8px 16px;
+          border: 1.5px solid #cbd5e1;
+          background: #ffffff;
+          border-radius: 8px;
+          font-weight: 700;
+          font-size: 0.85rem;
+          color: #475569;
+          cursor: pointer;
+          &:hover { background: #f1f5f9; }
+        }
+
+        .btn-submit-cust {
+          padding: 8px 18px;
+          border: none;
+          background: var(--primary-green, #065f46);
+          color: #ffffff;
+          border-radius: 8px;
+          font-weight: 800;
+          font-size: 0.85rem;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          gap: 6px;
+          transition: opacity 0.15s;
+
+          &:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+          }
+          &:hover:not(:disabled) {
+            opacity: 0.92;
+          }
+        }
+      }
+    }
   `]
 })
 export class PosComponent {
@@ -1680,6 +1835,12 @@ export class PosComponent {
   // Modal signals
   isLookupOpen = signal<boolean>(false);
   isCustomerModalOpen = signal<boolean>(false);
+  isNewCustomerModalOpen = signal<boolean>(false);
+  newCustName = signal<string>('');
+  newCustPhone = signal<string>('');
+  newCustEmail = signal<string>('');
+  newCustError = signal<string | null>(null);
+  isRegisteringCustomer = signal<boolean>(false);
 
   // Coupon input
   couponInput = '';
@@ -1757,6 +1918,83 @@ export class PosComponent {
     this.isCustomerModalOpen.set(true);
   }
 
+  openNewCustomerModal(): void {
+    this.newCustName.set('');
+    this.newCustPhone.set('');
+    this.newCustEmail.set('');
+    this.newCustError.set(null);
+    this.isRegisteringCustomer.set(false);
+    this.isNewCustomerModalOpen.set(true);
+  }
+
+  closeNewCustomerModal(): void {
+    this.isNewCustomerModalOpen.set(false);
+    this.newCustError.set(null);
+  }
+
+  allowNumbersOnly(event: KeyboardEvent): void {
+    const charCode = event.which ? event.which : event.keyCode;
+    if (charCode < 48 || charCode > 57) {
+      event.preventDefault();
+    }
+  }
+
+  onPosPhoneChange(val: string): void {
+    const digits = val.replace(/\D/g, '');
+    this.newCustPhone.set(digits);
+    if (digits.length > 0 && digits.length < 10) {
+      this.newCustError.set(`Phone number must be 10 digits (${digits.length}/10 digits).`);
+    } else {
+      this.newCustError.set(null);
+    }
+  }
+
+  submitNewCustomer(): void {
+    const name = this.newCustName().trim();
+    const phone = this.newCustPhone().trim();
+    const email = this.newCustEmail().trim();
+
+    if (!name || !phone) {
+      this.newCustError.set('Name and phone number are required.');
+      return;
+    }
+
+    if (phone.length < 10) {
+      this.newCustError.set('Please enter a valid 10-digit phone number (e.g. 0771234567).');
+      return;
+    }
+
+    this.isRegisteringCustomer.set(true);
+    this.newCustError.set(null);
+
+    this.http.post<{ customerId: number }>('/api/customers', {
+      fullName: name,
+      phone: phone,
+      email: email || null
+    }).subscribe({
+      next: (res) => {
+        this.isRegisteringCustomer.set(false);
+        this.isNewCustomerModalOpen.set(false);
+        this.customerService.loadCustomers();
+        const newCust: Customer = {
+          id: res.customerId,
+          fullName: name,
+          phone: phone,
+          email: email || undefined,
+          loyaltyPoints: 0,
+          tier: 'BRONZE',
+          registeredDate: new Date().toISOString()
+        };
+        this.cartService.setCustomer(newCust);
+      },
+      error: (err) => {
+        this.isRegisteringCustomer.set(false);
+        const msg = err?.error?.message || err?.error?.error || 'Registration failed. Phone or email may already exist.';
+        this.newCustError.set(msg);
+      }
+    });
+  }
+
   selectCustomer(cust: Customer): void {
     this.cartService.setCustomer(cust);
     this.isCustomerModalOpen.set(false);
@@ -1768,8 +2006,14 @@ export class PosComponent {
   }
 
   applyCouponCode(): void {
-    if (!this.couponInput.trim()) return;
-    this.cartService.setCoupon(this.couponInput.trim());
+    const raw = this.couponInput.trim();
+    if (!raw) return;
+    const validation = this.cartService.validateCoupon(raw);
+    if (!validation.valid) {
+      alert(validation.reason || 'Invalid coupon code');
+      return;
+    }
+    this.cartService.setCoupon(raw);
     this.couponInput = '';
   }
 

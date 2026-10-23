@@ -3,6 +3,7 @@ import { HttpClient } from '@angular/common/http';
 import { CartItem, Product, AppliedDiscount, SalesOrder, Customer } from '../models';
 import { AuthService } from './auth.service';
 import { ProductService } from './product.service';
+import { DiscountService } from './discount.service';
 
 export interface HeldCart {
   id: number;
@@ -21,6 +22,7 @@ export class CartService {
   private readonly http = inject(HttpClient);
   private readonly authService = inject(AuthService);
   private readonly productService = inject(ProductService);
+  private readonly discountService = inject(DiscountService);
 
   // Cart line items (initialized empty)
   readonly cartItems = signal<CartItem[]>([]);
@@ -34,8 +36,8 @@ export class CartService {
   // Coupon code
   readonly appliedCoupon = signal<string>('');
 
-  // Payment method
-  readonly paymentMethod = signal<'CASH' | 'CARD' | 'QR'>('CARD');
+  // Payment method (Cash only mode)
+  readonly paymentMethod = signal<'CASH'>('CASH');
 
   // Cash tendered for cash transactions
   readonly cashTendered = signal<number>(0.00);
@@ -76,14 +78,58 @@ export class CartService {
         const amt = Number((sub * 0.05).toFixed(2));
         list.push({ ruleId: 2, ruleName: 'Silver Loyalty (5%)', amount: amt });
         runningDiscount += amt;
+      } else if (cust.tier === 'BRONZE' || cust.loyaltyPoints === 0) {
+        const welcomeRule = this.discountService.rules().find(r => r.ruleType === 'FIRST_PURCHASE');
+        const ruleId = welcomeRule ? welcomeRule.ruleId : 1;
+        const ruleName = welcomeRule ? welcomeRule.name : 'Welcome 10% Discount';
+        const pct = welcomeRule && welcomeRule.value ? welcomeRule.value : 10;
+        let amt = Number((sub * (pct / 100)).toFixed(2));
+        if (welcomeRule?.maxDiscount && welcomeRule.maxDiscount > 0) {
+          amt = Math.min(amt, welcomeRule.maxDiscount);
+        }
+        list.push({ ruleId, ruleName, amount: amt });
+        runningDiscount += amt;
       }
     }
 
     const couponCode = this.appliedCoupon().trim().toUpperCase();
-    if (couponCode === 'NEWYEAR50' && sub >= 30.00) {
-      const couponAmt = 10.00;
-      list.push({ ruleId: 4, ruleName: 'Coupon NEWYEAR50', amount: couponAmt });
-      runningDiscount += couponAmt;
+    if (couponCode) {
+      const c = this.discountService.coupons().find(cp => cp.code.toUpperCase() === couponCode);
+      if (c && c.isActive !== false) {
+        const today = new Date().toISOString().slice(0, 10);
+        const isExpired = c.expiresOn && c.expiresOn < today;
+        const maxUsesReached = c.maxUses > 0 && c.usedCount >= c.maxUses;
+        const minOrder = c.minOrderAmount ?? 0;
+
+        if (!isExpired && !maxUsesReached && sub >= minOrder) {
+          let couponAmt = 0;
+          if (c.kind === 'FIXED') {
+            couponAmt = c.value ?? 0;
+          } else {
+            const pct = c.value ?? 10;
+            couponAmt = Number((sub * (pct / 100)).toFixed(2));
+          }
+          if (c.maxDiscount && c.maxDiscount > 0) {
+            couponAmt = Math.min(couponAmt, c.maxDiscount);
+          }
+          if (couponAmt > 0) {
+            list.push({
+              ruleId: c.ruleId,
+              ruleName: c.ruleName || `Coupon ${c.code}`,
+              amount: Number(couponAmt.toFixed(2))
+            });
+            runningDiscount += couponAmt;
+          }
+        }
+      } else if (couponCode === 'NEWYEAR50' && sub >= 30.00) {
+        const couponAmt = 10.00;
+        list.push({ ruleId: 4, ruleName: 'Coupon NEWYEAR50', amount: couponAmt });
+        runningDiscount += couponAmt;
+      } else if (couponCode === 'WELCOME10' && sub >= 20.00) {
+        const couponAmt = Math.min(Number((sub * 0.10).toFixed(2)), 15.00);
+        list.push({ ruleId: 1, ruleName: 'Coupon WELCOME10 (10%)', amount: couponAmt });
+        runningDiscount += couponAmt;
+      }
     }
 
     const maxAllowed = sub * 0.50;
@@ -98,15 +144,12 @@ export class CartService {
     return Number(this.discounts().reduce((sum, d) => sum + d.amount, 0).toFixed(2));
   });
 
-  // Tax 5% VAT
-  readonly taxAmount = computed(() => {
-    const taxable = Math.max(0, this.subtotal() - this.discountTotal());
-    return Number((taxable * 0.05).toFixed(2));
-  });
+  // Tax (VAT removed per requirement)
+  readonly taxAmount = computed(() => 0.00);
 
-  // Total Amount
+  // Total Amount (Subtotal minus Discounts)
   readonly totalAmount = computed(() => {
-    const total = this.subtotal() - this.discountTotal() + this.taxAmount();
+    const total = this.subtotal() - this.discountTotal();
     return Number(Math.max(0, total).toFixed(2));
   });
 
@@ -175,11 +218,9 @@ export class CartService {
     this.selectedCustomer.set(cust);
   }
 
-  setPaymentMethod(method: 'CASH' | 'CARD' | 'QR'): void {
+  setPaymentMethod(method: 'CASH'): void {
     this.paymentMethod.set(method);
-    if (method === 'CASH') {
-      this.cashTendered.set(Math.ceil(this.totalAmount() / 5) * 5 || this.totalAmount());
-    }
+    this.cashTendered.set(Math.ceil(this.totalAmount() / 5) * 5 || this.totalAmount());
   }
 
   setCashTendered(val: number): void {
@@ -188,6 +229,42 @@ export class CartService {
 
   setCoupon(code: string): void {
     this.appliedCoupon.set(code);
+  }
+
+  validateCoupon(rawCode: string): { valid: boolean; reason?: string } {
+    const code = rawCode.trim().toUpperCase();
+    if (!code) return { valid: false, reason: 'Please enter a coupon code.' };
+
+    const c = this.discountService.coupons().find(cp => cp.code.toUpperCase() === code);
+    if (!c) {
+      if (code === 'NEWYEAR50' || code === 'WELCOME10') {
+        return { valid: true };
+      }
+      return { valid: false, reason: `Coupon "${code}" is invalid or does not exist.` };
+    }
+
+    if (c.isActive === false) {
+      return { valid: false, reason: `Coupon "${code}" is no longer active.` };
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+    if (c.expiresOn && c.expiresOn < today) {
+      return { valid: false, reason: `Coupon "${code}" expired on ${c.expiresOn}.` };
+    }
+
+    if (c.maxUses > 0 && c.usedCount >= c.maxUses) {
+      return { valid: false, reason: `Coupon "${code}" has reached its maximum usage limit (${c.maxUses} uses).` };
+    }
+
+    const minOrder = c.minOrderAmount ?? 0;
+    if (this.subtotal() < minOrder) {
+      return {
+        valid: false,
+        reason: `Coupon "${code}" requires a minimum order amount of Rs. ${minOrder.toFixed(2)}. Current subtotal is Rs. ${this.subtotal().toFixed(2)}.`
+      };
+    }
+
+    return { valid: true };
   }
 
   holdCurrentCart(): void {
