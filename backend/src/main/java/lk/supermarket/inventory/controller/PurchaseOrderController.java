@@ -19,7 +19,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping({"/purchase-orders", "/api/purchase-orders"})
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = {"http://localhost:4200", "http://127.0.0.1:4200"})
 public class PurchaseOrderController {
 
     private final PurchaseOrderService purchaseOrderService;

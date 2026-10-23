@@ -13,7 +13,6 @@ import {
   ExplainBenchmark,
   FinancialReconciliation
 } from '../models';
-import { InventoryService } from './inventory.service';
 import { AuthService } from './auth.service';
 
 export type { ProductRankItem, DailySalesItem, SupplierPerformanceItem };
@@ -23,7 +22,6 @@ export type { ProductRankItem, DailySalesItem, SupplierPerformanceItem };
 })
 export class ReportService {
   private readonly http = inject(HttpClient);
-  private readonly inventoryService = inject(InventoryService);
   private readonly authService = inject(AuthService);
   private readonly apiUrl = '/api/reports';
 
@@ -101,53 +99,12 @@ export class ReportService {
   });
 
   constructor() {
-    // Initial dynamic computation for supplier performance from live orders
-    this.supplierPerformance.set(this.computeLiveSupplierPerformance());
     this.refreshAll();
   }
 
   // =========================================================================
   // DYNAMIC COMPUTATIONS & API INTEGRATION
   // =========================================================================
-
-  /**
-   * Dynamically calculates vendor fulfillment rate metrics using the active
-   * purchase orders and suppliers in the system. Mimics fn_supplier_fulfillment_rate.
-   */
-  computeLiveSupplierPerformance(): SupplierPerformanceItem[] {
-    const suppliers = this.inventoryService.suppliers();
-    const orders = this.inventoryService.purchaseOrders();
-
-    return suppliers.map(sup => {
-      const supOrders = orders.filter(o => o.supplierId === sup.supplierId);
-      const totalOrders = supOrders.length;
-      const totalRequested = supOrders.reduce((sum, o) => sum + (o.requestedQty || 0), 0);
-      const totalConfirmed = supOrders.reduce((sum, o) => sum + (o.confirmedQty != null ? o.confirmedQty : 0), 0);
-      const totalReceived = supOrders.reduce((sum, o) => sum + (o.receivedQty != null ? o.receivedQty : 0), 0);
-      const totalSpend = supOrders.reduce((sum, o) => sum + (o.totalCost || 0), 0);
-
-      // Scalar Function fn_supplier_fulfillment_rate calculation
-      const rate = totalRequested > 0 ? Number(((totalConfirmed / totalRequested) * 100).toFixed(1)) : 100.0;
-      let ratingTier = 'UNDER_REVIEW';
-      if (rate >= 95.0) ratingTier = 'PREFERRED';
-      else if (rate >= 85.0) ratingTier = 'RELIABLE';
-
-      return {
-        supplierId: sup.supplierId,
-        supplierName: sup.name,
-        contactPerson: sup.contactPerson || 'Sales Desk',
-        phone: sup.phone || '077-0000000',
-        city: sup.city || 'Colombo',
-        totalOrders,
-        totalRequestedQty: totalRequested,
-        totalConfirmedQty: totalConfirmed,
-        totalReceivedQty: totalReceived,
-        totalSpend,
-        fulfillmentRate: rate,
-        ratingTier
-      };
-    }).sort((a, b) => b.fulfillmentRate - a.fulfillmentRate || b.totalSpend - a.totalSpend);
-  }
 
   /**
    * Refreshes all analytical endpoints from the Spring Boot backend concurrently.
@@ -192,11 +149,9 @@ export class ReportService {
         if (res.discounts && res.discounts.length > 0) { this.discountImpact.set(res.discounts); connectedCount++; }
         if (res.benchmark) { this.explainBenchmark.set(res.benchmark); connectedCount++; }
         if (res.reconciliation) { this.financialReconciliation.set(res.reconciliation); connectedCount++; }
-        if (res.supplierPerformance && res.supplierPerformance.length > 0) {
+        if (res.supplierPerformance) {
           this.supplierPerformance.set(res.supplierPerformance);
-          connectedCount++;
-        } else {
-          this.supplierPerformance.set(this.computeLiveSupplierPerformance());
+          if (res.supplierPerformance.length > 0) connectedCount++;
         }
 
         this.isLiveConnected.set(connectedCount > 0);
@@ -204,8 +159,8 @@ export class ReportService {
         this.isLoading.set(false);
       },
       error: (err) => {
-        console.warn('API connection failed. Using dynamic live state.', err);
-        this.supplierPerformance.set(this.computeLiveSupplierPerformance());
+        console.warn('API connection failed.', err);
+        this.supplierPerformance.set([]);
         this.isLiveConnected.set(false);
         this.isLoading.set(false);
         this.errorMessage.set('Live backend unreachable. Displaying active dataset.');
