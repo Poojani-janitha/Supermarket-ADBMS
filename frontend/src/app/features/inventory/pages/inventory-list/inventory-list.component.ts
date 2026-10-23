@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterModule } from '@angular/router';
 import { InventoryService } from '../../../../core/services/inventory.service';
 import { ProductService } from '../../../../core/services/product.service';
+import { AuthService } from '../../../../core/services/auth.service';
 import { InventoryItem } from '../../../../core/models';
 
 @Component({
@@ -955,8 +956,9 @@ import { InventoryItem } from '../../../../core/models';
 export class InventoryListComponent {
   readonly inventoryService = inject(InventoryService);
   readonly productService = inject(ProductService);
+  readonly authService = inject(AuthService);
 
-  selectedBranchFilter = signal<number>(0);
+  selectedBranchFilter = signal<number>(this.authService.currentUser()?.branchId || 1);
   searchQuery = signal<string>('');
 
   // Notification dropdown state
