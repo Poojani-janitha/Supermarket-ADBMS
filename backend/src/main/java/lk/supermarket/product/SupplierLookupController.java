@@ -21,9 +21,9 @@ public class SupplierLookupController {
     @GetMapping
     public List<Map<String, Object>> suppliers() {
         return jdbcTemplate.queryForList("""
-                SELECT supplier_id, name
+                SELECT supplier_id, name, contact_person, phone, email, username, city, tax_number, is_active, status
                 FROM supplier
-                WHERE is_active = TRUE AND status = 'ACTIVE'
+                WHERE is_active = TRUE
                 ORDER BY name
                 """);
     }
