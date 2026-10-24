@@ -1,10 +1,20 @@
-import { Injectable, signal } from '@angular/core';
-import { Employee, EmployeeAuditLog, SecurityEventLog } from '../models';
+import { Injectable, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, tap, catchError, of, map } from 'rxjs';
+import { Employee, EmployeeAuditLog, SecurityEventLog, BackupInfo, DatabaseAccount } from '../models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthService {
+  private readonly http = inject(HttpClient);
+
+  // JWT Token Signal
+  readonly token = signal<string | null>(typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null);
+
+  // Database Backup snapshots (Member 5: PITR & Disaster Recovery)
+  readonly backups = signal<BackupInfo[]>([]);
+
   // Staff directory simulating employee table
   readonly employees = signal<Employee[]>([
     {
@@ -81,8 +91,42 @@ export class AuthService {
     }
   ]);
 
-  // Current active user signal (Defaults to Floyd Miles as shown in Pinterest SS)
-  readonly currentUser = signal<Employee>(this.employees()[0]);
+  // Member 5: Security alert modal signal for unauthorized action guard
+  readonly securityAlert = signal<{
+    open: boolean;
+    title: string;
+    message: string;
+    role: string;
+    objectName: string;
+    action: string;
+  } | null>(null);
+
+  private getInitialUser(): Employee {
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem('user');
+      if (stored) {
+        try {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.username && parsed.role) {
+            return parsed;
+          }
+        } catch (e) {
+          console.error('Failed to parse user from localStorage', e);
+        }
+      }
+    }
+    return this.employees()[0];
+  }
+
+  // Current active user signal (restored from localStorage if available)
+  readonly currentUser = signal<Employee>(this.getInitialUser());
+
+  setCurrentUser(user: Employee): void {
+    this.currentUser.set(user);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('user', JSON.stringify(user));
+    }
+  }
 
   // Member 5: Audit log automatically maintained via trg_employee_audit
   readonly employeeAuditLogs = signal<EmployeeAuditLog[]>([
@@ -140,7 +184,7 @@ export class AuthService {
   switchUser(role: 'CASHIER' | 'MANAGER' | 'ADMIN' | 'SUPPLIER'): void {
     const user = this.employees().find(u => u.role === role);
     if (user) {
-      this.currentUser.set(user);
+      this.setCurrentUser(user);
     }
   }
 
@@ -347,9 +391,219 @@ export class AuthService {
   login(username: string): boolean {
     const user = this.employees().find(u => u.username === username);
     if (user && user.isActive) {
-      this.currentUser.set(user);
+      this.setCurrentUser(user);
       return true;
     }
     return false;
+  }
+
+  // Token Management (Member 5)
+  getToken(): string | null {
+    return this.token() || (typeof localStorage !== 'undefined' ? localStorage.getItem('token') : null);
+  }
+
+  setToken(token: string): void {
+    this.token.set(token);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('token', token);
+    }
+  }
+
+  clearToken(): void {
+    this.token.set(null);
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('token');
+    }
+  }
+
+  logout(): void {
+    this.clearToken();
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem('user');
+    }
+    this.currentUser.set(this.employees()[0]);
+  }
+
+  isAuthenticated(): boolean {
+    return !!this.getToken();
+  }
+
+  // Real REST API integration connecting to Spring Boot backend
+  loginApi(username: string, password: string): Observable<any> {
+    return this.http.post<any>('/api/auth/login', { username, password }).pipe(
+      tap(res => {
+        if (res && res.token) {
+          this.setToken(res.token);
+          if (res.user) {
+            const userObj: Employee = {
+              employeeId: res.user.employeeId,
+              branchId: res.user.branchId || 1,
+              branchName: res.user.branchName || ('Branch #' + (res.user.branchId || 1)),
+              fullName: res.user.fullName,
+              role: res.user.role,
+              username: res.user.username,
+              hireDate: new Date().toISOString().split('T')[0],
+              isActive: res.user.isActive
+            };
+            this.setCurrentUser(userObj);
+          }
+        }
+      })
+    );
+  }
+
+  // Member 5: Red Warning Style Security Violation Trigger
+  triggerSecurityAlert(objectName: string, action: string, customMessage?: string): void {
+    const current = this.currentUser();
+    const msg = customMessage || `Action Prohibited: Your active role '${current.role}' is not granted privilege '${action}' on database object '${objectName}'.`;
+    this.securityAlert.set({
+      open: true,
+      title: 'SECURITY VIOLATION: ACCESS DENIED',
+      message: msg,
+      role: current.role,
+      objectName,
+      action
+    });
+
+    const secEntry: SecurityEventLog = {
+      logId: this.securityLogs().length + 1,
+      eventType: 'UNAUTHORIZED_ACCESS',
+      description: `Access violation attempt by user '${current.username}' (${current.role}_ROLE) targeting '${objectName}' with action '${action}'`,
+      username: current.username,
+      ipAddress: '127.0.0.1',
+      createdAt: new Date().toISOString().replace('T', ' ').substring(0, 19)
+    };
+    this.securityLogs.update(prev => [secEntry, ...prev]);
+  }
+
+  closeSecurityAlert(): void {
+    this.securityAlert.set(null);
+  }
+
+  fetchRolesHttp(): Observable<string[]> {
+    return this.http.get<string[]>('/api/admin/roles').pipe(
+      catchError(() => of(['ADMIN', 'MANAGER', 'CASHIER', 'SUPPLIER']))
+    );
+  }
+
+  fetchObjectsHttp(): Observable<any[]> {
+    return this.http.get<any[]>('/api/admin/objects').pipe(
+      catchError(() => of([]))
+    );
+  }
+
+  fetchRolePrivilegesHttp(role?: string): Observable<any[]> {
+    const url = role ? `/api/admin/privileges?role=${role}` : '/api/admin/privileges';
+    return this.http.get<any[]>(url).pipe(
+      catchError(() => of([]))
+    );
+  }
+
+    provisionDatabaseAccountHttp(payload: { username: string; host?: string; role?: string; password?: string }): Observable<DatabaseAccount> {
+    return this.http.post<DatabaseAccount>('/api/admin/database-accounts', payload);
+  }
+
+  saveRolePrivilegesHttp(role: string, rules: any[]): Observable<any> {
+    return this.http.post('/api/admin/privileges', { role, rules });
+  }
+
+  fetchEmployeesHttp(): Observable<Employee[]> {
+    return this.http.get<Employee[]>('/api/admin/employees').pipe(
+      tap(data => {
+        if (data && data.length > 0) {
+          this.employees.set(data);
+        }
+      }),
+      catchError(() => of(this.employees()))
+    );
+  }
+
+  fetchAuditLogsHttp(): Observable<EmployeeAuditLog[]> {
+    return this.http.get<any[]>('/api/admin/audit-logs').pipe(
+      map(logs => (logs || []).map((l: any) => ({
+        logId: l.logId,
+        employeeId: l.employeeId,
+        employeeName: l.employeeName,
+        action: (l.action || (l.isActiveChanged ? 'DEACTIVATE' : (l.oldRole !== l.newRole ? 'ROLE_CHANGE' : (l.oldBranchName !== l.newBranchName ? 'BRANCH_TRANSFER' : 'REGISTER')))) as any,
+        oldValue: l.oldValue || l.oldRole || l.oldBranchName || 'ACTIVE',
+        newValue: l.newValue || l.newRole || l.newBranchName || 'DEACTIVATED',
+        modifiedBy: l.modifiedBy || l.changedBy || 'SYSTEM',
+        modifiedAt: l.modifiedAt || l.changedAt || ''
+      }))),
+      tap(logs => {
+        if (logs && logs.length > 0) {
+          this.employeeAuditLogs.set(logs);
+        }
+      }),
+      catchError(() => of(this.employeeAuditLogs()))
+    );
+  }
+
+  fetchSecurityLogsHttp(): Observable<SecurityEventLog[]> {
+    return this.http.get<any[]>('/api/admin/security-logs').pipe(
+      map(logs => (logs || []).map((s: any) => ({
+        logId: s.logId,
+        eventType: s.eventType,
+        description: s.description || s.details || '',
+        username: s.username || s.performedBy || '',
+        ipAddress: s.ipAddress || '127.0.0.1',
+        createdAt: s.createdAt || s.loggedAt || ''
+      }))),
+      tap(logs => {
+        if (logs && logs.length > 0) {
+          this.securityLogs.set(logs);
+        }
+      }),
+      catchError(() => of(this.securityLogs()))
+    );
+  }
+
+  fetchMaskedCustomersHttp(): Observable<any[]> {
+    return this.http.get<any[]>('/api/admin/masked-customers');
+  }
+
+  changeRoleHttp(employeeId: number, role: string): Observable<any> {
+    return this.http.put(`/api/admin/employees/${employeeId}/role`, { role });
+  }
+
+  deactivateEmployeeHttp(employeeId: number): Observable<any> {
+    return this.http.delete(`/api/admin/employees/${employeeId}`);
+  }
+
+  reactivateEmployeeHttp(employeeId: number): Observable<any> {
+    return this.http.put(`/api/admin/employees/${employeeId}/reactivate`, {});
+  }
+
+  registerEmployeeHttp(payload: any): Observable<any> {
+    return this.http.post('/api/admin/employees', payload);
+  }
+
+  fetchBackupsHttp(): Observable<BackupInfo[]> {
+    return this.http.get<BackupInfo[]>('/api/admin/backups').pipe(
+      tap(data => {
+        if (data) {
+          this.backups.set(data);
+        }
+      }),
+      catchError(() => of(this.backups()))
+    );
+  }
+
+  createBackupHttp(): Observable<BackupInfo> {
+    return this.http.post<BackupInfo>('/api/admin/backup', {}).pipe(
+      tap(res => {
+        if (res) {
+          this.backups.update(prev => [res, ...prev.filter(b => b.fileName !== res.fileName)]);
+        }
+      })
+    );
+  }
+
+  downloadBackup(fileName: string): Observable<Blob> {
+    return this.http.get(`/api/admin/backup/download/${fileName}`, { responseType: 'blob' });
+  }
+
+  restoreBackupHttp(fileName: string): Observable<any> {
+    return this.http.post(`/api/admin/backup/restore/${fileName}`, {});
   }
 }

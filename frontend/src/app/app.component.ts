@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { RouterOutlet } from '@angular/router';
+import { Router, RouterOutlet } from '@angular/router';
 import { SidebarComponent } from './shared/components/sidebar/sidebar.component';
 import { ReceiptModalComponent } from './shared/components/receipt-modal/receipt-modal.component';
 
@@ -9,9 +9,11 @@ import { ReceiptModalComponent } from './shared/components/receipt-modal/receipt
   standalone: true,
   imports: [CommonModule, RouterOutlet, SidebarComponent, ReceiptModalComponent],
   template: `
-    <div class="pos-app-wrapper">
-      <app-sidebar></app-sidebar>
-      <main class="pos-main-container">
+    <div class="pos-app-wrapper" [class.auth-layout]="isAuthPage">
+      @if (!isAuthPage) {
+        <app-sidebar></app-sidebar>
+      }
+      <main class="pos-main-container" [class.full-page]="isAuthPage">
         <router-outlet></router-outlet>
       </main>
       <app-receipt-modal></app-receipt-modal>
@@ -26,6 +28,10 @@ import { ReceiptModalComponent } from './shared/components/receipt-modal/receipt
       background: var(--bg-app);
     }
 
+    .pos-app-wrapper.auth-layout {
+      background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
+    }
+
     .pos-main-container {
       flex: 1;
       height: 100vh;
@@ -33,6 +39,18 @@ import { ReceiptModalComponent } from './shared/components/receipt-modal/receipt
       display: flex;
       flex-direction: column;
     }
+
+    .pos-main-container.full-page {
+      width: 100vw;
+      height: 100vh;
+      overflow-y: auto;
+    }
   `]
 })
-export class AppComponent {}
+export class AppComponent {
+  private readonly router = inject(Router);
+
+  get isAuthPage(): boolean {
+    return this.router.url.includes('/login') || this.router.url === '/';
+  }
+}

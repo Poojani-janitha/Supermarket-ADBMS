@@ -203,11 +203,21 @@ export interface EmployeeAuditLog {
 
 export interface SecurityEventLog {
   logId: number;
-  eventType: 'LOGIN_SUCCESS' | 'LOGIN_FAILURE' | 'ROLE_ASSIGN' | 'UNAUTHORIZED_ACCESS' | 'EMPLOYEE_DEACTIVATED' | 'EMPLOYEE_REGISTERED';
+  eventType: 'LOGIN_SUCCESS' | 'LOGIN_FAILURE' | 'ROLE_ASSIGN' | 'UNAUTHORIZED_ACCESS' | 'EMPLOYEE_DEACTIVATED' | 'EMPLOYEE_REGISTERED' | 'DATABASE_BACKUP_CREATED';
   description: string;
   username: string;
   ipAddress: string;
   createdAt: string;
+}
+
+export interface BackupInfo {
+  fileName: string;
+  filePath: string;
+  fileSizeKb: number;
+  createdAt: string;
+  binlogCoordinate: string;
+  status: string;
+  message: string;
 }
 
 export interface MonthlyRollupRow {
@@ -334,4 +344,26 @@ export interface FinancialReconciliation {
   variance: number;
   isBalanced: boolean;
   tenders: PaymentTenderSummary[];
+}
+
+
+export interface DatabaseUserAccount {
+  username: string;
+  host: string;
+  assignedRole: string;
+  status: 'ACTIVE' | 'LOCKED' | string;
+  purpose: string;
+  authPlugin: string;
+  privilegesSummary: string;
+}
+
+export interface DatabaseAccount {
+  id: string | number;
+  username: string;
+  role: string;
+  host: string;
+  status: 'active' | 'disabled';
+  privilegeCount: number;
+  createdAt: string;
+  lastUsedAt: string;
 }
