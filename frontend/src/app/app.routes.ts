@@ -1,14 +1,17 @@
 import { Routes } from '@angular/router';
+import { authGuard } from './core/guards/auth.guard';
+import { adminRoleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
   {
     path: '',
-    redirectTo: 'pos',
+    redirectTo: 'login',
     pathMatch: 'full'
   },
   {
     path: 'pos',
-    loadComponent: () => import('./features/pos/pos.component').then(m => m.PosComponent)
+    loadComponent: () => import('./features/pos/pos.component').then(m => m.PosComponent),
+    canActivate: [authGuard]
   },
   {
     path: 'sales-management',
@@ -49,7 +52,23 @@ export const routes: Routes = [
   },
   {
     path: 'admin',
-    loadComponent: () => import('./features/admin/pages/admin-dashboard/admin-dashboard.component').then(m => m.AdminDashboardComponent)
+    loadComponent: () => import('./features/admin/pages/admin-dashboard/admin-dashboard.component').then(m => m.AdminDashboardComponent),
+    canActivate: [authGuard, adminRoleGuard]
+  },
+  {
+    path: 'admin/backups',
+    loadComponent: () => import('./features/backups/pages/database-backups-page/database-backups-page.component').then(m => m.DatabaseBackupsPage),
+    canActivate: [authGuard, adminRoleGuard]
+  },
+  {
+    path: 'backup-recovery',
+    redirectTo: 'admin/backups',
+    pathMatch: 'full'
+  },
+  {
+    path: 'backup',
+    redirectTo: 'admin/backups',
+    pathMatch: 'full'
   },
   {
     path: 'login',
@@ -57,6 +76,6 @@ export const routes: Routes = [
   },
   {
     path: '**',
-    redirectTo: 'pos'
+    redirectTo: 'login'
   }
 ];

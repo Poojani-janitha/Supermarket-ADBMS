@@ -3,6 +3,8 @@ package lk.supermarket.common;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -13,6 +15,16 @@ import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * Enterprise Global Exception & Error Translation Handler
+ * Primary Owner: Member 5 (Security, Exception Mapping & Error Resilience)
+ * 
+ * Fulfills Section 8 of ADBMS Implementation Guide:
+ * - SQLSTATE 45000 'Security Violation' -> HTTP 403 Forbidden
+ * - SQLSTATE 45000 'Insufficient stock' -> HTTP 409 Conflict
+ * - Validation failures -> HTTP 400 Bad Request
+ * - Authentication/Access errors -> HTTP 401 / 403
+ */
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -25,7 +37,11 @@ public class GlobalExceptionHandler {
         String code;
         String userMsg = msg;
 
-        if (normalized.contains("insufficient stock")) {
+        // Member 5: Security Violations raised by database triggers or procedures
+        if (normalized.contains("security violation") || normalized.contains("administrator cannot deactivate own account")) {
+            status = HttpStatus.FORBIDDEN;
+            code = "SECURITY_VIOLATION";
+        } else if (normalized.contains("insufficient stock")) {
             status = HttpStatus.CONFLICT;
             code = "INSUFFICIENT_STOCK";
             userMsg = "One or more cart items exceed available branch inventory.";
@@ -52,6 +68,16 @@ public class GlobalExceptionHandler {
                 ? ex.getBindingResult().getAllErrors().get(0).getDefaultMessage()
                 : "Validation error";
         return createResponse(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", msg);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
+        return createResponse(HttpStatus.FORBIDDEN, "ACCESS_DENIED", "Insufficient role privileges to access this administrative resource.");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<Map<String, Object>> handleAuthenticationException(AuthenticationException ex) {
+        return createResponse(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", ex.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)

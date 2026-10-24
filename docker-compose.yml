@@ -1,0 +1,82 @@
+# ============================================================================
+# SUPERMARKET CHAIN MANAGEMENT SYSTEM - DOCKER COMPOSE ORCHESTRATION
+# Primary Owner: Member 5 (Security, RBAC, Data Masking & Platform DevOps)
+# Runs MySQL 8.0, Spring Boot 3 Pure JDBC API, and Angular 17+ Frontend
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # --------------------------------------------------------------------------
+  # 1. DATABASE SERVICE (MySQL 8.0 InnoDB)
+  # --------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: supermarket-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Root_Secret_Pass!2026}
+      MYSQL_DATABASE: supermarket_db
+      MYSQL_USER: ${DB_USER:-app_user}
+      MYSQL_PASSWORD: ${DB_PASSWORD:-App_Secret_Pass!2026}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # Automatically initializes database scripts in alphabetical order on first start
+      - ./database:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-Root_Secret_Pass!2026}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - supermarket-net
+
+  # --------------------------------------------------------------------------
+  # 2. BACKEND REST API (Spring Boot 3 + Java 17 + Pure JDBC)
+  # --------------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: supermarket-backend
+    restart: on-failure
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/supermarket_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:-app_user}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:-App_Secret_Pass!2026}
+      JWT_SECRET: ${JWT_SECRET:-supermarket_secret_key_ict3222_adbms_project_2026_at_least_256_bits_long!}
+      SERVER_PORT: 8080
+    ports:
+      - "8080:8080"
+    networks:
+      - supermarket-net
+
+  # --------------------------------------------------------------------------
+  # 3. FRONTEND UI (Angular 17+ with Nginx Reverse Proxy)
+  # --------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: supermarket-frontend
+    restart: on-failure
+    depends_on:
+      - backend
+    ports:
+      - "4200:80"
+    networks:
+      - supermarket-net
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  supermarket-net:
+    driver: bridge

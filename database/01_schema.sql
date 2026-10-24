@@ -57,16 +57,28 @@ CREATE TABLE supplier (
 -- 4. EMPLOYEE
 -- Staff users with role-based access (ADMIN, MANAGER, CASHIER).
 -- ----------------------------------------------------------------------------
+-- ----------------------------------------------------------------------------
+-- 3b. ROLES
+-- Role-based access control table for administrative and staff permission assignments.
+-- ----------------------------------------------------------------------------
+CREATE TABLE roles (
+  role_id INT AUTO_INCREMENT PRIMARY KEY,
+  role_name VARCHAR(50) NOT NULL UNIQUE,
+  description VARCHAR(255) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
 CREATE TABLE employee (
   employee_id INT AUTO_INCREMENT PRIMARY KEY,
   branch_id INT NOT NULL,
   full_name VARCHAR(120) NOT NULL,
-  role ENUM('ADMIN', 'MANAGER', 'CASHIER') NOT NULL,
+  role_id INT NOT NULL,
   username VARCHAR(50) NOT NULL UNIQUE,
   password_hash VARCHAR(255) NOT NULL,
   hire_date DATE NOT NULL DEFAULT (CURRENT_DATE),
   is_active BOOLEAN NOT NULL DEFAULT TRUE,
-  FOREIGN KEY (branch_id) REFERENCES branch(branch_id)
+  FOREIGN KEY (branch_id) REFERENCES branch(branch_id),
+  FOREIGN KEY (role_id) REFERENCES roles(role_id)
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------
