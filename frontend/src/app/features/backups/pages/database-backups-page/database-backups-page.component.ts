@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { HttpClient } from '@angular/common/http';
+import { Router } from '@angular/router';
 import { Observable, tap, catchError, of } from 'rxjs';
 import { AuthService } from '../../../../core/services/auth.service';
 import { BackupInfo } from '../../../../core/models';
@@ -29,12 +30,18 @@ import { BackupSnapshotsTableComponent } from '../../components/backup-snapshots
           </p>
         </div>
 
-        <div class="session-box">
-          <span class="session-label">DBA Session:</span>
-          <span class="session-pill">
-            <span class="status-dot-pulse"></span>
-            {{ authService.currentUser().fullName }} ({{ authService.currentUser().role }}_ROLE)
-          </span>
+        <div class="header-session-actions">
+          <div class="session-box">
+            <span class="session-label">DBA Session:</span>
+            <span class="session-pill">
+              <span class="status-dot-pulse"></span>
+              {{ authService.currentUser().fullName }} ({{ authService.currentUser().role }}_ROLE)
+            </span>
+          </div>
+          <button type="button" class="btn-header-signout" (click)="signOut()" title="Sign Out & Return to Login">
+            <span class="material-symbols-outlined">logout</span>
+            <span>Sign Out</span>
+          </button>
         </div>
       </div>
 
@@ -284,6 +291,45 @@ import { BackupSnapshotsTableComponent } from '../../components/backup-snapshots
       margin: 0;
       max-width: 800px;
       line-height: 1.5;
+    }
+
+    .header-session-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-header-signout {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      background: #ffffff;
+      border: 1px solid #fecaca;
+      border-radius: 9999px;
+      color: #dc2626;
+      font-size: 0.82rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      box-shadow: 0 1px 3px rgba(220, 38, 38, 0.08);
+
+      &:hover {
+        background: #fef2f2;
+        border-color: #f87171;
+        color: #b91c1c;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 10px rgba(220, 38, 38, 0.15);
+      }
+
+      &:active {
+        transform: translateY(0);
+      }
+
+      .material-symbols-outlined {
+        font-size: 18px;
+        color: #ef4444;
+      }
     }
 
     .session-box {
@@ -687,7 +733,13 @@ import { BackupSnapshotsTableComponent } from '../../components/backup-snapshots
 })
 export class DatabaseBackupsPage implements OnInit {
   private readonly http = inject(HttpClient);
+  private readonly router = inject(Router);
   readonly authService = inject(AuthService);
+
+  signOut(): void {
+    this.authService.logout();
+    this.router.navigate(['/login']);
+  }
 
   readonly snapshots = signal<BackupInfo[]>([]);
   readonly isLoading = signal<boolean>(false);

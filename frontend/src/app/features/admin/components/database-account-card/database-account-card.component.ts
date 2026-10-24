@@ -30,15 +30,15 @@ import { DatabaseAccount } from '../../../../core/models';
       <div class="role-privilege-row">
         <span
           class="role-badge"
-          [class.role-admin]="account.role.includes('admin')"
-          [class.role-mgr]="account.role.includes('manager') && !account.role.includes('db_manager')"
-          [class.role-db-mgr]="account.role.includes('db_manager') || account.role.includes('db manager')"
-          [class.role-hr]="account.role.includes('hr')"
-          [class.role-cashier]="account.role.includes('cashier')"
-          [class.role-direct]="account.role.includes('DIRECT') || account.role.includes('pool')"
+          [class.role-admin]="account.role?.includes('admin')"
+          [class.role-mgr]="account.role?.includes('manager') && !account.role?.includes('db_manager')"
+          [class.role-db-mgr]="account.role?.includes('db_manager') || account.role?.includes('db manager')"
+          [class.role-hr]="account.role?.includes('hr')"
+          [class.role-cashier]="account.role?.includes('cashier')"
+          [class.role-direct]="account.role?.includes('DIRECT') || account.role?.includes('pool')"
         >
           <span class="material-symbols-outlined role-icon">shield_person</span>
-          {{ account.role }}
+          {{ account.role || 'ROLE_UNASSIGNED' }}
         </span>
 
         <div class="privilege-count-badge" title="Number of granted database privileges">
@@ -331,15 +331,18 @@ export class DatabaseAccountCardComponent {
   @Output() onConfigure = new EventEmitter<DatabaseAccount>();
 
   isAdminRole(): boolean {
-    return this.account.username.includes('admin') || this.account.role.includes('admin');
+    const u = (this.account?.username || '').toLowerCase();
+    const r = (this.account?.role || '').toLowerCase();
+    return u.includes('admin') || r.includes('admin');
   }
 
   getAccountIcon(): string {
-    if (this.account.username.includes('admin')) return 'admin_panel_settings';
-    if (this.account.username.includes('manager')) return 'manage_accounts';
-    if (this.account.username.includes('cashier')) return 'point_of_sale';
-    if (this.account.username.includes('etl')) return 'sync_alt';
-    if (this.account.username.includes('report')) return 'analytics';
+    const u = (this.account?.username || '').toLowerCase();
+    if (u.includes('admin')) return 'admin_panel_settings';
+    if (u.includes('manager')) return 'manage_accounts';
+    if (u.includes('cashier')) return 'point_of_sale';
+    if (u.includes('etl')) return 'sync_alt';
+    if (u.includes('report')) return 'analytics';
     return 'database';
   }
 }

@@ -100,7 +100,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
           <span class="branch-text">{{ currentBranchName() }}</span>
         </div>
 
-        <div class="staff-card active-staff">
+        <div class="staff-card active-staff" (click)="signOut()" title="Active Session - Click to Sign Out">
           <div class="avatar-circle">
             {{ authService.currentUser().fullName.substring(0, 2).toUpperCase() }}
           </div>
@@ -108,10 +108,13 @@ import { InventoryService } from '../../../core/services/inventory.service';
             <span class="staff-name">{{ authService.currentUser().fullName }}</span>
             <span class="staff-role">{{ authService.currentUser().role }}_ROLE</span>
           </div>
+          <button type="button" class="mini-logout-btn" (click)="signOut(); $event.stopPropagation()" title="Sign Out">
+            <span class="material-symbols-outlined">logout</span>
+          </button>
         </div>
 
         <div class="footer-links-row">
-          <button class="logout-btn" (click)="signOut()" title="Sign Out & Return to Login">
+          <button type="button" class="logout-btn" (click)="signOut()" title="Sign Out & Return to Login">
             <span class="material-symbols-outlined logout-icon">logout</span>
             <span>Sign Out</span>
           </button>
@@ -127,35 +130,39 @@ import { InventoryService } from '../../../core/services/inventory.service';
       border-right: 1px solid var(--border-subtle);
       display: flex;
       flex-direction: column;
-      padding: 22px 16px;
+      padding: 14px 12px;
       position: sticky;
       top: 0;
       flex-shrink: 0;
+      box-sizing: border-box;
+      overflow: hidden;
     }
 
     .brand-header {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding-bottom: 22px;
+      gap: 10px;
+      padding-bottom: 12px;
       border-bottom: 1px solid #f1f3f5;
-      margin-bottom: 18px;
+      margin-bottom: 10px;
+      flex-shrink: 0;
     }
 
     .brand-logo-circle {
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
       background: var(--primary-green);
       display: flex;
       align-items: center;
       justify-content: center;
       box-shadow: 0 4px 12px rgba(6, 95, 70, 0.25);
+      flex-shrink: 0;
     }
 
     .logo-icon {
       color: #ffffff;
-      font-size: 24px;
+      font-size: 22px;
     }
 
     .brand-text {
@@ -164,14 +171,15 @@ import { InventoryService } from '../../../core/services/inventory.service';
     }
 
     .brand-name {
-      font-size: 1.1rem;
+      font-size: 1.05rem;
       font-weight: 800;
       letter-spacing: -0.3px;
       color: var(--primary-green-dark);
+      line-height: 1.2;
     }
 
     .brand-tag {
-      font-size: 0.62rem;
+      font-size: 0.60rem;
       font-weight: 700;
       color: var(--primary-green);
       letter-spacing: 0.5px;
@@ -180,27 +188,49 @@ import { InventoryService } from '../../../core/services/inventory.service';
     .nav-menu {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 3px;
       flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 2px;
+      scrollbar-width: thin;
+      scrollbar-color: #cbd5e1 transparent;
+
+      &::-webkit-scrollbar {
+        width: 4px;
+      }
+      &::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      &::-webkit-scrollbar-thumb {
+        background: #cbd5e1;
+        border-radius: 4px;
+      }
+      &::-webkit-scrollbar-thumb:hover {
+        background: #94a3b8;
+      }
     }
 
     .nav-item {
       display: flex;
       align-items: center;
-      gap: 12px;
-      padding: 11px 16px;
+      gap: 10px;
+      padding: 7px 12px;
       border-radius: var(--radius-pill);
       color: var(--text-secondary);
       text-decoration: none;
       font-weight: 600;
-      font-size: 0.92rem;
+      font-size: 0.86rem;
       transition: all 0.2s ease;
+      flex-shrink: 0;
     }
 
     .nav-icon {
-      font-size: 22px;
+      font-size: 20px;
       color: #64748b;
       transition: color 0.2s ease;
+      flex-shrink: 0;
     }
 
     .nav-item:hover {
@@ -215,7 +245,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
     .nav-item.active {
       background: var(--primary-green);
       color: #ffffff;
-      box-shadow: 0 6px 16px rgba(6, 95, 70, 0.32);
+      box-shadow: 0 4px 12px rgba(6, 95, 70, 0.28);
     }
 
     .nav-item.active .nav-icon {
@@ -238,26 +268,28 @@ import { InventoryService } from '../../../core/services/inventory.service';
     .sidebar-footer {
       display: flex;
       flex-direction: column;
-      gap: 8px;
-      padding-top: 16px;
+      gap: 6px;
+      padding-top: 10px;
+      margin-top: auto;
       border-top: 1px solid #f1f3f5;
+      flex-shrink: 0;
     }
 
     .branch-pill {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px 14px;
+      gap: 6px;
+      padding: 5px 10px;
       background: #ecfdf5;
       color: #065f46;
       border: 1px solid #a7f3d0;
       border-radius: 20px;
       font-weight: 700;
-      font-size: 0.82rem;
+      font-size: 0.78rem;
       box-sizing: border-box;
 
       .branch-icon {
-        font-size: 18px;
+        font-size: 16px;
         color: #065f46;
         flex-shrink: 0;
       }
@@ -272,13 +304,14 @@ import { InventoryService } from '../../../core/services/inventory.service';
     .staff-card {
       display: flex;
       align-items: center;
-      gap: 10px;
-      padding: 8px 12px;
+      gap: 8px;
+      padding: 6px 10px;
       border-radius: var(--radius-pill);
       background: #f8fafc;
       border: 1px solid #edf0f3;
       cursor: pointer;
       transition: all 0.2s ease;
+      position: relative;
     }
 
     .staff-card:hover {
@@ -292,16 +325,17 @@ import { InventoryService } from '../../../core/services/inventory.service';
     }
 
     .avatar-circle {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       background: var(--primary-green);
       color: #ffffff;
-      font-size: 0.78rem;
+      font-size: 0.74rem;
       font-weight: 700;
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
 
     .avatar-circle.secondary {
@@ -313,30 +347,59 @@ import { InventoryService } from '../../../core/services/inventory.service';
       display: flex;
       flex-direction: column;
       line-height: 1.2;
+      flex: 1;
+      min-width: 0;
     }
 
     .staff-name {
-      font-size: 0.82rem;
+      font-size: 0.80rem;
       font-weight: 700;
       color: var(--text-main);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .staff-role {
-      font-size: 0.7rem;
+      font-size: 0.68rem;
       color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .mini-logout-btn {
+      background: transparent;
+      border: none;
+      padding: 4px;
+      border-radius: 6px;
+      color: #94a3b8;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+
+      .material-symbols-outlined {
+        font-size: 18px;
+      }
+
+      &:hover {
+        color: #ef4444;
+        background: #fee2e2;
+      }
     }
 
     .logout-btn {
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 8px;
+      gap: 6px;
       background: #f8fafc;
       border: 1px solid #e2e8f0;
-      padding: 9px 14px;
+      padding: 7px 12px;
       color: #64748b;
-      font-weight: 600;
-      font-size: 0.84rem;
+      font-weight: 700;
+      font-size: 0.82rem;
       cursor: pointer;
       border-radius: var(--radius-pill);
       transition: all 0.2s ease;
@@ -350,7 +413,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
     }
 
     .logout-icon {
-      font-size: 19px;
+      font-size: 18px;
     }
 
     .footer-links-row {

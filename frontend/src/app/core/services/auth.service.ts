@@ -421,6 +421,7 @@ export class AuthService {
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('user');
     }
+    this.currentUser.set(this.employees()[0]);
   }
 
   isAuthenticated(): boolean {

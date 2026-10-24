@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { AuthService } from '../../../../core/services/auth.service';
 import { CustomerService } from '../../../../core/services/customer.service';
 import { Employee, DatabaseAccount } from '../../../../core/models';
@@ -20,10 +21,6 @@ import { useDatabaseAccounts } from '../../services/use-database-accounts.servic
           <p class="page-subtitle">
             Access control, database role privileges, employee permissions, data masking, and audit trails.
           </p>
-        </div>
-        <div class="role-badge-box">
-          <span class="role-label">Active Session:</span>
-          <span class="badge-pill badge-primary">{{ authService.currentUser().fullName }} ({{ authService.currentUser().role }}_ROLE)</span>
         </div>
       </div>
 
@@ -869,21 +866,6 @@ import { useDatabaseAccounts } from '../../services/use-database-accounts.servic
       margin: 2px 0 0 0;
     }
 
-    .role-badge-box {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: #ffffff;
-      padding: 6px 14px;
-      border-radius: var(--radius-pill);
-      border: 1px solid var(--border-subtle);
-    }
-
-    .role-label {
-      font-size: 0.75rem;
-      color: var(--text-muted);
-      font-weight: 600;
-    }
 
     .action-alert {
       padding: 12px 18px;
@@ -2402,8 +2384,18 @@ export class AdminDashboardComponent implements OnInit {
     return user;
   }
 
+  private readonly router = inject(Router);
+
+  signOut(): void {
+    this.authService.logout();
+    this.router.navigate(['/login']);
+  }
+
   @HostListener('document:keydown.escape', ['$event'])
   onKeydownEscape(event: Event) {
+    if (this.authService.securityAlert()) {
+      this.authService.closeSecurityAlert();
+    }
     if (this.isAddRuleModalOpen()) {
       this.isAddRuleModalOpen.set(false);
     }
