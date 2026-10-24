@@ -226,8 +226,9 @@ import { Product } from '../../../../core/models';
                 </select>
               </div>
               <div class="form-group">
-                <label for="edit-product-supplier">Supplier *</label>
+                <label for="edit-product-supplier">Supplier</label>
                 <select id="edit-product-supplier" [(ngModel)]="editProduct.supplierId" class="form-control">
+                  <option [ngValue]="0">Select supplier (optional)</option>
                   @for (supplier of productService.suppliers(); track supplier.supplier_id) {
                     <option [ngValue]="supplier.supplier_id">{{ supplier.name }}</option>
                   }
@@ -248,6 +249,7 @@ import { Product } from '../../../../core/models';
               <div class="form-group">
                 <label for="edit-product-unit">Unit of Measure *</label>
                 <select id="edit-product-unit" [(ngModel)]="editProduct.unitOfMeasure" class="form-control">
+                  <option value="">Select unit of measure</option>
                   @for (unit of productService.units(); track unit.code) {
                     <option [ngValue]="unit.code">{{ unit.displayName }}</option>
                   }
@@ -394,22 +396,22 @@ import { Product } from '../../../../core/models';
               </div>
               <div class="form-group">
                 <div class="label-with-action">
-                  <label for="product-category">Subcategory *</label>
+                  <label for="product-category">Subcategory</label>
                   <button type="button" class="link-button" [disabled]="!productParentId"
                           (click)="openSubcategoryModal()">+ Add subcategory</button>
                 </div>
                 <select id="product-category" [(ngModel)]="newProduct.categoryId" class="form-control"
                         [disabled]="!productParentId">
-                  <option [ngValue]="0">Select subcategory</option>
+                  <option [ngValue]="0">Select subcategory (optional)</option>
                   @for (category of subcategoriesFor(productParentId); track category.id) {
                     <option [ngValue]="category.id">{{ category.name }}</option>
                   }
                 </select>
               </div>
               <div class="form-group">
-                <label for="product-supplier">Supplier ID *</label>
+                <label for="product-supplier">Supplier ID</label>
                 <select id="product-supplier" [(ngModel)]="newProduct.supplierId" class="form-control">
-                  <option [ngValue]="0">Select supplier</option>
+                  <option [ngValue]="0">Select supplier (optional)</option>
                   @for (supplier of productService.suppliers(); track supplier.supplier_id) {
                     <option [ngValue]="supplier.supplier_id">{{ supplier.name }}</option>
                   }
@@ -420,11 +422,11 @@ import { Product } from '../../../../core/models';
             <div class="form-row">
               <div class="form-group">
                 <label for="product-price">Unit Price *</label>
-                <input id="product-price" type="number" min="0" step="0.01" [(ngModel)]="newProduct.unitPrice" class="form-control" />
+                <input id="product-price" type="number" min="0" step="0.01" [(ngModel)]="newProduct.unitPrice" class="form-control" placeholder="0.00" />
               </div>
               <div class="form-group">
                 <label for="product-cost">Cost Price *</label>
-                <input id="product-cost" type="number" min="0" step="0.01" [(ngModel)]="newProduct.costPrice" class="form-control" />
+                <input id="product-cost" type="number" min="0" step="0.01" [(ngModel)]="newProduct.costPrice" class="form-control" placeholder="0.00" />
               </div>
             </div>
 
@@ -432,6 +434,7 @@ import { Product } from '../../../../core/models';
               <div class="form-group">
                 <label for="product-unit">Unit of Measure *</label>
                 <select id="product-unit" [(ngModel)]="newProduct.unitOfMeasure" class="form-control">
+                  <option value="">Select unit of measure</option>
                   @for (unit of productService.units(); track unit.code) {
                     <option [ngValue]="unit.code">{{ unit.displayName }}</option>
                   }
@@ -1089,12 +1092,28 @@ export class ProductListComponent {
       this.addProductError.set('SKU and product name are required.');
       return;
     }
-    if (product.categoryId <= 0 || product.supplierId <= 0) {
-      this.addProductError.set('Select a category and enter a valid supplier ID.');
+    const effectiveCategoryId = (product.categoryId && product.categoryId > 0)
+      ? product.categoryId
+      : (this.productParentId && this.productParentId > 0 ? this.productParentId : 0);
+
+    if (effectiveCategoryId <= 0) {
+      this.addProductError.set('Please select a parent category.');
       return;
     }
-    if (product.unitPrice < 0 || product.costPrice < 0 || product.minOrderQty <= 0) {
-      this.addProductError.set('Prices must be zero or higher and minimum order quantity must be greater than zero.');
+    if (product.unitPrice == null || (product.unitPrice as any) === '' || isNaN(Number(product.unitPrice)) || Number(product.unitPrice) < 0) {
+      this.addProductError.set('Unit Price is required and must be zero or higher.');
+      return;
+    }
+    if (product.costPrice == null || (product.costPrice as any) === '' || isNaN(Number(product.costPrice)) || Number(product.costPrice) < 0) {
+      this.addProductError.set('Cost Price is required and must be zero or higher.');
+      return;
+    }
+    if (!product.unitOfMeasure || !product.unitOfMeasure.trim()) {
+      this.addProductError.set('Unit of Measure is required.');
+      return;
+    }
+    if (product.minOrderQty == null || (product.minOrderQty as any) === '' || isNaN(Number(product.minOrderQty)) || Number(product.minOrderQty) <= 0) {
+      this.addProductError.set('Minimum order quantity is required and must be greater than zero.');
       return;
     }
 
@@ -1106,6 +1125,12 @@ export class ProductListComponent {
     this.isSavingProduct.set(true);
     const save = (imageUrl: string) => this.productService.createProduct({
       ...product,
+      categoryId: effectiveCategoryId,
+      supplierId: product.supplierId && product.supplierId > 0 ? product.supplierId : 0,
+      unitPrice: Number(product.unitPrice),
+      costPrice: Number(product.costPrice),
+      unitOfMeasure: (product.unitOfMeasure || '').trim(),
+      minOrderQty: Number(product.minOrderQty),
       sku: product.sku.trim(),
       name: product.name.trim(),
       imageUrl
@@ -1153,12 +1178,24 @@ export class ProductListComponent {
       this.editProductError.set('SKU and product name are required.');
       return;
     }
-    if (product.categoryId <= 0 || product.supplierId <= 0) {
-      this.editProductError.set('Select a category and supplier.');
+    if (!product.categoryId || product.categoryId <= 0) {
+      this.editProductError.set('Please select a category.');
       return;
     }
-    if (product.unitPrice < 0 || product.costPrice < 0 || product.minOrderQty <= 0) {
-      this.editProductError.set('Prices must be zero or higher and minimum order quantity must be greater than zero.');
+    if (product.unitPrice == null || (product.unitPrice as any) === '' || isNaN(Number(product.unitPrice)) || Number(product.unitPrice) < 0) {
+      this.editProductError.set('Unit Price is required and must be zero or higher.');
+      return;
+    }
+    if (product.costPrice == null || (product.costPrice as any) === '' || isNaN(Number(product.costPrice)) || Number(product.costPrice) < 0) {
+      this.editProductError.set('Cost Price is required and must be zero or higher.');
+      return;
+    }
+    if (!product.unitOfMeasure || !product.unitOfMeasure.trim()) {
+      this.editProductError.set('Unit of Measure is required.');
+      return;
+    }
+    if (product.minOrderQty == null || (product.minOrderQty as any) === '' || isNaN(Number(product.minOrderQty)) || Number(product.minOrderQty) <= 0) {
+      this.editProductError.set('Minimum order quantity is required and must be greater than zero.');
       return;
     }
 
@@ -1166,6 +1203,11 @@ export class ProductListComponent {
     this.isSavingEditProduct.set(true);
     const save = (imageUrl: string) => this.productService.updateProduct(prod.id, {
       ...product,
+      supplierId: product.supplierId && product.supplierId > 0 ? product.supplierId : 0,
+      unitPrice: Number(product.unitPrice),
+      costPrice: Number(product.costPrice),
+      unitOfMeasure: (product.unitOfMeasure || '').trim(),
+      minOrderQty: Number(product.minOrderQty),
       sku: product.sku.trim(),
       name: product.name.trim(),
       imageUrl
@@ -1201,11 +1243,11 @@ export class ProductListComponent {
       supplierId: 0,
       sku: '',
       name: '',
-      unitPrice: 0,
-      costPrice: 0,
+      unitPrice: '' as unknown as number,
+      costPrice: '' as unknown as number,
       imageUrl: '',
       dietType: null,
-      unitOfMeasure: 'PIECE',
+      unitOfMeasure: '',
       minOrderQty: 1,
       isActive: true
     };

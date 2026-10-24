@@ -30,7 +30,7 @@ public class ProductDao {
                     FROM product p
                     JOIN category c ON c.category_id = p.category_id
                     LEFT JOIN category parent ON parent.category_id = c.parent_id
-                    JOIN supplier s ON s.supplier_id = p.supplier_id
+                    LEFT JOIN supplier s ON s.supplier_id = p.supplier_id
                     WHERE (? IS NULL OR p.category_id = ?)
                       AND (? IS NULL OR p.is_active = ?)
                       AND (MATCH(p.name) AGAINST (? IN BOOLEAN MODE) OR p.sku LIKE ?)
@@ -49,7 +49,7 @@ public class ProductDao {
                     FROM product p
                     JOIN category c ON c.category_id = p.category_id
                     LEFT JOIN category parent ON parent.category_id = c.parent_id
-                    JOIN supplier s ON s.supplier_id = p.supplier_id
+                    LEFT JOIN supplier s ON s.supplier_id = p.supplier_id
                     WHERE (? IS NULL OR p.category_id = ?)
                       AND (? IS NULL OR p.is_active = ?)
                     ORDER BY product_name
@@ -108,6 +108,7 @@ public class ProductDao {
     public int saveProduct(Map<String, ?> parameters) {
         SimpleJdbcCall call = new SimpleJdbcCall(jdbcTemplate)
                 .withProcedureName("sp_save_product")
+                .withoutProcedureColumnMetaDataAccess()
                 .declareParameters(
                         new SqlParameter("p_product_id", java.sql.Types.INTEGER),
                         new SqlParameter("p_category_id", java.sql.Types.INTEGER),

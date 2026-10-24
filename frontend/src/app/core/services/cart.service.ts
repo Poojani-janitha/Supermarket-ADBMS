@@ -4,6 +4,7 @@ import { CartItem, Product, AppliedDiscount, SalesOrder, Customer } from '../mod
 import { AuthService } from './auth.service';
 import { ProductService } from './product.service';
 import { DiscountService } from './discount.service';
+import { CustomerService } from './customer.service';
 
 export interface HeldCart {
   id: number;
@@ -23,6 +24,7 @@ export class CartService {
   private readonly authService = inject(AuthService);
   private readonly productService = inject(ProductService);
   private readonly discountService = inject(DiscountService);
+  private readonly customerService = inject(CustomerService);
 
   // Cart line items (initialized empty)
   readonly cartItems = signal<CartItem[]>([]);
@@ -70,15 +72,16 @@ export class CartService {
     const cust = this.selectedCustomer();
 
     if (cust) {
-      if (cust.tier === 'GOLD') {
-        const amt = Number((sub * 0.10).toFixed(2));
-        list.push({ ruleId: 2, ruleName: 'Gold Loyalty (10%)', amount: amt });
+      if (cust.tier === 'GOLD' && sub >= 1000) {
+        const amt = Number((sub * 0.07).toFixed(2));
+        list.push({ ruleId: 21, ruleName: 'Gold Tier (7% Rule Discount)', amount: amt });
         runningDiscount += amt;
-      } else if (cust.tier === 'SILVER') {
+      } else if (cust.tier === 'SILVER' && sub >= 500) {
         const amt = Number((sub * 0.05).toFixed(2));
-        list.push({ ruleId: 2, ruleName: 'Silver Loyalty (5%)', amount: amt });
+        list.push({ ruleId: 20, ruleName: 'Silver Tier (5% Rule Discount)', amount: amt });
         runningDiscount += amt;
-      } else if (cust.tier === 'BRONZE' || cust.loyaltyPoints === 0) {
+      } else if (cust.isFirstPurchase) {
+        // Welcome 10% First Purchase discount - strictly only for newly registered customers
         const welcomeRule = this.discountService.rules().find(r => r.ruleType === 'FIRST_PURCHASE');
         const ruleId = welcomeRule ? welcomeRule.ruleId : 1;
         const ruleName = welcomeRule ? welcomeRule.name : 'Welcome 10% Discount';
@@ -333,6 +336,21 @@ export class CartService {
         this.cartItems.set([]);
         // Reload live inventory from MySQL
         this.productService.loadProducts();
+        // Reload live customers so loyalty points and directory update immediately
+        this.customerService.loadCustomers();
+
+        if (cust) {
+          const earnedPts = Math.floor(savedOrder.totalAmount / 100);
+          const newPts = (cust.loyaltyPoints || 0) + earnedPts;
+          const newTier = newPts >= 1000 ? 'GOLD' : newPts >= 500 ? 'SILVER' : 'BRONZE';
+          this.selectedCustomer.set({
+            ...cust,
+            loyaltyPoints: newPts,
+            tier: newTier,
+            isFirstPurchase: false
+          });
+        }
+
         this.http.get<Record<string, number>>('/api/orders/stock?branchId=1').subscribe({
           next: (stockMap) => {
             if (!stockMap) return;

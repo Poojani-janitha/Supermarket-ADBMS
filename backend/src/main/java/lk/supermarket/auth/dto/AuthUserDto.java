@@ -8,6 +8,7 @@ public class AuthUserDto {
     private String username;
     private String role;
     private Boolean isActive;
+    private Long supplierId;
 
     public AuthUserDto() {
     }
@@ -80,5 +81,13 @@ public class AuthUserDto {
 
     public void setIsActive(Boolean active) {
         isActive = active;
+    }
+
+    public Long getSupplierId() {
+        return supplierId;
+    }
+
+    public void setSupplierId(Long supplierId) {
+        this.supplierId = supplierId;
     }
 }

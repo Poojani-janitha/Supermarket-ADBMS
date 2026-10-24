@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Coupon, DiscountRule, Holiday } from '../../../../core/models';
 import { DiscountService } from '../../../../core/services/discount.service';
 
 @Component({
@@ -12,24 +13,32 @@ import { DiscountService } from '../../../../core/services/discount.service';
       <div class="page-header">
         <div>
           <h1 class="page-title">Discount Engine & Promotions</h1>
+          <p class="page-subtitle">Manage multi-tier promotional rules, coupon redemption limits, and calendar discounts.</p>
         </div>
         <div class="header-actions">
-        <button class="btn-pill btn-outline" (click)="openRuleModal()">
-          <span class="material-symbols-outlined">tune</span> Add Promotion Rule
-        </button>
-        <button class="btn-pill btn-outline" (click)="openHolidayModal()">
-          <span class="material-symbols-outlined">event</span> Add Holiday
-        </button>
-        <button class="btn-pill btn-primary" (click)="openCouponModal()">
-          <span class="material-symbols-outlined">add</span> Create Coupon
-        </button>
+          <button class="btn-pill btn-outline" (click)="openRuleModal()">
+            <span class="material-symbols-outlined">tune</span> Add Promotion Rule
+          </button>
+          <button class="btn-pill btn-outline" (click)="openHolidayModal()">
+            <span class="material-symbols-outlined">event</span> Add Holiday
+          </button>
+          <button class="btn-pill btn-primary" (click)="openCouponModal()">
+            <span class="material-symbols-outlined">add</span> Create Coupon
+          </button>
         </div>
       </div>
 
+      <!-- Section: Add Promotion Rule Modal -->
       @if (isRuleModalOpen) {
         <div class="modal-backdrop" (click)="closeRuleModal()">
           <div class="modal-dialog rule-dialog" (click)="$event.stopPropagation()">
-            <div class="modal-header"><div><h3 class="modal-title">Add Promotion Rule</h3><p class="modal-subtitle">Define when and how a discount is applied.</p></div><button class="close-btn" (click)="closeRuleModal()">&times;</button></div>
+            <div class="modal-header">
+              <div>
+                <h3 class="modal-title">Add Promotion Rule</h3>
+                <p class="modal-subtitle">Define when and how a discount is applied.</p>
+              </div>
+              <button class="close-btn" (click)="closeRuleModal()">&times;</button>
+            </div>
             <p class="procedure-note">Saves through <strong>sp_save_discount_rule</strong>. A HOLIDAY rule becomes eligible only when the order date is in the holiday calendar.</p>
             @if (ruleError) { <div class="form-error">{{ ruleError }}</div> }
             <div class="form-group"><label>Rule Name *</label><input class="form-control" [(ngModel)]="ruleName" placeholder="e.g. Christmas 10% Promotion"></div>
@@ -56,6 +65,7 @@ import { DiscountService } from '../../../../core/services/discount.service';
         </div>
       }
 
+      <!-- Section: Add Holiday Modal -->
       @if (isHolidayModalOpen) {
         <div class="modal-backdrop" (click)="closeHolidayModal()">
           <div class="modal-dialog" (click)="$event.stopPropagation()">
@@ -70,6 +80,7 @@ import { DiscountService } from '../../../../core/services/discount.service';
         </div>
       }
 
+      <!-- Section: Create Coupon Modal -->
       @if (isCouponModalOpen) {
         <div class="modal-backdrop" (click)="closeCouponModal()">
           <div class="modal-dialog coupon-dialog" (click)="$event.stopPropagation()">
@@ -141,11 +152,448 @@ import { DiscountService } from '../../../../core/services/discount.service';
         </div>
       }
 
-      
+      <!-- Section: View Rule Modal -->
+      @if (isViewRuleModalOpen && selectedRuleForView) {
+        <div class="modal-backdrop" (click)="closeViewRule()">
+          <div class="modal-dialog rule-dialog" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div>
+                <div class="modal-title-with-badge">
+                  <h3 class="modal-title">{{ selectedRuleForView.name }}</h3>
+                  <span class="priority-pill">#{{ selectedRuleForView.priority }}</span>
+                  <span class="badge-pill" [class.badge-veg]="selectedRuleForView.isActive" [class.badge-muted]="!selectedRuleForView.isActive">
+                    {{ selectedRuleForView.isActive ? 'ACTIVE' : 'INACTIVE' }}
+                  </span>
+                </div>
+                <p class="modal-subtitle">Promotional rule details and discount engine constraints</p>
+              </div>
+              <button class="close-btn" (click)="closeViewRule()">&times;</button>
+            </div>
+
+            <div class="view-details-card">
+              <div class="details-grid">
+                <div class="detail-item">
+                  <span class="detail-label">Rule ID</span>
+                  <span class="detail-value font-mono">#{{ selectedRuleForView.ruleId }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Rule Type</span>
+                  <span class="detail-value">
+                    <span class="badge-pill badge-tier">{{ selectedRuleForView.ruleType }}</span>
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Discount Value</span>
+                  <span class="detail-value disc-highlight">
+                    {{ selectedRuleForView.value }}{{ selectedRuleForView.kind === 'PERCENT' ? '%' : ' LKR' }}
+                    {{ selectedRuleForView.kind === 'PERCENT' ? 'Percentage' : 'Fixed Amount' }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Minimum Order Spend</span>
+                  <span class="detail-value">Rs. {{ selectedRuleForView.minOrderAmount.toFixed(2) }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Maximum Discount Cap</span>
+                  <span class="detail-value">
+                    {{ selectedRuleForView.maxDiscount !== undefined && selectedRuleForView.maxDiscount !== null ? 'Rs. ' + selectedRuleForView.maxDiscount.toFixed(2) : 'No Cap / Unlimited' }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Eligible Loyalty Tier</span>
+                  <span class="detail-value">
+                    @if (selectedRuleForView.tier) {
+                      <span class="badge-pill" [class.badge-gold]="selectedRuleForView.tier === 'GOLD'" [class.badge-silver]="selectedRuleForView.tier === 'SILVER'" [class.badge-bronze]="selectedRuleForView.tier === 'BRONZE'">
+                        {{ selectedRuleForView.tier }}
+                      </span>
+                    } @else {
+                      <span class="text-muted">All Shoppers / Any Tier</span>
+                    }
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Validity Period</span>
+                  <span class="detail-value">{{ selectedRuleForView.startDate }} to {{ selectedRuleForView.endDate }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Priority Order</span>
+                  <span class="detail-value font-mono">#{{ selectedRuleForView.priority }} (Lower numbers evaluate first)</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Stackable With Others</span>
+                  <span class="detail-value">
+                    <span class="badge-pill" [class.badge-veg]="selectedRuleForView.stackable" [class.badge-muted]="!selectedRuleForView.stackable">
+                      {{ selectedRuleForView.stackable ? 'Yes (Can combine)' : 'No (Exclusive)' }}
+                    </span>
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Discount Engine Status</span>
+                  <span class="detail-value">
+                    <span class="badge-pill" [class.badge-veg]="selectedRuleForView.isActive" [class.badge-muted]="!selectedRuleForView.isActive">
+                      {{ selectedRuleForView.isActive ? 'Active in Engine' : 'Inactive' }}
+                    </span>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-actions">
+              <button class="btn-pill btn-outline" (click)="closeViewRule()">Close</button>
+              <button class="btn-pill btn-primary" (click)="editRuleFromView(selectedRuleForView)">
+                <span class="material-symbols-outlined" style="font-size: 16px;">edit</span> Edit Rule
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Section: Edit Rule Modal -->
+      @if (isEditRuleModalOpen && selectedRuleForEdit) {
+        <div class="modal-backdrop" (click)="closeEditRule()">
+          <div class="modal-dialog rule-dialog" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div>
+                <h3 class="modal-title">Edit Promotion Rule</h3>
+                <p class="modal-subtitle">Update parameters for rule #{{ selectedRuleForEdit.ruleId }} via <strong>sp_save_discount_rule</strong>.</p>
+              </div>
+              <button class="close-btn" (click)="closeEditRule()">&times;</button>
+            </div>
+            @if (editRuleError) { <div class="form-error">{{ editRuleError }}</div> }
+            <div class="form-group">
+              <label>Rule Name *</label>
+              <input class="form-control" [(ngModel)]="editRuleName" placeholder="e.g. Christmas 10% Promotion">
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Rule Type *</label>
+                <select class="form-control" [(ngModel)]="editRuleType">
+                  <option value="HOLIDAY">Holiday</option>
+                  <option value="COUPON">Coupon</option>
+                  <option value="LOYALTY">Loyalty</option>
+                  <option value="FIRST_PURCHASE">First Purchase</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Discount Kind *</label>
+                <select class="form-control" [(ngModel)]="editRuleKind">
+                  <option value="PERCENT">Percentage</option>
+                  <option value="FIXED">Fixed Amount</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>{{ editRuleKind === 'PERCENT' ? 'Discount Percentage (%)' : 'Discount Amount (Rs.)' }} *</label>
+                <input class="form-control" type="number" min="0.01" [max]="editRuleKind === 'PERCENT' ? 100 : null" step="0.01" [(ngModel)]="editRuleValue">
+              </div>
+              <div class="form-group">
+                <label>Minimum Order Amount (Rs.) *</label>
+                <input class="form-control" type="number" min="0" step="0.01" [(ngModel)]="editRuleMinOrder">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Maximum Discount (Rs.)</label>
+                <input class="form-control" type="number" min="0" step="0.01" [(ngModel)]="editRuleMaxDiscount" placeholder="Optional cap">
+              </div>
+              <div class="form-group">
+                <label>Priority *</label>
+                <input class="form-control" type="number" min="0" step="1" [(ngModel)]="editRulePriority">
+                <small>Lower number executes first in cursor loop.</small>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Start Date *</label>
+                <input class="form-control" type="date" [(ngModel)]="editRuleStartDate">
+              </div>
+              <div class="form-group">
+                <label>End Date *</label>
+                <input class="form-control" type="date" [(ngModel)]="editRuleEndDate">
+              </div>
+            </div>
+            @if (editRuleType === 'LOYALTY') {
+              <div class="form-group">
+                <label>Loyalty Tier *</label>
+                <select class="form-control" [(ngModel)]="editRuleTier">
+                  <option value="">Select tier</option>
+                  <option value="BRONZE">Bronze</option>
+                  <option value="SILVER">Silver</option>
+                  <option value="GOLD">Gold</option>
+                </select>
+              </div>
+            }
+            <div class="form-row" style="margin-top: 4px;">
+              <label class="checkbox-row">
+                <input type="checkbox" [(ngModel)]="editRuleStackable"> Allow combining with other discounts
+              </label>
+              <label class="checkbox-row">
+                <input type="checkbox" [(ngModel)]="editRuleIsActive"> Rule is Active
+              </label>
+            </div>
+            <div class="modal-actions">
+              <button class="btn-pill btn-outline" (click)="closeEditRule()">Cancel</button>
+              <button class="btn-pill btn-primary" [disabled]="isSavingEditRule" (click)="saveEditRule()">
+                {{ isSavingEditRule ? 'Saving...' : 'Save Changes' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Section: View Coupon Modal -->
+      @if (isViewCouponModalOpen && selectedCouponForView) {
+        <div class="modal-backdrop" (click)="closeViewCoupon()">
+          <div class="modal-dialog coupon-dialog" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div>
+                <div class="modal-title-with-badge">
+                  <h3 class="modal-title">Coupon Details</h3>
+                  <span class="code-badge">{{ selectedCouponForView.code }}</span>
+                </div>
+                <p class="modal-subtitle">Promotional coupon redemption limit and linked discount rule</p>
+              </div>
+              <button class="close-btn" (click)="closeViewCoupon()">&times;</button>
+            </div>
+
+            <div class="view-details-card">
+              <div class="details-grid">
+                <div class="detail-item">
+                  <span class="detail-label">Coupon Code</span>
+                  <span class="detail-value font-mono"><strong>{{ selectedCouponForView.code }}</strong></span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Linked Rule Name</span>
+                  <span class="detail-value"><strong>{{ selectedCouponForView.ruleName }}</strong> (ID: #{{ selectedCouponForView.ruleId }})</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Redemption Usage</span>
+                  <span class="detail-value">
+                    <strong>{{ selectedCouponForView.usedCount }}</strong> / {{ selectedCouponForView.maxUses }} used
+                    ({{ getUsagePercentage(selectedCouponForView) }}%)
+                  </span>
+                  <div class="mini-progress-bar">
+                    <div class="mini-progress-fill" [style.width.%]="getUsagePercentage(selectedCouponForView)"></div>
+                  </div>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Expiry Date</span>
+                  <span class="detail-value">{{ selectedCouponForView.expiresOn }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Discount Value</span>
+                  <span class="detail-value disc-highlight">
+                    @if (selectedCouponForView.value !== undefined) {
+                      {{ selectedCouponForView.value }}{{ selectedCouponForView.kind === 'PERCENT' ? '%' : ' LKR' }}
+                    } @else {
+                      Defined in rule
+                    }
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Min Order Spend</span>
+                  <span class="detail-value">
+                    {{ selectedCouponForView.minOrderAmount !== undefined ? 'Rs. ' + selectedCouponForView.minOrderAmount.toFixed(2) : 'Defined in rule' }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Max Discount Cap</span>
+                  <span class="detail-value">
+                    {{ selectedCouponForView.maxDiscount !== undefined && selectedCouponForView.maxDiscount !== null ? 'Rs. ' + selectedCouponForView.maxDiscount.toFixed(2) : 'No Cap / Unlimited' }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Status</span>
+                  <span class="detail-value">
+                    @if (isCouponExpired(selectedCouponForView)) {
+                      <span class="badge-pill badge-muted">EXPIRED</span>
+                    } @else if (selectedCouponForView.usedCount >= selectedCouponForView.maxUses) {
+                      <span class="badge-pill badge-muted">DEPLETED</span>
+                    } @else {
+                      <span class="badge-pill badge-veg">ACTIVE & READY</span>
+                    }
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-actions">
+              <button class="btn-pill btn-outline" (click)="closeViewCoupon()">Close</button>
+              <button class="btn-pill btn-primary" (click)="editCouponFromView(selectedCouponForView)">
+                <span class="material-symbols-outlined" style="font-size: 16px;">edit</span> Edit Coupon
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Section: Edit Coupon Modal -->
+      @if (isEditCouponModalOpen && selectedCouponForEdit) {
+        <div class="modal-backdrop" (click)="closeEditCoupon()">
+          <div class="modal-dialog coupon-dialog" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div>
+                <h3 class="modal-title">Edit Promotional Coupon</h3>
+                <p class="modal-subtitle">Modify coupon parameters for <strong>{{ selectedCouponForEdit.code }}</strong></p>
+              </div>
+              <button class="close-btn" (click)="closeEditCoupon()">&times;</button>
+            </div>
+
+            @if (editCouponError) {
+              <div class="form-error">{{ editCouponError }}</div>
+            }
+
+            <div class="form-group">
+              <label for="edit-coupon-code">Coupon Code *</label>
+              <input
+                id="edit-coupon-code"
+                class="form-control code-input"
+                [value]="editCouponCode"
+                (input)="setEditCouponCode($any($event.target).value)"
+                maxlength="20"
+                placeholder="e.g. FLASH20"
+                autocomplete="off"
+              />
+              <small>Use 3–20 characters (letters, numbers, hyphens, underscores).</small>
+            </div>
+
+            <div class="form-group">
+              <label for="edit-coupon-rule">Linked Promotion Rule *</label>
+              <select id="edit-coupon-rule" class="form-control" [(ngModel)]="editCouponRuleId">
+                <option [ngValue]="null">Select a discount rule</option>
+                @for (rule of discountService.rules(); track rule.ruleId) {
+                  <option [ngValue]="rule.ruleId">
+                    {{ rule.name }} — {{ rule.value }}{{ rule.kind === 'PERCENT' ? '%' : '' }} {{ rule.kind === 'FIXED' ? 'fixed' : 'off' }}
+                  </option>
+                }
+              </select>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label for="edit-coupon-max-uses">Maximum Uses *</label>
+                <input id="edit-coupon-max-uses" class="form-control" type="number" min="1" step="1" [(ngModel)]="editCouponMaxUses" />
+                <small>Current used count is {{ selectedCouponForEdit.usedCount }}.</small>
+              </div>
+              <div class="form-group">
+                <label for="edit-coupon-expires">Expiry Date *</label>
+                <input id="edit-coupon-expires" class="form-control" type="date" [(ngModel)]="editCouponExpiresOn" />
+                <small>Coupon cannot be used after this date.</small>
+              </div>
+            </div>
+
+            <div class="modal-actions">
+              <button class="btn-pill btn-outline" (click)="closeEditCoupon()">Cancel</button>
+              <button class="btn-pill btn-primary" [disabled]="isSavingEditCoupon" (click)="saveEditCoupon()">
+                {{ isSavingEditCoupon ? 'Saving...' : 'Save Changes' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Section: View Holiday Modal -->
+      @if (isViewHolidayModalOpen && selectedHolidayForView) {
+        <div class="modal-backdrop" (click)="closeViewHoliday()">
+          <div class="modal-dialog" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div>
+                <div class="modal-title-with-badge">
+                  <h3 class="modal-title">{{ selectedHolidayForView.name }}</h3>
+                  <span class="date-badge">{{ selectedHolidayForView.holidayDate }}</span>
+                </div>
+                <p class="modal-subtitle">Calendar entry details and promotional eligibility</p>
+              </div>
+              <button class="close-btn" (click)="closeViewHoliday()">&times;</button>
+            </div>
+
+            <div class="view-details-card">
+              <div class="details-grid">
+                <div class="detail-item">
+                  <span class="detail-label">Holiday Date</span>
+                  <span class="detail-value font-mono"><strong>{{ selectedHolidayForView.holidayDate }}</strong></span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Occasion Name</span>
+                  <span class="detail-value"><strong>{{ selectedHolidayForView.name }}</strong></span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Discount Percentage</span>
+                  <span class="detail-value disc-highlight">
+                    @if (selectedHolidayForView.discountPercent !== undefined) {
+                      <span class="badge-pill badge-veg">{{ selectedHolidayForView.discountPercent }}% OFF</span>
+                    } @else {
+                      <span class="badge-pill badge-muted">No discount configured</span>
+                    }
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Calendar Function</span>
+                  <span class="detail-value font-mono">fn_is_holiday('{{ selectedHolidayForView.holidayDate }}') = 1</span>
+                </div>
+                <div class="detail-item" style="grid-column: span 2;">
+                  <span class="detail-label">Promotional Application</span>
+                  <span class="detail-value" style="font-size: 0.82rem; color: #475569; font-weight: normal; line-height: 1.4;">
+                    Orders placed on this holiday date automatically match the <strong>HOLIDAY</strong> promotion rule.
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="modal-actions">
+              <button class="btn-pill btn-outline" (click)="closeViewHoliday()">Close</button>
+              <button class="btn-pill btn-primary" (click)="editHolidayFromView(selectedHolidayForView)">
+                <span class="material-symbols-outlined" style="font-size: 16px;">edit</span> Edit Holiday
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Section: Edit Holiday Modal -->
+      @if (isEditHolidayModalOpen && selectedHolidayForEdit) {
+        <div class="modal-backdrop" (click)="closeEditHoliday()">
+          <div class="modal-dialog" (click)="$event.stopPropagation()">
+            <div class="modal-header">
+              <div>
+                <h3 class="modal-title">Edit Holiday in Calendar</h3>
+                <p class="modal-subtitle">Modify date, occasion, or discount percentage for this holiday.</p>
+              </div>
+              <button class="close-btn" (click)="closeEditHoliday()">&times;</button>
+            </div>
+
+            @if (editHolidayError) {
+              <div class="form-error">{{ editHolidayError }}</div>
+            }
+
+            <div class="form-group">
+              <label>Holiday Date *</label>
+              <input class="form-control" type="date" [(ngModel)]="editHolidayDate">
+            </div>
+            <div class="form-group">
+              <label>Holiday Name *</label>
+              <input class="form-control" [(ngModel)]="editHolidayName" placeholder="e.g. Christmas Day">
+            </div>
+            <div class="form-group">
+              <label>Discount Percentage *</label>
+              <input class="form-control" type="number" min="0.01" max="100" step="0.01" [(ngModel)]="editHolidayDiscountPercent">
+              <small>Enter a value from 0.01% to 100%.</small>
+            </div>
+
+            <div class="modal-actions">
+              <button class="btn-pill btn-outline" (click)="closeEditHoliday()">Cancel</button>
+              <button class="btn-pill btn-primary" [disabled]="isSavingEditHoliday" (click)="saveEditHoliday()">
+                {{ isSavingEditHoliday ? 'Saving...' : 'Save Changes' }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
 
       <!-- Section 2: Grid of Coupons and Holidays -->
       <div class="grid-2-col">
-        <!-- Coupons Table -->
+        <!-- Table 1: Coupons Table -->
         <div class="section-card">
           <div class="card-title-row">
             <span class="material-symbols-outlined" style="color: #f59e0b;">confirmation_number</span>
@@ -159,6 +607,7 @@ import { DiscountService } from '../../../../core/services/discount.service';
                 <th>LINKED RULE</th>
                 <th>USAGE</th>
                 <th>EXPIRES</th>
+                <th style="text-align: right;">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -168,13 +617,23 @@ import { DiscountService } from '../../../../core/services/discount.service';
                   <td>{{ c.ruleName }}</td>
                   <td>{{ c.usedCount }} / {{ c.maxUses }}</td>
                   <td>{{ c.expiresOn }}</td>
+                  <td style="text-align: right;">
+                    <div class="row-actions">
+                      <button class="icon-btn icon-btn-view" title="View Coupon" (click)="openViewCoupon(c)">
+                        <span class="material-symbols-outlined">visibility</span>
+                      </button>
+                      <button class="icon-btn icon-btn-edit" title="Edit Coupon" (click)="openEditCoupon(c)">
+                        <span class="material-symbols-outlined">edit</span>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               }
             </tbody>
           </table>
         </div>
 
-        <!-- Holidays Table -->
+        <!-- Table 2: Holidays Table -->
         <div class="section-card">
           <div class="card-title-row">
             <span class="material-symbols-outlined" style="color: #ec4899;">event</span>
@@ -187,6 +646,7 @@ import { DiscountService } from '../../../../core/services/discount.service';
                 <th>DATE</th>
                 <th>HOLIDAY OCCASION</th>
                 <th>STATUS</th>
+                <th style="text-align: right;">ACTIONS</th>
               </tr>
             </thead>
             <tbody>
@@ -201,6 +661,16 @@ import { DiscountService } from '../../../../core/services/discount.service';
                       <span class="badge-pill badge-muted">No discount configured</span>
                     }
                   </td>
+                  <td style="text-align: right;">
+                    <div class="row-actions">
+                      <button class="icon-btn icon-btn-view" title="View Holiday" (click)="openViewHoliday(h)">
+                        <span class="material-symbols-outlined">visibility</span>
+                      </button>
+                      <button class="icon-btn icon-btn-edit" title="Edit Holiday" (click)="openEditHoliday(h)">
+                        <span class="material-symbols-outlined">edit</span>
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               }
             </tbody>
@@ -208,7 +678,7 @@ import { DiscountService } from '../../../../core/services/discount.service';
         </div>
       </div>
 
-      <!-- Section 1: Active Promotion Rules -->
+      <!-- Table 3: Active Promotion Rules -->
       <div class="section-card">
         <div class="card-title-row">
           <span class="material-symbols-outlined" style="color: var(--primary-green);">tune</span>
@@ -226,6 +696,7 @@ import { DiscountService } from '../../../../core/services/discount.service';
               <th>VALIDITY PERIOD</th>
               <th>STACKABLE</th>
               <th>STATUS</th>
+              <th style="text-align: right;">ACTIONS</th>
             </tr>
           </thead>
           <tbody>
@@ -234,11 +705,25 @@ import { DiscountService } from '../../../../core/services/discount.service';
                 <td><span class="priority-pill">#{{ rule.priority }}</span></td>
                 <td><strong>{{ rule.name }}</strong></td>
                 <td><span class="badge-pill badge-tier">{{ rule.ruleType }}</span></td>
-                <td><span class="disc-highlight">{{ rule.value }}% OFF</span></td>
+                <td><span class="disc-highlight">{{ rule.value }}{{ rule.kind === 'PERCENT' ? '%' : ' LKR' }} OFF</span></td>
                 <td>Rs. {{ rule.minOrderAmount.toFixed(2) }}</td>
                 <td>{{ rule.startDate }} to {{ rule.endDate }}</td>
                 <td>{{ rule.stackable ? 'Yes' : 'No' }}</td>
-                <td><span class="badge-pill badge-veg">ACTIVE</span></td>
+                <td>
+                  <span class="badge-pill" [class.badge-veg]="rule.isActive" [class.badge-muted]="!rule.isActive">
+                    {{ rule.isActive ? 'ACTIVE' : 'INACTIVE' }}
+                  </span>
+                </td>
+                <td style="text-align: right;">
+                  <div class="row-actions">
+                    <button class="icon-btn icon-btn-view" title="View Rule" (click)="openViewRule(rule)">
+                      <span class="material-symbols-outlined">visibility</span>
+                    </button>
+                    <button class="icon-btn icon-btn-edit" title="Edit Rule" (click)="openEditRule(rule)">
+                      <span class="material-symbols-outlined">edit</span>
+                    </button>
+                  </div>
+                </td>
               </tr>
             }
           </tbody>
@@ -363,6 +848,69 @@ import { DiscountService } from '../../../../core/services/discount.service';
       color: #64748b;
     }
 
+    .badge-tier {
+      background: #ede9fe;
+      color: #6d28d9;
+    }
+
+    .badge-gold {
+      background: #fef3c7;
+      color: #b45309;
+      border: 1px solid #fde68a;
+    }
+
+    .badge-silver {
+      background: #f1f5f9;
+      color: #475569;
+      border: 1px solid #cbd5e1;
+    }
+
+    .badge-bronze {
+      background: #ffedd5;
+      color: #c2410c;
+      border: 1px solid #fed7aa;
+    }
+
+    .row-actions {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .icon-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      border: 1px solid var(--border-light, #e2e8f0);
+      background: #ffffff;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+      padding: 0;
+    }
+
+    .icon-btn .material-symbols-outlined {
+      font-size: 18px;
+    }
+
+    .icon-btn-view:hover {
+      background: #eff6ff;
+      color: #2563eb;
+      border-color: #bfdbfe;
+      transform: translateY(-1px);
+    }
+
+    .icon-btn-edit:hover {
+      background: #ecfdf5;
+      color: var(--primary-green, #065f46);
+      border-color: var(--primary-green-border, #a7f3d0);
+      transform: translateY(-1px);
+    }
+
     .modal-backdrop {
       position: fixed;
       inset: 0;
@@ -383,12 +931,21 @@ import { DiscountService } from '../../../../core/services/discount.service';
       display: flex;
       flex-direction: column;
       gap: 14px;
+      max-height: 90vh;
+      overflow-y: auto;
     }
 
     .modal-header {
       display: flex;
       justify-content: space-between;
       align-items: flex-start;
+    }
+
+    .modal-title-with-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     .modal-title {
@@ -419,6 +976,62 @@ import { DiscountService } from '../../../../core/services/discount.service';
       font-size: 0.78rem;
       color: var(--primary-green-dark);
       line-height: 1.4;
+    }
+
+    .view-details-card {
+      background: #f8fafc;
+      border-radius: var(--radius-md, 12px);
+      border: 1px solid var(--border-light, #e2e8f0);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .details-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 14px 16px;
+    }
+
+    .detail-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .detail-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #64748b;
+      letter-spacing: 0.04em;
+    }
+
+    .detail-value {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--text-main, #0f172a);
+    }
+
+    .font-mono {
+      font-family: monospace;
+    }
+
+    .mini-progress-bar {
+      width: 100%;
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+
+    .mini-progress-fill {
+      height: 100%;
+      background: var(--primary-green, #065f46);
+      border-radius: 999px;
+      transition: width 0.3s ease;
     }
 
     .form-group {
@@ -491,6 +1104,7 @@ import { DiscountService } from '../../../../core/services/discount.service';
 export class DiscountListComponent {
   readonly discountService = inject(DiscountService);
 
+  // Existing creation modals state
   isCouponModalOpen = false;
   isSavingCoupon = false;
   couponError = '';
@@ -498,6 +1112,7 @@ export class DiscountListComponent {
   couponRuleId: number | null = null;
   couponMaxUses = 50;
   couponExpiresOn = '';
+
   isRuleModalOpen = false;
   isSavingRule = false;
   ruleError = '';
@@ -512,6 +1127,7 @@ export class DiscountListComponent {
   ruleEndDate = '';
   rulePriority = 10;
   ruleStackable = true;
+
   isHolidayModalOpen = false;
   isSavingHoliday = false;
   holidayError = '';
@@ -519,6 +1135,296 @@ export class DiscountListComponent {
   holidayName = '';
   holidayDiscountPercent: number | null = null;
 
+  // View & Edit Modals state: Rules
+  isViewRuleModalOpen = false;
+  selectedRuleForView: DiscountRule | null = null;
+
+  isEditRuleModalOpen = false;
+  isSavingEditRule = false;
+  editRuleError = '';
+  selectedRuleForEdit: DiscountRule | null = null;
+  editRuleName = '';
+  editRuleType: 'FIRST_PURCHASE' | 'HOLIDAY' | 'LOYALTY' | 'COUPON' = 'HOLIDAY';
+  editRuleKind: 'PERCENT' | 'FIXED' = 'PERCENT';
+  editRuleValue = 10;
+  editRuleMinOrder = 0;
+  editRuleMaxDiscount: number | undefined;
+  editRuleTier = '';
+  editRuleStartDate = '';
+  editRuleEndDate = '';
+  editRulePriority = 10;
+  editRuleStackable = true;
+  editRuleIsActive = true;
+
+  // View & Edit Modals state: Coupons
+  isViewCouponModalOpen = false;
+  selectedCouponForView: Coupon | null = null;
+
+  isEditCouponModalOpen = false;
+  isSavingEditCoupon = false;
+  editCouponError = '';
+  selectedCouponForEdit: Coupon | null = null;
+  editCouponCode = '';
+  editCouponRuleId: number | null = null;
+  editCouponMaxUses = 50;
+  editCouponExpiresOn = '';
+
+  // View & Edit Modals state: Holidays
+  isViewHolidayModalOpen = false;
+  selectedHolidayForView: Holiday | null = null;
+
+  isEditHolidayModalOpen = false;
+  isSavingEditHoliday = false;
+  editHolidayError = '';
+  selectedHolidayForEdit: Holiday | null = null;
+  editHolidayDate = '';
+  editHolidayName = '';
+  editHolidayDiscountPercent: number | null = null;
+
+  // --- Rule View & Edit handlers ---
+  openViewRule(rule: DiscountRule): void {
+    this.selectedRuleForView = rule;
+    this.isViewRuleModalOpen = true;
+  }
+
+  closeViewRule(): void {
+    this.isViewRuleModalOpen = false;
+    this.selectedRuleForView = null;
+  }
+
+  editRuleFromView(rule: DiscountRule): void {
+    this.closeViewRule();
+    this.openEditRule(rule);
+  }
+
+  openEditRule(rule: DiscountRule): void {
+    this.selectedRuleForEdit = rule;
+    this.editRuleError = '';
+    this.editRuleName = rule.name;
+    this.editRuleType = rule.ruleType;
+    this.editRuleKind = rule.kind;
+    this.editRuleValue = rule.value;
+    this.editRuleMinOrder = rule.minOrderAmount;
+    this.editRuleMaxDiscount = rule.maxDiscount;
+    this.editRuleTier = rule.tier || '';
+    this.editRuleStartDate = rule.startDate;
+    this.editRuleEndDate = rule.endDate;
+    this.editRulePriority = rule.priority;
+    this.editRuleStackable = rule.stackable;
+    this.editRuleIsActive = rule.isActive;
+    this.isEditRuleModalOpen = true;
+  }
+
+  closeEditRule(): void {
+    if (!this.isSavingEditRule) {
+      this.isEditRuleModalOpen = false;
+      this.selectedRuleForEdit = null;
+    }
+  }
+
+  saveEditRule(): void {
+    if (!this.selectedRuleForEdit) return;
+
+    if (!this.editRuleName.trim() || !this.editRuleStartDate || !this.editRuleEndDate || this.editRuleValue <= 0 || this.editRuleMinOrder < 0 || this.editRulePriority < 0) {
+      this.editRuleError = 'Complete all required fields with valid positive values.';
+      return;
+    }
+    if (this.editRuleEndDate < this.editRuleStartDate) {
+      this.editRuleError = 'End date cannot be before start date.';
+      return;
+    }
+    if (this.editRuleKind === 'PERCENT' && this.editRuleValue > 100) {
+      this.editRuleError = 'Percentage discount cannot exceed 100%.';
+      return;
+    }
+    if (this.editRuleType === 'LOYALTY' && !this.editRuleTier) {
+      this.editRuleError = 'Select a loyalty tier.';
+      return;
+    }
+
+    this.isSavingEditRule = true;
+    this.editRuleError = '';
+    this.discountService.updateRule(this.selectedRuleForEdit.ruleId, {
+      name: this.editRuleName.trim(),
+      ruleType: this.editRuleType,
+      kind: this.editRuleKind,
+      value: Number(this.editRuleValue),
+      minOrderAmount: Number(this.editRuleMinOrder),
+      maxDiscount: this.editRuleMaxDiscount !== undefined && this.editRuleMaxDiscount !== null ? Number(this.editRuleMaxDiscount) : undefined,
+      tier: this.editRuleTier || undefined,
+      startDate: this.editRuleStartDate,
+      endDate: this.editRuleEndDate,
+      priority: Number(this.editRulePriority),
+      stackable: this.editRuleStackable,
+      isActive: this.editRuleIsActive
+    }).subscribe({
+      next: () => {
+        this.discountService.loadRules();
+        this.isSavingEditRule = false;
+        this.isEditRuleModalOpen = false;
+        this.selectedRuleForEdit = null;
+      },
+      error: error => {
+        this.isSavingEditRule = false;
+        this.editRuleError = error?.error?.message || 'Unable to update promotion rule.';
+      }
+    });
+  }
+
+  // --- Coupon View & Edit handlers ---
+  openViewCoupon(coupon: Coupon): void {
+    this.selectedCouponForView = coupon;
+    this.isViewCouponModalOpen = true;
+  }
+
+  closeViewCoupon(): void {
+    this.isViewCouponModalOpen = false;
+    this.selectedCouponForView = null;
+  }
+
+  editCouponFromView(coupon: Coupon): void {
+    this.closeViewCoupon();
+    this.openEditCoupon(coupon);
+  }
+
+  openEditCoupon(coupon: Coupon): void {
+    this.selectedCouponForEdit = coupon;
+    this.editCouponError = '';
+    this.editCouponCode = coupon.code;
+    this.editCouponRuleId = coupon.ruleId;
+    this.editCouponMaxUses = coupon.maxUses;
+    this.editCouponExpiresOn = coupon.expiresOn;
+    this.isEditCouponModalOpen = true;
+  }
+
+  closeEditCoupon(): void {
+    if (!this.isSavingEditCoupon) {
+      this.isEditCouponModalOpen = false;
+      this.selectedCouponForEdit = null;
+    }
+  }
+
+  setEditCouponCode(value: string): void {
+    this.editCouponCode = value.toUpperCase().replace(/[^A-Z0-9_-]/g, '').slice(0, 20);
+  }
+
+  saveEditCoupon(): void {
+    if (!this.selectedCouponForEdit) return;
+
+    const code = this.editCouponCode.trim();
+    if (!/^[A-Z0-9_-]{3,20}$/.test(code)) {
+      this.editCouponError = 'Coupon code must contain 3–20 uppercase letters, numbers, hyphens, or underscores.';
+      return;
+    }
+    if (this.editCouponRuleId === null) {
+      this.editCouponError = 'Select the promotion rule linked to this coupon.';
+      return;
+    }
+    if (!Number.isInteger(Number(this.editCouponMaxUses)) || Number(this.editCouponMaxUses) <= 0) {
+      this.editCouponError = 'Maximum uses must be a positive whole number.';
+      return;
+    }
+    if (!this.editCouponExpiresOn) {
+      this.editCouponError = 'Select an expiry date.';
+      return;
+    }
+
+    this.isSavingEditCoupon = true;
+    this.editCouponError = '';
+    this.discountService.updateCoupon(this.selectedCouponForEdit.code, {
+      code,
+      ruleId: this.editCouponRuleId,
+      maxUses: Number(this.editCouponMaxUses),
+      expiresOn: this.editCouponExpiresOn
+    }).subscribe({
+      next: () => {
+        this.discountService.loadCoupons();
+        this.isSavingEditCoupon = false;
+        this.isEditCouponModalOpen = false;
+        this.selectedCouponForEdit = null;
+      },
+      error: error => {
+        this.isSavingEditCoupon = false;
+        this.editCouponError = error?.error?.message || 'Unable to update coupon.';
+      }
+    });
+  }
+
+  getUsagePercentage(c: Coupon): number {
+    if (!c.maxUses || c.maxUses <= 0) return 0;
+    return Math.min(100, Math.round((c.usedCount / c.maxUses) * 100));
+  }
+
+  isCouponExpired(c: Coupon): boolean {
+    return Boolean(c.expiresOn && c.expiresOn < this.today());
+  }
+
+  // --- Holiday View & Edit handlers ---
+  openViewHoliday(holiday: Holiday): void {
+    this.selectedHolidayForView = holiday;
+    this.isViewHolidayModalOpen = true;
+  }
+
+  closeViewHoliday(): void {
+    this.isViewHolidayModalOpen = false;
+    this.selectedHolidayForView = null;
+  }
+
+  editHolidayFromView(holiday: Holiday): void {
+    this.closeViewHoliday();
+    this.openEditHoliday(holiday);
+  }
+
+  openEditHoliday(holiday: Holiday): void {
+    this.selectedHolidayForEdit = holiday;
+    this.editHolidayError = '';
+    this.editHolidayDate = holiday.holidayDate;
+    this.editHolidayName = holiday.name;
+    this.editHolidayDiscountPercent = holiday.discountPercent ?? 10;
+    this.isEditHolidayModalOpen = true;
+  }
+
+  closeEditHoliday(): void {
+    if (!this.isSavingEditHoliday) {
+      this.isEditHolidayModalOpen = false;
+      this.selectedHolidayForEdit = null;
+    }
+  }
+
+  saveEditHoliday(): void {
+    if (!this.selectedHolidayForEdit) return;
+
+    if (!this.editHolidayDate || !this.editHolidayName.trim()
+      || this.editHolidayDiscountPercent === null
+      || this.editHolidayDiscountPercent <= 0
+      || this.editHolidayDiscountPercent > 100) {
+      this.editHolidayError = 'Holiday date, name and a discount percentage between 0.01 and 100 are required.';
+      return;
+    }
+
+    this.isSavingEditHoliday = true;
+    this.editHolidayError = '';
+    this.discountService.updateHoliday({
+      originalDate: this.selectedHolidayForEdit.holidayDate,
+      holidayDate: this.editHolidayDate,
+      name: this.editHolidayName.trim(),
+      discountPercent: Number(this.editHolidayDiscountPercent)
+    }).subscribe({
+      next: () => {
+        this.discountService.loadHolidays();
+        this.discountService.loadRules();
+        this.isSavingEditHoliday = false;
+        this.isEditHolidayModalOpen = false;
+        this.selectedHolidayForEdit = null;
+      },
+      error: error => {
+        this.isSavingEditHoliday = false;
+        this.editHolidayError = error?.error?.message || 'Unable to update holiday.';
+      }
+    });
+  }
+
+  // --- Create Modals handlers (existing) ---
   openCouponModal(): void {
     this.couponError = '';
     this.couponCode = '';

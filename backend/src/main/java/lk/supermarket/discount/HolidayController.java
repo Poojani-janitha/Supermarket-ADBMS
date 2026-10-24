@@ -35,4 +35,10 @@ public class HolidayController {
                 "ruleId", ruleId
         );
     }
+
+    @org.springframework.web.bind.annotation.PutMapping
+    public Map<String, Object> updateHoliday(@RequestBody Map<String, Object> request) {
+        discountService.updateHoliday(request);
+        return Map.of("holidayDate", String.valueOf(request.get("holidayDate")));
+    }
 }

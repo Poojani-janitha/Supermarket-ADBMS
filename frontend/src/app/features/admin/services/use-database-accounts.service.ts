@@ -15,99 +15,6 @@ export class DatabaseAccountsService {
   readonly isLoading = signal<boolean>(false);
   readonly error = signal<string | null>(null);
 
-  private readonly fallbackAccounts: DatabaseAccount[] = [
-    {
-      id: 'admin@localhost',
-      username: 'admin',
-      role: 'admin_role',
-      host: 'localhost',
-      status: 'active',
-      privilegeCount: 18,
-      createdAt: '2026-01-15 08:30:00',
-      lastUsedAt: 'Active DBA session'
-    },
-    {
-      id: 'admin_user@localhost',
-      username: 'admin_user',
-      role: 'admin_role',
-      host: 'localhost',
-      status: 'active',
-      privilegeCount: 18,
-      createdAt: '2026-01-15 08:30:00',
-      lastUsedAt: 'Local DBA'
-    },
-    {
-      id: 'app_user@%',
-      username: 'app_user',
-      role: 'DIRECT_PRIVS',
-      host: '%',
-      status: 'active',
-      privilegeCount: 9,
-      createdAt: '2026-01-15 08:30:00',
-      lastUsedAt: 'HikariCP pool active'
-    },
-    {
-      id: 'report_user@%',
-      username: 'report_user',
-      role: 'DIRECT_PRIVS',
-      host: '%',
-      status: 'active',
-      privilegeCount: 3,
-      createdAt: '2026-01-15 08:30:00',
-      lastUsedAt: '15 mins ago'
-    },
-    {
-      id: 'etl_user@%',
-      username: 'etl_user',
-      role: 'DIRECT_PRIVS',
-      host: '%',
-      status: 'active',
-      privilegeCount: 5,
-      createdAt: '2026-01-15 08:30:00',
-      lastUsedAt: 'Nightly batch runner'
-    },
-    {
-      id: 'db_manager@%',
-      username: 'db_manager',
-      role: 'db_manager_role',
-      host: '%',
-      status: 'active',
-      privilegeCount: 14,
-      createdAt: '2026-01-15 08:30:00',
-      lastUsedAt: 'Active schema DBA'
-    },
-    {
-      id: 'hr@%',
-      username: 'hr',
-      role: 'hr_role',
-      host: '%',
-      status: 'active',
-      privilegeCount: 4,
-      createdAt: '2026-01-15 08:30:00',
-      lastUsedAt: 'HR Administrator'
-    },
-    {
-      id: 'demo_manager@%',
-      username: 'demo_manager',
-      role: 'manager_role',
-      host: '%',
-      status: 'active',
-      privilegeCount: 12,
-      createdAt: '2026-01-15 08:30:00',
-      lastUsedAt: '5 mins ago'
-    },
-    {
-      id: 'demo_cashier@%',
-      username: 'demo_cashier',
-      role: 'cashier_role',
-      host: '%',
-      status: 'active',
-      privilegeCount: 6,
-      createdAt: '2026-01-15 08:30:00',
-      lastUsedAt: 'Just now'
-    }
-  ];
-
   constructor() {
     this.initRealtimePolling();
   }
@@ -128,18 +35,11 @@ export class DatabaseAccountsService {
         next: (data) => {
           this.isLoading.set(false);
           this.error.set(null);
-          if (data && data.length > 0) {
-            this.accounts.set(data);
-          } else if (this.accounts().length === 0) {
-            this.accounts.set(this.fallbackAccounts);
-          }
+          this.accounts.set(data || []);
         },
         error: (err) => {
           this.isLoading.set(false);
           this.error.set('Failed to connect to MySQL user privilege engine');
-          if (this.accounts().length === 0) {
-            this.accounts.set(this.fallbackAccounts);
-          }
         }
       });
   }
@@ -147,7 +47,7 @@ export class DatabaseAccountsService {
   fetchHttp() {
     return this.http.get<DatabaseAccount[]>('/api/admin/database-accounts').pipe(
       retry(1),
-      catchError(() => of(this.fallbackAccounts))
+      catchError(() => of([]))
     );
   }
 
@@ -157,16 +57,12 @@ export class DatabaseAccountsService {
       next: (data) => {
         this.isLoading.set(false);
         this.error.set(null);
-        if (data && data.length > 0) {
-          this.accounts.set(data);
-        } else {
-          this.accounts.set(this.fallbackAccounts);
-        }
+        this.accounts.set(data || []);
       },
       error: () => {
         this.isLoading.set(false);
         this.error.set('Could not refresh MySQL database accounts');
-        this.accounts.set(this.fallbackAccounts);
+        this.accounts.set([]);
       }
     });
   }

@@ -119,4 +119,41 @@ public class DiscountDao {
         )).get("p_saved_rule_id");
         return id.intValue();
     }
+
+    public void updateCoupon(String originalCode, Map<String, ?> request) {
+        String newCode = request.get("code") != null ? request.get("code").toString().trim().toUpperCase() : originalCode.toUpperCase();
+        Integer ruleId = request.get("ruleId") instanceof Number ? ((Number) request.get("ruleId")).intValue() : Integer.parseInt(request.get("ruleId").toString());
+        Integer maxUses = request.get("maxUses") instanceof Number ? ((Number) request.get("maxUses")).intValue() : Integer.parseInt(request.get("maxUses").toString());
+        Object expiresOn = request.get("expiresOn");
+
+        jdbcTemplate.update("""
+                UPDATE coupon
+                SET code = ?, rule_id = ?, max_uses = ?, expires_on = ?
+                WHERE code = ?
+                """, newCode, ruleId, maxUses, expiresOn, originalCode.toUpperCase());
+    }
+
+    public void updateHoliday(Map<String, ?> request) {
+        String originalDate = request.get("originalDate") != null ? request.get("originalDate").toString() : null;
+        String holidayDate = request.get("holidayDate") != null ? request.get("holidayDate").toString() : originalDate;
+        String name = request.get("name") != null ? request.get("name").toString() : "";
+        Object discountPercent = request.get("discountPercent");
+
+        if (originalDate != null && !originalDate.equals(holidayDate)) {
+            jdbcTemplate.update("UPDATE holiday SET holiday_date = ?, name = ? WHERE holiday_date = ?", holidayDate, name, originalDate);
+            if (discountPercent != null) {
+                jdbcTemplate.update("""
+                        UPDATE discount_rule
+                        SET name = ?, value = ?, start_date = ?, end_date = ?
+                        WHERE rule_type = 'HOLIDAY' AND start_date = ?
+                        """, name + " Promotion", discountPercent, holidayDate, holidayDate, originalDate);
+            }
+        } else {
+            saveHolidayDiscount(Map.of(
+                    "holidayDate", holidayDate,
+                    "name", name,
+                    "discountPercent", discountPercent != null ? discountPercent : 10.0
+            ));
+        }
+    }
 }

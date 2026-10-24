@@ -18,7 +18,7 @@ public class CustomerDao {
 
     public List<Map<String, Object>> findCustomers() {
         return jdbcTemplate.queryForList("""
-                SELECT customer_id, full_name, phone, email, loyalty_points, tier, registered_date
+                SELECT customer_id, full_name, phone, email, loyalty_points, tier, registered_date, is_first_purchase
                 FROM v_customer_directory
                 ORDER BY full_name
                 """);
@@ -119,14 +119,27 @@ public class CustomerDao {
         String fullName = request.get("fullName") == null ? "" : request.get("fullName").toString().trim();
         String phone = request.get("phone") == null ? "" : request.get("phone").toString().trim();
         String email = request.get("email") == null ? null : request.get("email").toString().trim();
+        Integer loyaltyPoints = null;
+        if (request.get("loyaltyPoints") instanceof Number) {
+            loyaltyPoints = ((Number) request.get("loyaltyPoints")).intValue();
+        }
         if (fullName.isBlank() || phone.isBlank()) {
             throw new IllegalArgumentException("Customer name and phone are required");
         }
-        int updated = jdbcTemplate.update("""
-                UPDATE customer
-                SET full_name = ?, phone = ?, email = NULLIF(?, '')
-                WHERE customer_id = ?
-                """, fullName, phone, email, customerId);
+        int updated;
+        if (loyaltyPoints != null && loyaltyPoints >= 0) {
+            updated = jdbcTemplate.update("""
+                    UPDATE customer
+                    SET full_name = ?, phone = ?, email = NULLIF(?, ''), loyalty_points = ?
+                    WHERE customer_id = ?
+                    """, fullName, phone, email, loyaltyPoints, customerId);
+        } else {
+            updated = jdbcTemplate.update("""
+                    UPDATE customer
+                    SET full_name = ?, phone = ?, email = NULLIF(?, '')
+                    WHERE customer_id = ?
+                    """, fullName, phone, email, customerId);
+        }
         if (updated == 0) {
             throw new IllegalArgumentException("Customer does not exist");
         }
@@ -134,7 +147,8 @@ public class CustomerDao {
                 SELECT customer_id AS id, full_name AS fullName, phone, email,
                        loyalty_points AS loyaltyPoints,
                        fn_customer_tier(customer_id) AS tier,
-                       registered_date AS registeredDate
+                       registered_date AS registeredDate,
+                       fn_is_first_purchase(customer_id, NULL) AS isFirstPurchase
                 FROM customer
                 WHERE customer_id = ?
                 """, customerId);

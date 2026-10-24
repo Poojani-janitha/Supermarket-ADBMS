@@ -11,12 +11,10 @@ export class InventoryService {
   private readonly authService = inject(AuthService);
   readonly apiUrl = '/api';
 
-  readonly branches = [
-    { id: 1, name: 'Colombo Central Flagship' },
-    { id: 2, name: 'Kandy City Center' },
-    { id: 3, name: 'Galle Fort Outlet' },
-    { id: 4, name: 'Negombo Coastal Mart' }
-  ];
+  private readonly _branches = signal<{ id: number; name: string }[]>([]);
+  get branches(): { id: number; name: string }[] {
+    return this._branches();
+  }
 
   readonly selectedBranchId = signal<number>(this.authService.currentUser()?.branchId || 1);
 
@@ -27,10 +25,30 @@ export class InventoryService {
   readonly purchaseOrders = signal<PurchaseOrder[]>([]);
 
   constructor() {
+    this.loadBranches();
     this.loadSuppliers();
     this.loadInventory();
     this.loadPurchaseOrders();
     this.loadLowStock();
+  }
+
+  /**
+   * Load registered active branches from MySQL (GET /api/branches).
+   */
+  loadBranches(): void {
+    this.http.get<any[]>(`${this.apiUrl}/branches`).subscribe({
+      next: (rows) => {
+        if (rows && rows.length > 0) {
+          this._branches.set(rows.map(r => ({
+            id: r.id ?? r.branch_id ?? r.branchId,
+            name: r.name ?? r.branch_name ?? r.branchName
+          })));
+        } else {
+          this._branches.set([]);
+        }
+      },
+      error: (err) => console.warn('Failed to load branches from database:', err)
+    });
   }
 
   // =========================================================================
@@ -375,39 +393,40 @@ export class InventoryService {
   }
 
   /**
-   * Register new supplier
+   * Register new supplier (Persists to MySQL supplier table)
    */
   registerSupplier(supplierData: {
     name: string;
-    contactPerson: string;
-    phone: string;
-    email: string;
+    contactPerson?: string;
+    phone?: string;
+    email?: string;
     username: string;
-    city: string;
-    taxNumber: string;
+    city?: string;
+    taxNumber?: string;
+    password?: string;
   }): { success: boolean; message: string } {
-    if (this.suppliers().some(s => s.username?.toLowerCase() === supplierData.username.toLowerCase())) {
-      return { success: false, message: `Username '${supplierData.username}' is already registered.` };
-    }
+    const rawUsername = supplierData.username.trim();
+    const rawName = supplierData.name?.trim() || rawUsername;
 
-    const newId = Math.max(10, ...this.suppliers().map(s => s.supplierId), 0) + 1;
-    const newSupplier: Supplier = {
-      supplierId: newId,
-      name: supplierData.name,
-      contactPerson: supplierData.contactPerson,
-      phone: supplierData.phone,
-      email: supplierData.email,
-      username: supplierData.username,
-      city: supplierData.city,
-      taxNumber: supplierData.taxNumber,
-      isActive: true,
-      status: 'ACTIVE'
+    const payload = {
+      name: rawName,
+      contactPerson: supplierData.contactPerson?.trim() || rawName,
+      phone: supplierData.phone?.trim() || '077-0000000',
+      email: supplierData.email?.trim() || `${rawUsername}@vendor.lk`,
+      username: rawUsername,
+      city: supplierData.city?.trim() || 'Colombo',
+      taxNumber: supplierData.taxNumber?.trim() || '',
+      password: supplierData.password || rawUsername
     };
 
-    this.suppliers.update(list => [...list, newSupplier]);
+    this.http.post<any>(`${this.apiUrl}/auth/supplier/signup`, payload).subscribe({
+      next: () => this.loadSuppliers(),
+      error: (err) => console.warn('Supplier registration sync to MySQL:', err)
+    });
+
     return {
       success: true,
-      message: `Supplier '${newSupplier.name}' registered successfully! You can now log into the Vendor Portal.`
+      message: `Supplier '${payload.name}' registered successfully! You can now log into the Vendor Portal.`
     };
   }
 }

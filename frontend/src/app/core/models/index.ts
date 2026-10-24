@@ -47,6 +47,7 @@ export interface Customer {
   loyaltyPoints: number;
   tier: 'BRONZE' | 'SILVER' | 'GOLD';
   registeredDate: string;
+  isFirstPurchase?: boolean;
 }
 
 export interface SalesOrderItem {

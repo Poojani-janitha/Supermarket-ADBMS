@@ -45,12 +45,17 @@ BEGIN
   END IF;
 
   SELECT COUNT(*) INTO v_category_exists FROM category WHERE category_id = p_category_id;
-  SELECT COUNT(*) INTO v_supplier_exists FROM supplier WHERE supplier_id = p_supplier_id;
   IF v_category_exists = 0 THEN
     SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Product category does not exist';
   END IF;
-  IF v_supplier_exists = 0 THEN
-    SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Product supplier does not exist';
+
+  IF p_supplier_id IS NOT NULL AND p_supplier_id > 0 THEN
+    SELECT COUNT(*) INTO v_supplier_exists FROM supplier WHERE supplier_id = p_supplier_id;
+    IF v_supplier_exists = 0 THEN
+      SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'Product supplier does not exist';
+    END IF;
+  ELSE
+    SET p_supplier_id = NULL;
   END IF;
 
   SELECT COUNT(*) INTO v_duplicate_sku
@@ -216,7 +221,11 @@ BEGIN
 
   START TRANSACTION;
   INSERT INTO coupon (code, rule_id, max_uses, expires_on)
-  VALUES (UPPER(TRIM(p_code)), p_rule_id, p_max_uses, p_expires_on);
+  VALUES (UPPER(TRIM(p_code)), p_rule_id, p_max_uses, p_expires_on)
+  ON DUPLICATE KEY UPDATE
+    rule_id = VALUES(rule_id),
+    max_uses = VALUES(max_uses),
+    expires_on = VALUES(expires_on);
   COMMIT;
 END$$
 
@@ -370,7 +379,7 @@ BEGIN
   END IF;
 
   SET v_tier = fn_customer_tier(v_customer_id);
-  SET v_first_purchase = fn_is_first_purchase(v_customer_id, p_order_id) OR (v_customer_id IS NOT NULL AND v_tier = 'BRONZE');
+  SET v_first_purchase = (v_customer_id IS NOT NULL) AND fn_is_first_purchase(v_customer_id, p_order_id);
 
   DELETE FROM order_discount WHERE order_id = p_order_id;
 

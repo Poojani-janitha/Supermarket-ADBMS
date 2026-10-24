@@ -48,14 +48,18 @@ DROP FUNCTION IF EXISTS fn_customer_tier$$
 CREATE FUNCTION fn_customer_tier(p_customer_id INT) RETURNS VARCHAR(10)
 READS SQL DATA
 BEGIN
-  DECLARE v_spent DECIMAL(14,2);
-  SELECT COALESCE(SUM(total_amount), 0) INTO v_spent
-  FROM sales_order
-  WHERE customer_id = p_customer_id AND status = 'COMPLETED';
+  DECLARE v_points INT DEFAULT 0;
+  IF p_customer_id IS NULL THEN
+    RETURN 'BRONZE';
+  END IF;
+
+  SELECT COALESCE(loyalty_points, 0) INTO v_points
+  FROM customer
+  WHERE customer_id = p_customer_id;
 
   RETURN CASE 
-    WHEN v_spent >= 100000 THEN 'GOLD'
-    WHEN v_spent >= 50000  THEN 'SILVER'
+    WHEN v_points >= 1000 THEN 'GOLD'
+    WHEN v_points >= 500  THEN 'SILVER'
     ELSE 'BRONZE' 
   END;
 END$$
@@ -76,11 +80,29 @@ END$$
 DROP FUNCTION IF EXISTS fn_is_first_purchase$$
 CREATE FUNCTION fn_is_first_purchase(p_customer INT, p_order INT) RETURNS BOOLEAN
 READS SQL DATA
+DETERMINISTIC
 BEGIN
-  RETURN p_customer IS NOT NULL AND NOT EXISTS (
+  IF p_customer IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  IF EXISTS (
     SELECT 1 FROM sales_order
-    WHERE customer_id = p_customer AND order_id <> p_order AND status = 'COMPLETED'
-  );
+    WHERE customer_id = p_customer AND order_id <> COALESCE(p_order, -1) AND status = 'COMPLETED'
+  ) THEN
+    RETURN FALSE;
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM order_discount od
+    JOIN sales_order so ON so.order_id = od.order_id
+    JOIN discount_rule dr ON dr.rule_id = od.rule_id
+    WHERE so.customer_id = p_customer AND dr.rule_type = 'FIRST_PURCHASE' AND so.order_id <> COALESCE(p_order, -1)
+  ) THEN
+    RETURN FALSE;
+  END IF;
+
+  RETURN TRUE;
 END$$
 
 -- ============================================================================

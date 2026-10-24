@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit, OnDestroy, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CustomerService } from '../../../../core/services/customer.service';
@@ -10,6 +10,52 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
   imports: [CommonModule, FormsModule],
   template: `
     <div class="page-container">
+      <!-- Floating Beautiful Action Toast -->
+      @if (actionToast(); as toast) {
+        <div class="toast-notification-wrapper" [class]="toast.type">
+          <div class="toast-card" [class]="toast.type">
+            <div class="toast-icon-wrap" [class]="toast.type">
+              <span class="material-symbols-outlined">
+                {{ toast.type === 'success' ? (toast.isRegistration ? 'celebration' : 'check_circle') : 'error' }}
+              </span>
+            </div>
+
+            <div class="toast-body">
+              <div class="toast-header-line">
+                <div class="toast-main-title">{{ toast.title }}</div>
+                @if (toast.procedureTag) {
+                  <span class="toast-procedure-badge">
+                    <span class="material-symbols-outlined inline-icon">terminal</span>
+                    {{ toast.procedureTag }}
+                  </span>
+                }
+              </div>
+
+              <div class="toast-message-text">{{ toast.message }}</div>
+
+              @if (toast.promoHighlight) {
+                <div class="toast-promo-card">
+                  <div class="promo-gift-icon">
+                    <span class="material-symbols-outlined">redeem</span>
+                  </div>
+                  <div class="promo-text-wrap">
+                    <div class="promo-title">Welcome 10% First Purchase Discount</div>
+                    <div class="promo-note">Enforced in POS checkout &bull; Starter BRONZE Tier loyalty awarded</div>
+                  </div>
+                </div>
+              }
+            </div>
+
+            <button type="button" class="toast-close-btn" (click)="dismissToast()" title="Dismiss">&times;</button>
+
+            <!-- Auto-dismiss Progress Bar -->
+            <div class="toast-progress-track">
+              <div class="toast-progress-bar"></div>
+            </div>
+          </div>
+        </div>
+      }
+
       <!-- Header -->
       <div class="page-header">
         <div>
@@ -28,7 +74,7 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
           </div>
           <div>
             <span class="tier-name">GOLD TIER</span>
-            <span class="tier-desc">Spend &ge; Rs. 1,000 &bull; 7% Rule Discount</span>
+            <span class="tier-desc">1,000+ Points (Spend &ge; Rs. 100,000) &bull; 7% Rule Discount</span>
           </div>
         </div>
 
@@ -38,7 +84,7 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
           </div>
           <div>
             <span class="tier-name">SILVER TIER</span>
-            <span class="tier-desc">Spend &ge; Rs. 500 &bull; 5% Rule Discount</span>
+            <span class="tier-desc">500+ Points (Spend &ge; Rs. 50,000) &bull; 5% Rule Discount</span>
           </div>
         </div>
 
@@ -48,7 +94,7 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
           </div>
           <div>
             <span class="tier-name">BRONZE TIER</span>
-            <span class="tier-desc">New Shoppers &bull; Welcome 10% Discount</span>
+            <span class="tier-desc">0 &ndash; 499 Points &bull; Welcome 10% Discount</span>
           </div>
         </div>
       </div>
@@ -86,7 +132,16 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
                 <td><strong>{{ c.fullName }}</strong></td>
                 <td><span class="phone-text">{{ c.phone }}</span></td>
                 <td>{{ c.email || 'N/A' }}</td>
-                <td><strong>{{ c.loyaltyPoints }} pts</strong></td>
+                <td>
+                  <div class="loyalty-pts-cell">
+                    <span class="pts-number">{{ c.loyaltyPoints }} pts</span>
+                    @if (c.isFirstPurchase) {
+                      <span class="badge-welcome-bonus" title="Eligible for Welcome 10% First Purchase discount">
+                        <span class="material-symbols-outlined pts-icon">redeem</span> WEL 10
+                      </span>
+                    }
+                  </div>
+                </td>
                 <td>
                   <span
                     class="badge-pill"
@@ -226,6 +281,13 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
             <div class="form-group">
               <label>Email Address</label>
               <input class="form-control" type="email" [(ngModel)]="editCustEmail" />
+            </div>
+            <div class="form-group">
+              <label>Loyalty Points</label>
+              <input class="form-control" type="number" min="0" [(ngModel)]="editCustPoints" />
+              <small style="color: var(--text-muted); font-size: 0.75rem; margin-top: 4px; display: block;">
+                Rate: Rs. 100 spent = 1 pt. Tiers: Bronze (0–499), Silver (500–999), Gold (1,000+)
+              </small>
             </div>
             <div class="modal-actions">
               <button class="btn-pill btn-outline" (click)="isCustomerEditOpen.set(false)">Cancel</button>
@@ -519,6 +581,38 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
     .badge-silver { background: #f1f5f9; color: #475569; }
     .badge-bronze { background: #ffedd5; color: #9a3412; }
 
+    .loyalty-pts-cell {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      flex-wrap: wrap;
+    }
+
+    .pts-number {
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .badge-welcome-bonus {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      padding: 2px 7px;
+      border-radius: 6px;
+      font-size: 0.69rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+      box-shadow: 0 1px 3px rgba(5, 150, 105, 0.1);
+      letter-spacing: 0.02em;
+    }
+
+    .pts-icon {
+      font-size: 13px;
+      color: #059669;
+    }
+
     .btn-sm {
       padding: 5px 12px;
       font-size: 0.78rem;
@@ -630,10 +724,282 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
       gap: 10px;
       margin-top: 8px;
     }
+
+    /* ================= Floating Toast Notification ================= */
+    .toast-notification-wrapper {
+      position: fixed;
+      top: 24px;
+      right: 28px;
+      z-index: 9999;
+      max-width: 490px;
+      width: calc(100vw - 48px);
+      pointer-events: auto;
+      animation: toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes toastSlideIn {
+      from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.96);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+      }
+    }
+
+    .toast-card {
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 16px;
+      padding: 16px 18px 20px 18px;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      box-shadow: 0 20px 40px -10px rgba(6, 78, 59, 0.22), 0 4px 14px rgba(0, 0, 0, 0.06);
+      border: 1px solid rgba(6, 95, 70, 0.18);
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(12px);
+
+      &.success {
+        border-color: #a7f3d0;
+        border-left: 5px solid #059669;
+      }
+
+      &.error {
+        border-color: #fecaca;
+        border-left: 5px solid #dc2626;
+      }
+    }
+
+    .toast-icon-wrap {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+
+      &.success {
+        background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+        color: #059669;
+        box-shadow: 0 4px 10px rgba(5, 150, 105, 0.18);
+        span {
+          font-size: 24px;
+        }
+      }
+
+      &.error {
+        background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        color: #dc2626;
+        box-shadow: 0 4px 10px rgba(220, 38, 38, 0.18);
+        span {
+          font-size: 24px;
+        }
+      }
+    }
+
+    .toast-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .toast-header-line {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 4px;
+    }
+
+    .toast-main-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .toast-procedure-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #f1f5f9;
+      color: #334155;
+      border: 1px solid #cbd5e1;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.72rem;
+      font-weight: 600;
+
+      .inline-icon {
+        font-size: 13px;
+        color: #059669;
+      }
+    }
+
+    .toast-message-text {
+      font-size: 0.84rem;
+      color: #475569;
+      line-height: 1.4;
+    }
+
+    .toast-promo-card {
+      margin-top: 10px;
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 1px solid #bbf7d0;
+      border-radius: 10px;
+      padding: 9px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 2px 6px rgba(5, 150, 105, 0.08);
+    }
+
+    .promo-gift-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #059669;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+
+      span {
+        font-size: 18px;
+      }
+    }
+
+    .promo-text-wrap {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .promo-title {
+      font-size: 0.82rem;
+      font-weight: 700;
+      color: #065f46;
+    }
+
+    .promo-note {
+      font-size: 0.72rem;
+      color: #047857;
+      font-weight: 500;
+    }
+
+    .toast-close-btn {
+      background: none;
+      border: none;
+      font-size: 1.35rem;
+      line-height: 1;
+      color: #94a3b8;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 6px;
+      transition: color 0.15s, background 0.15s;
+
+      &:hover {
+        color: #334155;
+        background: #f1f5f9;
+      }
+    }
+
+    .toast-progress-track {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    .toast-progress-bar {
+      height: 100%;
+      background: #059669;
+      width: 100%;
+      animation: toastProgress 6s linear forwards;
+    }
+
+    .toast-card.error .toast-progress-bar {
+      background: #dc2626;
+    }
+
+    @keyframes toastProgress {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
   `]
 })
-export class CustomerListComponent {
+export class CustomerListComponent implements OnInit, OnDestroy {
   readonly customerService = inject(CustomerService);
+
+  private autoRefreshTimer: any = null;
+  private toastTimeout: any = null;
+
+  readonly actionToast = signal<{
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+    procedureTag?: string;
+    promoHighlight?: boolean;
+    isRegistration?: boolean;
+  } | null>(null);
+
+  ngOnInit(): void {
+    // Initial live customer directory load
+    this.customerService.loadCustomers();
+
+    // Auto-update loyalty points and customer rows every 3 seconds so live POS purchases reflect automatically
+    this.autoRefreshTimer = setInterval(() => {
+      // Avoid interrupting the user if they are currently typing in modal
+      if (!this.isRegisterOpen() && !this.isCustomerEditOpen()) {
+        this.customerService.loadCustomers();
+      }
+    }, 3000);
+  }
+
+  @HostListener('window:focus')
+  onWindowFocus(): void {
+    this.customerService.loadCustomers();
+  }
+
+  showToast(config: {
+    type: 'success' | 'error';
+    title: string;
+    message: string;
+    procedureTag?: string;
+    promoHighlight?: boolean;
+    isRegistration?: boolean;
+    durationMs?: number;
+  }): void {
+    if (this.toastTimeout) {
+      clearTimeout(this.toastTimeout);
+    }
+    this.actionToast.set(config);
+    this.toastTimeout = setTimeout(() => {
+      this.actionToast.set(null);
+    }, config.durationMs || 6000);
+  }
+
+  dismissToast(): void {
+    if (this.toastTimeout) {
+      clearTimeout(this.toastTimeout);
+    }
+    this.actionToast.set(null);
+  }
+
+  ngOnDestroy(): void {
+    if (this.autoRefreshTimer) {
+      clearInterval(this.autoRefreshTimer);
+    }
+    if (this.toastTimeout) {
+      clearTimeout(this.toastTimeout);
+    }
+  }
 
   readonly isRegisterOpen = signal<boolean>(false);
   readonly isCustomerViewOpen = signal<boolean>(false);
@@ -656,6 +1022,7 @@ export class CustomerListComponent {
   editCustName: string = '';
   editCustPhone: string = '';
   editCustEmail: string = '';
+  editCustPoints: number = 0;
 
   filteredCustomers(): Customer[] {
     const q = this.searchQuery.toLowerCase().trim();
@@ -753,7 +1120,14 @@ export class CustomerListComponent {
         this.newCustPhone = '';
         this.newCustEmail = '';
         this.phoneError.set(null);
-        alert('Customer registered successfully via sp_register_customer! Eligible for Welcome 10% First Purchase discount.');
+        this.showToast({
+          type: 'success',
+          title: 'Customer Registered Successfully!',
+          message: 'Saved to database and enrolled in customer loyalty system.',
+          procedureTag: 'sp_register_customer',
+          promoHighlight: true,
+          isRegistration: true
+        });
       },
       error: (err) => {
         this.isSubmittingCustomer.set(false);
@@ -787,18 +1161,24 @@ export class CustomerListComponent {
     this.editCustName = customer.fullName;
     this.editCustPhone = customer.phone;
     this.editCustEmail = customer.email ?? '';
+    this.editCustPoints = customer.loyaltyPoints ?? 0;
     this.isCustomerEditOpen.set(true);
   }
 
   saveCustomer(): void {
     if (!this.selectedCustomer || !this.editCustName.trim() || !this.editCustPhone.trim()) {
-      alert('Please provide the customer name and phone number.');
+      this.showToast({
+        type: 'error',
+        title: 'Validation Error',
+        message: 'Please provide both the customer name and phone number.'
+      });
       return;
     }
     this.customerService.updateCustomer(this.selectedCustomer.id, {
       fullName: this.editCustName.trim(),
       phone: this.editCustPhone.trim(),
-      email: this.editCustEmail.trim()
+      email: this.editCustEmail.trim(),
+      loyaltyPoints: Math.max(0, Math.floor(Number(this.editCustPoints) || 0))
     }).subscribe({
       next: updated => {
         this.customerService.customers.update(customers =>
@@ -806,8 +1186,17 @@ export class CustomerListComponent {
         );
         this.selectedCustomer = updated;
         this.isCustomerEditOpen.set(false);
+        this.showToast({
+          type: 'success',
+          title: 'Customer Updated Successfully',
+          message: `${updated.fullName}'s profile and loyalty points (${updated.loyaltyPoints} pts • ${updated.tier} Tier) saved.`
+        });
       },
-      error: () => alert('Unable to update customer. Please check whether the phone number is already used.')
+      error: () => this.showToast({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Unable to update customer. Please check whether the phone number is already used.'
+      })
     });
   }
 

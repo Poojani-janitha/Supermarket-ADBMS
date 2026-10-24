@@ -213,4 +213,9 @@ public class AuditController {
         }
         return ResponseEntity.ok(auditService.provisionDatabaseAccount(username, host, role, password, performer));
     }
+
+    @GetMapping("/dr-status")
+    public ResponseEntity<Map<String, Object>> getDrStatus() {
+        return ResponseEntity.ok(auditService.getDrStatus());
+    }
 }

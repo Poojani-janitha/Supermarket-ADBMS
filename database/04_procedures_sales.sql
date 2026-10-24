@@ -78,6 +78,13 @@ proc_label: BEGIN
   FROM sales_order 
   WHERE order_id = p_order_id;
 
+  -- 6. Credit Loyalty Points: Rs. 100 spent = 1 Point
+  IF p_customer IS NOT NULL THEN
+    UPDATE customer
+    SET loyalty_points = loyalty_points + FLOOR((SELECT total_amount FROM sales_order WHERE order_id = p_order_id) / 100.00)
+    WHERE customer_id = p_customer;
+  END IF;
+
   COMMIT;
 END$$
 
@@ -128,7 +135,12 @@ BEGIN
   JOIN sales_order o ON o.order_id = oi.order_id
   WHERE o.order_id = p_order_id;
 
-  -- 3. Mark sales order header as CANCELLED
+  -- 3. Revert loyalty points earned if this order was for a registered customer
+  UPDATE customer c
+  JOIN sales_order o ON o.customer_id = c.customer_id AND o.order_id = p_order_id
+  SET c.loyalty_points = GREATEST(0, c.loyalty_points - FLOOR(o.total_amount / 100.00));
+
+  -- 4. Mark sales order header as CANCELLED
   UPDATE sales_order 
   SET status = 'CANCELLED' 
   WHERE order_id = p_order_id;

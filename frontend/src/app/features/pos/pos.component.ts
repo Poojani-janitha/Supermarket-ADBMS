@@ -1983,7 +1983,8 @@ export class PosComponent {
           email: email || undefined,
           loyaltyPoints: 0,
           tier: 'BRONZE',
-          registeredDate: new Date().toISOString()
+          registeredDate: new Date().toISOString(),
+          isFirstPurchase: true
         };
         this.cartService.setCustomer(newCust);
       },

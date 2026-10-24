@@ -117,11 +117,23 @@ export class DiscountService {
     return this.http.post(`${this.apiUrl}/discounts/rules`, rule);
   }
 
+  updateRule(ruleId: number, rule: Partial<DiscountRule>) {
+    return this.http.put(`${this.apiUrl}/discounts/rules/${ruleId}`, rule);
+  }
+
   addCoupon(coupon: Coupon) {
     return this.http.post(`${this.apiUrl}/discounts/coupons`, coupon);
   }
 
+  updateCoupon(originalCode: string, coupon: Partial<Coupon> & { code?: string }) {
+    return this.http.put(`${this.apiUrl}/discounts/coupons/${originalCode}`, coupon);
+  }
+
   addHoliday(holiday: Holiday) {
     return this.http.post(`${this.apiUrl}/discounts/holidays`, holiday);
+  }
+
+  updateHoliday(holiday: Holiday & { originalDate?: string }) {
+    return this.http.put(`${this.apiUrl}/discounts/holidays`, holiday);
   }
 }

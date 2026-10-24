@@ -11,6 +11,7 @@ interface CustomerRow {
   loyalty_points: number;
   tier: Customer['tier'];
   registered_date: string;
+  is_first_purchase?: boolean | number;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -42,7 +43,8 @@ export class CustomerService {
         email: row.email ?? undefined,
         loyaltyPoints: row.loyalty_points,
         tier: row.tier,
-        registeredDate: row.registered_date
+        registeredDate: row.registered_date,
+        isFirstPurchase: row.is_first_purchase === true || row.is_first_purchase === 1
       }))),
       error: () => this.loadError.set('Unable to load customers from the database.')
     });
@@ -61,7 +63,7 @@ export class CustomerService {
     return this.http.post<any>(`${this.apiUrl}/customers`, customer);
   }
 
-  updateCustomer(customerId: number, customer: { fullName: string; phone: string; email: string }) {
+  updateCustomer(customerId: number, customer: { fullName: string; phone: string; email: string; loyaltyPoints?: number }) {
     return this.http.put<Customer>(`${this.apiUrl}/customers/${customerId}`, customer);
   }
 

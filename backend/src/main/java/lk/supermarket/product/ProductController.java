@@ -52,7 +52,11 @@ public class ProductController {
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("p_product_id", request.get("productId"));
         parameters.put("p_category_id", request.get("categoryId"));
-        parameters.put("p_supplier_id", request.get("supplierId"));
+        Object supplierIdObj = request.get("supplierId");
+        Integer supplierId = (supplierIdObj instanceof Number && ((Number) supplierIdObj).intValue() > 0)
+                ? ((Number) supplierIdObj).intValue()
+                : null;
+        parameters.put("p_supplier_id", supplierId);
         parameters.put("p_sku", request.get("sku"));
         parameters.put("p_name", request.get("name"));
         parameters.put("p_unit_price", request.get("unitPrice"));

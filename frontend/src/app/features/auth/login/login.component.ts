@@ -43,6 +43,30 @@ import { InventoryService } from '../../../core/services/inventory.service';
           </button>
         </div>
 
+        <!-- Supplier Portal Sub-Mode Tabs -->
+        @if (portalType() === 'SUPPLIER') {
+          <div class="supplier-submode-tabs">
+            <button
+              type="button"
+              class="submode-tab"
+              [class.active]="!showSupplierSignUp()"
+              (click)="toggleSignUp(false)"
+            >
+              <span class="material-symbols-outlined">login</span>
+              <span>Sign In</span>
+            </button>
+            <button
+              type="button"
+              class="submode-tab"
+              [class.active]="showSupplierSignUp()"
+              (click)="toggleSignUp(true)"
+            >
+              <span class="material-symbols-outlined">person_add</span>
+              <span>New Supplier Self-Registration</span>
+            </button>
+          </div>
+        }
+
         <!-- Error & Success Banners -->
         @if (errorMessage()) {
           <div class="error-banner">
@@ -139,7 +163,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
 
         <!-- ======================= SUPPLIER SIGNUP FORM ======================= -->
         @if (portalType() === 'SUPPLIER' && showSupplierSignUp()) {
-          <form (ngSubmit)="handleSupplierSignUp()" class="signup-form">
+          <form (ngSubmit)="handleSupplierSignUp()" novalidate class="signup-form">
             <div class="signup-header">
               <h3>Supplier Self-Registration</h3>
               <p>Register your wholesale company to receive purchase orders from Emerald Supermarket.</p>
@@ -147,42 +171,48 @@ import { InventoryService } from '../../../core/services/inventory.service';
 
             <div class="form-grid">
               <div class="form-group">
-                <label>Company / Supplier Name</label>
+                <label>Company / Supplier Name *</label>
                 <input type="text" [(ngModel)]="newSupplier.name" name="sup_name" placeholder="e.g. Apex Agri Products Ltd" required />
               </div>
               <div class="form-group">
                 <label>Contact Person</label>
-                <input type="text" [(ngModel)]="newSupplier.contactPerson" name="sup_contact" placeholder="e.g. Rohan Perera" required />
+                <input type="text" [(ngModel)]="newSupplier.contactPerson" name="sup_contact" placeholder="e.g. Rohan Perera" />
               </div>
               <div class="form-group">
                 <label>Phone Number</label>
-                <input type="text" [(ngModel)]="newSupplier.phone" name="sup_phone" placeholder="e.g. 077-9876543" required />
+                <input type="text" [(ngModel)]="newSupplier.phone" name="sup_phone" placeholder="e.g. 077-9876543" />
               </div>
               <div class="form-group">
                 <label>Business Email</label>
-                <input type="email" [(ngModel)]="newSupplier.email" name="sup_email" placeholder="e.g. sales@apexagri.lk" required />
+                <input type="email" [(ngModel)]="newSupplier.email" name="sup_email" placeholder="e.g. sales@apexagri.lk" />
               </div>
               <div class="form-group">
                 <label>Operating City / District</label>
-                <input type="text" [(ngModel)]="newSupplier.city" name="sup_city" placeholder="e.g. Kurunegala" required />
+                <input type="text" [(ngModel)]="newSupplier.city" name="sup_city" placeholder="e.g. Kurunegala" />
               </div>
               <div class="form-group">
                 <label>Tax / VAT Reg Number</label>
                 <input type="text" [(ngModel)]="newSupplier.taxNumber" name="sup_tax" placeholder="e.g. V-88990011" />
               </div>
               <div class="form-group">
-                <label>Portal Username</label>
+                <label>Portal Username *</label>
                 <input type="text" [(ngModel)]="newSupplier.username" name="sup_username" placeholder="e.g. supplier_apex" required />
               </div>
               <div class="form-group">
-                <label>Password</label>
+                <label>Password *</label>
                 <input type="password" [(ngModel)]="newSupplier.password" name="sup_pass" placeholder="Create strong password..." required />
               </div>
             </div>
 
             <div class="signup-actions">
               <button type="button" class="btn-secondary" (click)="toggleSignUp(false)">Back to Login</button>
-              <button type="submit" class="btn-primary">Register & Submit for Approval</button>
+              <button type="button" class="btn-primary" (click)="handleSupplierSignUp()" [disabled]="isLoading()">
+                @if (isLoading()) {
+                  <span>Saving supplier...</span>
+                } @else {
+                  <span>Register & Submit for Approval</span>
+                }
+              </button>
             </div>
           </form>
         }
@@ -288,6 +318,40 @@ import { InventoryService } from '../../../core/services/inventory.service';
         background: #ffffff;
         color: #0f172a;
         box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+      }
+    }
+
+    .supplier-submode-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 12px;
+      background: #e2e8f0;
+      padding: 4px;
+      border-radius: 10px;
+    }
+
+    .submode-tab {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 8px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #64748b;
+      cursor: pointer;
+      transition: all 0.2s;
+
+      .material-symbols-outlined { font-size: 17px; }
+
+      &.active {
+        background: #0284c7;
+        color: #ffffff;
+        box-shadow: 0 2px 5px rgba(2, 132, 199, 0.25);
       }
     }
 
@@ -518,6 +582,17 @@ export class LoginComponent {
     this.showSupplierSignUp.set(val);
     this.errorMessage.set(null);
     this.successMessage.set(null);
+    if (val) {
+      if (this.username && !this.newSupplier.username) {
+        this.newSupplier.username = this.username.trim();
+      }
+      if (this.password && !this.newSupplier.password) {
+        this.newSupplier.password = this.password;
+      }
+      if (this.username && !this.newSupplier.name) {
+        this.newSupplier.name = this.username.trim();
+      }
+    }
   }
 
   onPasswordInput(val: string): void {
@@ -556,37 +631,66 @@ export class LoginComponent {
       },
       error: (err) => {
         this.isLoading.set(false);
-        const msg = err?.error?.message || err?.message || 'Authentication failed: Invalid credentials or inactive account.';
-        this.errorMessage.set(msg);
+        if (this.portalType() === 'SUPPLIER') {
+          this.errorMessage.set(`Supplier account '${this.username}' was not found. Please click 'New Supplier Self-Registration' above to register.`);
+        } else {
+          const msg = err?.error?.message || err?.message || 'Authentication failed: Invalid credentials or inactive account.';
+          this.errorMessage.set(msg);
+        }
       }
     });
   }
 
   handleSupplierSignUp(): void {
-    if (!this.newSupplier.name || !this.newSupplier.username || !this.newSupplier.password) {
-      this.errorMessage.set('Company Name, Username, and Password are required.');
+    const rawUsername = (this.newSupplier.username || this.username || '').trim();
+    const rawPassword = this.newSupplier.password || this.password;
+    const rawName = (this.newSupplier.name || rawUsername || '').trim();
+
+    if (!rawUsername || !rawPassword) {
+      this.errorMessage.set('Username and Password are required to create a supplier account.');
       return;
     }
 
-    const res = this.inventoryService.registerSupplier(this.newSupplier);
-    if (res.success) {
-      // Also provision an employee/auth account with role SUPPLIER so they can log in
-      const empAccount = {
-        fullName: `${this.newSupplier.contactPerson} (${this.newSupplier.name})`,
-        branchId: 1,
-        branchName: 'Headquarters Vendor Network',
-        role: 'SUPPLIER' as const,
-        username: this.newSupplier.username,
-        password: this.newSupplier.password
-      };
-      this.authService.registerEmployee(empAccount);
+    this.errorMessage.set(null);
+    this.successMessage.set(null);
+    this.isLoading.set(true);
 
-      this.showSupplierSignUp.set(false);
-      this.username = this.newSupplier.username;
-      this.password = this.newSupplier.password;
-      this.successMessage.set(`${res.message} Please click 'Sign In' to enter.`);
-    } else {
-      this.errorMessage.set(res.message);
-    }
+    const payload = {
+      name: rawName,
+      contactPerson: this.newSupplier.contactPerson?.trim() || rawName,
+      phone: this.newSupplier.phone?.trim() || '077-0000000',
+      email: this.newSupplier.email?.trim() || `${rawUsername}@vendor.lk`,
+      city: this.newSupplier.city?.trim() || 'Colombo',
+      taxNumber: this.newSupplier.taxNumber?.trim() || '',
+      username: rawUsername,
+      password: rawPassword
+    };
+
+    this.authService.registerSupplierHttp(payload).subscribe({
+      next: (res: any) => {
+        this.isLoading.set(false);
+        this.successMessage.set(`Supplier '${payload.name}' saved to database successfully! Entering vendor portal...`);
+        this.inventoryService.loadSuppliers();
+
+        // Automatic instant login into vendor portal
+        setTimeout(() => {
+          this.authService.loginApi(payload.username, payload.password).subscribe({
+            next: () => {
+              this.router.navigate(['/supplier-portal']);
+            },
+            error: () => {
+              this.showSupplierSignUp.set(false);
+              this.username = payload.username;
+              this.password = payload.password;
+            }
+          });
+        }, 500);
+      },
+      error: (err: any) => {
+        this.isLoading.set(false);
+        const msg = err?.error?.message || err?.message || 'Supplier registration failed. Please verify credentials.';
+        this.errorMessage.set(msg);
+      }
+    });
   }
 }

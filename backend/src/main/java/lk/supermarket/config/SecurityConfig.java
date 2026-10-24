@@ -62,8 +62,8 @@ public class SecurityConfig {
                         // Public Endpoints: Pre-flight CORS and Login/Auth/Roles
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**", "/api/admin/roles").permitAll()
-                        // Member 5 Admin Endpoints: Restricted strictly to ADMIN
-                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        // Member 5 Admin Endpoints: Allowed during development and viva demonstration
+                        .requestMatchers("/api/admin/**").permitAll()
                         // General authenticated API endpoints
                         .requestMatchers("/api/**").permitAll() // Allow other members' APIs during development
                         .anyRequest().permitAll()

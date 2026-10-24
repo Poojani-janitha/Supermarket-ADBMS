@@ -13,21 +13,20 @@ CREATE FUNCTION fn_customer_tier(p_customer_id INT)
 RETURNS VARCHAR(10)
 READS SQL DATA
 BEGIN
-  DECLARE v_spent DECIMAL(14,2) DEFAULT 0.00;
+  DECLARE v_points INT DEFAULT 0;
 
   IF p_customer_id IS NULL THEN
     RETURN 'BRONZE';
   END IF;
 
-  SELECT COALESCE(SUM(total_amount), 0.00)
-    INTO v_spent
-  FROM sales_order
-  WHERE customer_id = p_customer_id
-    AND status = 'COMPLETED';
+  SELECT COALESCE(loyalty_points, 0)
+    INTO v_points
+  FROM customer
+  WHERE customer_id = p_customer_id;
 
   RETURN CASE
-    WHEN v_spent >= 100000.00 THEN 'GOLD'
-    WHEN v_spent >= 50000.00 THEN 'SILVER'
+    WHEN v_points >= 1000 THEN 'GOLD'
+    WHEN v_points >= 500  THEN 'SILVER'
     ELSE 'BRONZE'
   END;
 END$$
@@ -44,19 +43,41 @@ BEGIN
   );
 END$$
 
--- Identifies customers with no other completed order before this order.
+-- Identifies customers with no other completed order before this order and no prior welcome discount.
 CREATE FUNCTION fn_is_first_purchase(p_customer_id INT, p_order_id INT)
 RETURNS BOOLEAN
 READS SQL DATA
+DETERMINISTIC
 BEGIN
-  RETURN p_customer_id IS NOT NULL
-    AND NOT EXISTS (
-      SELECT 1
-      FROM sales_order
-      WHERE customer_id = p_customer_id
-        AND order_id <> COALESCE(p_order_id, -1)
-        AND status = 'COMPLETED'
-    );
+  IF p_customer_id IS NULL THEN
+    RETURN FALSE;
+  END IF;
+
+  -- 1. Check if customer has any other COMPLETED sales orders
+  IF EXISTS (
+    SELECT 1
+    FROM sales_order
+    WHERE customer_id = p_customer_id
+      AND order_id <> COALESCE(p_order_id, -1)
+      AND status = 'COMPLETED'
+  ) THEN
+    RETURN FALSE;
+  END IF;
+
+  -- 2. Check if customer has EVER already received the FIRST_PURCHASE discount on any order other than p_order_id
+  IF EXISTS (
+    SELECT 1
+    FROM order_discount od
+    JOIN sales_order so ON so.order_id = od.order_id
+    JOIN discount_rule dr ON dr.rule_id = od.rule_id
+    WHERE so.customer_id = p_customer_id
+      AND dr.rule_type = 'FIRST_PURCHASE'
+      AND so.order_id <> COALESCE(p_order_id, -1)
+  ) THEN
+    RETURN FALSE;
+  END IF;
+
+  RETURN TRUE;
 END$$
 
 -- Validates coupon ownership, dates, active rule status and usage remaining.

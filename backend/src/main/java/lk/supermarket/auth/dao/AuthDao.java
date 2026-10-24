@@ -1,5 +1,6 @@
 package lk.supermarket.auth.dao;
 
+import lk.supermarket.auth.dto.SupplierSignupRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.SqlParameter;
 import org.springframework.jdbc.core.simple.SimpleJdbcCall;
@@ -31,6 +32,7 @@ public class AuthDao {
     }
 
     public Optional<Map<String, Object>> getLoginCredentials(String username) {
+        // 1. Try employee authentication via sp_get_login
         try {
             Map<String, Object> out = getLoginCall.execute(Map.of("p_username", username));
             @SuppressWarnings("unchecked")
@@ -65,6 +67,75 @@ public class AuthDao {
                 return Optional.of(list.get(0));
             }
         }
+
+        // 2. If not found in employee, check supplier table
+        try {
+            List<Map<String, Object>> supList = jdbcTemplate.queryForList(
+                    "SELECT supplier_id, name, contact_person, phone, email, username, password_hash, city, is_active, status " +
+                    "FROM supplier " +
+                    "WHERE LOWER(TRIM(username)) = LOWER(TRIM(?)) AND is_active = TRUE",
+                    username.trim()
+            );
+            if (!supList.isEmpty()) {
+                Map<String, Object> sup = supList.get(0);
+                Map<String, Object> row = new java.util.HashMap<>();
+                Long supId = ((Number) sup.get("supplier_id")).longValue();
+                row.put("employee_id", supId);
+                row.put("supplier_id", supId);
+                row.put("branch_id", 1L);
+                row.put("branch_name", "Vendor Network (" + sup.get("city") + ")");
+                String contact = (String) sup.get("contact_person");
+                String compName = (String) sup.get("name");
+                row.put("full_name", (contact != null && !contact.isBlank()) ? contact + " (" + compName + ")" : compName);
+                row.put("username", sup.get("username"));
+                row.put("role", "SUPPLIER");
+                row.put("password_hash", sup.get("password_hash"));
+                row.put("is_active", Boolean.TRUE.equals(sup.get("is_active")) || Integer.valueOf(1).equals(sup.get("is_active")));
+                return Optional.of(row);
+            }
+        } catch (Exception ignored) {
+        }
+
         return Optional.empty();
+    }
+
+    public Long registerSupplier(SupplierSignupRequest req, String passwordHash) {
+        String checkSql = "SELECT COUNT(*) FROM supplier WHERE LOWER(TRIM(username)) = LOWER(TRIM(?))";
+        Integer existing = jdbcTemplate.queryForObject(checkSql, Integer.class, req.getUsername().trim());
+        if (existing != null && existing > 0) {
+            throw new IllegalArgumentException("Username '" + req.getUsername() + "' is already registered by another vendor.");
+        }
+
+        String name = (req.getName() != null && !req.getName().trim().isEmpty())
+                ? req.getName().trim()
+                : req.getUsername().trim();
+        String phone = (req.getPhone() != null && !req.getPhone().trim().isEmpty())
+                ? req.getPhone().trim()
+                : "077-0000000";
+        String city = (req.getCity() != null && !req.getCity().trim().isEmpty())
+                ? req.getCity().trim()
+                : "Colombo";
+        String contactPerson = (req.getContactPerson() != null && !req.getContactPerson().trim().isEmpty())
+                ? req.getContactPerson().trim()
+                : name;
+        String email = (req.getEmail() != null && !req.getEmail().trim().isEmpty())
+                ? req.getEmail().trim()
+                : (req.getUsername().trim() + "@vendor.lk");
+        String taxNumber = (req.getTaxNumber() != null) ? req.getTaxNumber().trim() : "";
+
+        String insertSql = "INSERT INTO supplier (name, contact_person, phone, email, username, password_hash, city, tax_number, is_active, status) " +
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, TRUE, 'ACTIVE')";
+        jdbcTemplate.update(insertSql,
+                name,
+                contactPerson,
+                phone,
+                email,
+                req.getUsername().trim(),
+                passwordHash,
+                city,
+                taxNumber
+        );
+
+        return jdbcTemplate.queryForObject("SELECT supplier_id FROM supplier WHERE LOWER(username) = LOWER(?)", Long.class, req.getUsername().trim());
     }
 }

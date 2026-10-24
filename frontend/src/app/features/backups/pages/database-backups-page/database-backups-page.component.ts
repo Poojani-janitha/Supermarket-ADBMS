@@ -66,8 +66,8 @@ import { BackupSnapshotsTableComponent } from '../../components/backup-snapshots
         <div class="metrics-grid">
           <app-recovery-metric-card
             label="Recovery Point Objective"
-            value="~0 Seconds"
-            subtext="Continuous Binary Logging (sync_binlog=1)"
+            [value]="drStatus()?.rpo || '~0 Seconds'"
+            [subtext]="drStatus()?.rpoSubtext || 'Continuous Binary Logging (sync_binlog=1)'"
             icon="timer"
             iconBg="#ecfdf5"
             iconColor="#059669"
@@ -75,8 +75,8 @@ import { BackupSnapshotsTableComponent } from '../../components/backup-snapshots
 
           <app-recovery-metric-card
             label="Recovery Time Objective"
-            value="< 5 Minutes"
-            subtext="Automated Snapshot & Table Integrity Checks"
+            [value]="drStatus()?.rto || '< 5 Minutes'"
+            [subtext]="drStatus()?.rtoSubtext || 'Automated Snapshot & Table Integrity Checks'"
             icon="speed"
             iconBg="#eff6ff"
             iconColor="#2563eb"
@@ -84,8 +84,8 @@ import { BackupSnapshotsTableComponent } from '../../components/backup-snapshots
 
           <app-recovery-metric-card
             label="Backup Mode"
-            value="Non-Blocking"
-            subtext="--single-transaction (Zero POS Lock Contention)"
+            [value]="drStatus()?.backupMode || 'Non-Blocking'"
+            [subtext]="drStatus()?.backupModeSubtext || '--single-transaction (Zero POS Lock Contention)'"
             icon="lock_open_right"
             iconBg="#fef3c7"
             iconColor="#d97706"
@@ -93,8 +93,8 @@ import { BackupSnapshotsTableComponent } from '../../components/backup-snapshots
 
           <app-recovery-metric-card
             label="Recovery Type"
-            value="Coordinate Bound"
-            subtext="--source-data=2 Replication Header"
+            [value]="drStatus()?.recoveryType || 'Coordinate Bound'"
+            [subtext]="drStatus()?.recoveryTypeSubtext || '--source-data=2 Replication Header'"
             icon="history_toggle_off"
             iconBg="#f3e8ff"
             iconColor="#9333ea"
@@ -742,6 +742,7 @@ export class DatabaseBackupsPage implements OnInit {
   }
 
   readonly snapshots = signal<BackupInfo[]>([]);
+  readonly drStatus = signal<any>(null);
   readonly isLoading = signal<boolean>(false);
   readonly isBackingUp = signal<boolean>(false);
   readonly isRestoring = signal<boolean>(false);
@@ -750,23 +751,28 @@ export class DatabaseBackupsPage implements OnInit {
 
   ngOnInit(): void {
     this.refreshSnapshots();
+    this.refreshDrStatus();
+  }
+
+  refreshDrStatus(): void {
+    this.http.get<any>('/api/admin/dr-status').subscribe({
+      next: (status) => this.drStatus.set(status),
+      error: () => {}
+    });
   }
 
   refreshSnapshots(): void {
     this.isLoading.set(true);
-    this.http.get<BackupInfo[]>('/api/admin/backups').pipe(
-      catchError(() => of(this.authService.backups()))
-    ).subscribe({
+    this.http.get<BackupInfo[]>('/api/admin/backups').subscribe({
       next: (data) => {
         this.isLoading.set(false);
-        if (data && data.length > 0) {
-          this.snapshots.set(data);
-          this.authService.backups.set(data);
-        } else {
-          this.snapshots.set(this.authService.backups());
-        }
+        this.snapshots.set(data || []);
+        this.authService.backups.set(data || []);
       },
-      error: () => this.isLoading.set(false)
+      error: () => {
+        this.isLoading.set(false);
+        this.snapshots.set([]);
+      }
     });
   }
 
@@ -780,6 +786,7 @@ export class DatabaseBackupsPage implements OnInit {
           message: `Database backup snapshot '${res.fileName}' (${res.fileSizeKb} KB) generated successfully via non-blocking mysqldump!`
         });
         this.refreshSnapshots();
+        this.refreshDrStatus();
       },
       error: (err) => {
         this.isBackingUp.set(false);
@@ -839,6 +846,7 @@ export class DatabaseBackupsPage implements OnInit {
           message: `Disaster Recovery Successful! Database restored from '${backup.fileName}'. Verified row counts across tables.${detailMsg}`
         });
         this.refreshSnapshots();
+        this.refreshDrStatus();
       },
       error: (err) => {
         this.isRestoring.set(false);

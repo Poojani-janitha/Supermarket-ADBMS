@@ -9,6 +9,8 @@ import org.springframework.stereotype.Repository;
 import java.sql.Types;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Pure JDBC Administrative & Audit Data Access Object
@@ -23,6 +25,7 @@ import java.util.Map;
 @Repository
 public class AuditDao {
 
+    private static final Logger log = LoggerFactory.getLogger(AuditDao.class);
     private final JdbcTemplate jdbcTemplate;
     private final SimpleJdbcCall deactivateEmployeeCall;
     private final SimpleJdbcCall changeUserRoleCall;
@@ -98,7 +101,29 @@ public class AuditDao {
         Integer roleId = getOrCreateRoleId(req.getRole());
         String sql = "INSERT INTO employee (branch_id, full_name, role_id, username, password_hash, hire_date, is_active) " +
                 "VALUES (?, ?, ?, ?, ?, CURDATE(), TRUE)";
-        return jdbcTemplate.update(sql, req.getBranchId(), req.getFullName(), roleId, req.getUsername(), passwordHash);
+        int rows = jdbcTemplate.update(sql, req.getBranchId(), req.getFullName(), roleId, req.getUsername(), passwordHash);
+
+        // Provision real MySQL engine user account with dedicated role privileges
+        try {
+            String roleClean = req.getRole().trim().toUpperCase().replace(' ', '_');
+            String roleLower = roleClean.toLowerCase();
+            String userClean = req.getUsername().trim().toLowerCase().replaceAll("[^a-z0-9_]", "");
+            String userPass = (req.getPassword() != null && !req.getPassword().isBlank()) ? req.getPassword().trim() : "Pass!2026";
+
+            jdbcTemplate.execute("CREATE ROLE IF NOT EXISTS '" + roleLower + "_role'");
+            jdbcTemplate.execute("CREATE USER IF NOT EXISTS '" + userClean + "'@'%' IDENTIFIED BY '" + userPass + "'");
+            jdbcTemplate.execute("GRANT '" + roleLower + "_role' TO '" + userClean + "'@'%'");
+            jdbcTemplate.execute("SET DEFAULT ROLE '" + roleLower + "_role' TO '" + userClean + "'@'%'");
+            jdbcTemplate.execute("FLUSH PRIVILEGES");
+
+            logSecurityEvent("EMPLOYEE_PROVISIONED", 
+                "Provisioned database account '" + userClean + "' with role '" + roleLower + "_role' for employee " + req.getFullName(), 
+                "Admin (Member 5)");
+        } catch (Exception ex) {
+            log.warn("MySQL engine user provisioning note: {}", ex.getMessage());
+        }
+
+        return rows;
     }
 
     public void changeUserRole(Long employeeId, String newRole) {
@@ -224,32 +249,48 @@ public class AuditDao {
     }
 
     public List<Map<String, Object>> getDatabaseObjects() {
-        return List.of(
-            Map.of("name", "roles", "type", "TABLE", "description", "Dynamic RBAC role definitions & permissions registry"),
-            Map.of("name", "employee", "type", "TABLE", "description", "Staff credentials and foreign key role assignments"),
-            Map.of("name", "sales_order", "type", "TABLE", "description", "Order transaction records"),
-            Map.of("name", "order_item", "type", "TABLE", "description", "Individual line items per order"),
-            Map.of("name", "customer", "type", "TABLE", "description", "Shopper directory & loyalty points"),
-            Map.of("name", "product", "type", "TABLE", "description", "Merchandise catalog & pricing"),
-            Map.of("name", "inventory", "type", "TABLE", "description", "Branch stock quantities & reorder levels"),
-            Map.of("name", "discount_rule", "type", "TABLE", "description", "Promotional and loyalty discount rules"),
-            Map.of("name", "purchase_order", "type", "TABLE", "description", "Supplier restock purchase orders"),
-            Map.of("name", "employee_audit_log", "type", "TABLE", "description", "Trigger-based role & branch audit log"),
-            Map.of("name", "security_event_log", "type", "TABLE", "description", "Administrative access audit trail"),
-            Map.of("name", "v_masked_customer_directory", "type", "VIEW", "description", "PII-masked customer view"),
-            Map.of("name", "v_active_discounts", "type", "VIEW", "description", "Active promotional discount rules"),
-            Map.of("name", "v_low_stock", "type", "VIEW", "description", "Products below reorder threshold"),
-            Map.of("name", "v_daily_sales", "type", "VIEW", "description", "Daily aggregated revenue metrics"),
-            Map.of("name", "v_product_ranking", "type", "VIEW", "description", "Top selling products by revenue"),
-            Map.of("name", "sp_place_order", "type", "PROCEDURE", "description", "Transactional sales order execution"),
-            Map.of("name", "sp_cancel_order", "type", "PROCEDURE", "description", "Order rollback and stock replenishment"),
-            Map.of("name", "sp_get_login", "type", "PROCEDURE", "description", "Authentication credential verification"),
-            Map.of("name", "sp_add_stock", "type", "PROCEDURE", "description", "Inventory restock procedure"),
-            Map.of("name", "sp_transfer_stock", "type", "PROCEDURE", "description", "Inter-branch stock transfer"),
-            Map.of("name", "sp_receive_purchase", "type", "PROCEDURE", "description", "3-way PO receipt verification"),
-            Map.of("name", "sp_deactivate_employee", "type", "PROCEDURE", "description", "Employee deactivation with self-lockout check"),
-            Map.of("name", "sp_change_user_role", "type", "PROCEDURE", "description", "Dynamic role escalation and audit")
-        );
+        List<Map<String, Object>> objects = new java.util.ArrayList<>();
+        try {
+            // Query tables and views dynamically from active database
+            String tableSql = 
+                "SELECT TABLE_NAME AS name, " +
+                "       CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'TABLE' ELSE 'VIEW' END AS type, " +
+                "       COALESCE(NULLIF(TABLE_COMMENT, ''), " +
+                "                CONCAT('Database ', CASE WHEN TABLE_TYPE = 'BASE TABLE' THEN 'table' ELSE 'analytical view' END, ' in supermarket schema')) AS description " +
+                "FROM information_schema.tables " +
+                "WHERE table_schema = DATABASE() " +
+                "ORDER BY TABLE_TYPE ASC, TABLE_NAME ASC";
+
+            List<Map<String, Object>> tableRows = jdbcTemplate.query(tableSql, (rs, rowNum) -> {
+                Map<String, Object> map = new java.util.HashMap<>();
+                map.put("name", rs.getString("name"));
+                map.put("type", rs.getString("type"));
+                map.put("description", rs.getString("description"));
+                return map;
+            });
+            objects.addAll(tableRows);
+
+            // Query stored procedures dynamically from active database
+            String procSql = 
+                "SELECT ROUTINE_NAME AS name, " +
+                "       'PROCEDURE' AS type, " +
+                "       COALESCE(NULLIF(ROUTINE_COMMENT, ''), 'Stored business logic procedure in supermarket schema') AS description " +
+                "FROM information_schema.routines " +
+                "WHERE routine_schema = DATABASE() AND routine_type = 'PROCEDURE' " +
+                "ORDER BY ROUTINE_NAME ASC";
+
+            List<Map<String, Object>> procRows = jdbcTemplate.query(procSql, (rs, rowNum) -> {
+                Map<String, Object> map = new java.util.HashMap<>();
+                map.put("name", rs.getString("name"));
+                map.put("type", rs.getString("type"));
+                map.put("description", rs.getString("description"));
+                return map;
+            });
+            objects.addAll(procRows);
+        } catch (Exception ex) {
+            log.warn("Failed to dynamically inspect information_schema: {}", ex.getMessage());
+        }
+        return objects;
     }
 
     public List<Map<String, Object>> getRolePrivileges(String role) {
@@ -267,8 +308,19 @@ public class AuditDao {
     }
 
     public void saveRolePrivilegeRules(String role, List<Map<String, String>> rules, String adminUser) {
+        ensureRolesTable();
         ensurePrivilegeTable();
         String normalizedRole = role.trim().toUpperCase().replace(' ', '_');
+
+        // 1. Ensure role exists in roles table
+        try {
+            jdbcTemplate.update(
+                "INSERT INTO roles (role_name, description) VALUES (?, ?) ON DUPLICATE KEY UPDATE description = VALUES(description)",
+                normalizedRole, "Role definition and permission container for " + normalizedRole
+            );
+        } catch (Exception ignored) {}
+
+        // 2. Save or update each privilege rule
         for (Map<String, String> rule : rules) {
             String obj = rule.get("objectName");
             String type = rule.getOrDefault("objectType", "TABLE");
@@ -282,13 +334,10 @@ public class AuditDao {
             );
         }
 
-        // Provision corresponding MySQL role and user automatically
+        // 3. Ensure corresponding MySQL role exists (e.g. 'cashier_role'), but user account is provisioned later
         try {
             String roleLower = normalizedRole.toLowerCase();
             jdbcTemplate.execute("CREATE ROLE IF NOT EXISTS '" + roleLower + "_role'");
-            jdbcTemplate.execute("CREATE USER IF NOT EXISTS '" + roleLower + "'@'%' IDENTIFIED BY 'Pass!2026'");
-            jdbcTemplate.execute("GRANT '" + roleLower + "_role' TO '" + roleLower + "'@'%'");
-            jdbcTemplate.execute("SET DEFAULT ROLE '" + roleLower + "_role' TO '" + roleLower + "'@'%'");
             jdbcTemplate.execute("FLUSH PRIVILEGES");
         } catch (Exception ignored) {}
 
@@ -391,115 +440,46 @@ public class AuditDao {
     }
 
     public List<DatabaseAccountDto> getDatabaseAccounts() {
+        ensureRolesTable();
         ensurePrivilegeTable();
-        ensureDefaultDbManager();
 
-        String sql = "SELECT u.user, u.host, u.account_locked, u.plugin, " +
-                "COALESCE(r.FROM_USER, '') AS assigned_role " +
-                "FROM mysql.user u " +
-                "LEFT JOIN mysql.role_edges r ON r.TO_USER = u.user AND r.TO_HOST = u.host " +
-                "WHERE u.user NOT IN ('mysql.infoschema', 'mysql.session', 'mysql.sys', 'root') " +
-                "  AND u.user NOT LIKE '%_role' " +
-                "  AND NOT (u.user = 'admin' AND u.host = '%') " +
-                "ORDER BY CASE " +
-                "    WHEN u.user = 'admin' AND u.host = 'localhost' THEN 1 " +
-                "    WHEN u.user = 'admin_user' THEN 2 " +
-                "    WHEN u.user = 'app_user' THEN 3 " +
-                "    WHEN u.user = 'report_user' THEN 4 " +
-                "    WHEN u.user = 'etl_user' THEN 5 " +
-                "    WHEN u.user = 'db_manager' THEN 6 " +
-                "    WHEN u.user = 'demo_manager' THEN 7 " +
-                "    WHEN u.user = 'demo_cashier' THEN 8 " +
-                "    ELSE 9 END, u.user ASC";
+        String sql = 
+            "SELECT r.role_id, " +
+            "       r.role_name, " +
+            "       r.description, " +
+            "       DATE_FORMAT(r.created_at, '%Y-%m-%d %H:%i:%s') AS created_at_fmt, " +
+            "       COUNT(DISTINCT CASE WHEN p.privileges IS NOT NULL AND p.privileges != 'DENIED' THEN p.id END) AS privilege_count, " +
+            "       (SELECT COUNT(*) FROM employee e WHERE e.role_id = r.role_id AND e.is_active = TRUE) AS active_staff_count " +
+            "FROM roles r " +
+            "LEFT JOIN role_privilege_rule p ON UPPER(REPLACE(p.role_name, ' ', '_')) = UPPER(REPLACE(r.role_name, ' ', '_')) " +
+            "GROUP BY r.role_id, r.role_name, r.description, r.created_at " +
+            "ORDER BY r.role_id ASC";
 
         try {
-            List<DatabaseAccountDto> accounts = new java.util.ArrayList<>(jdbcTemplate.query(sql, (rs, rowNum) -> {
-                String user = rs.getString("user");
-                String host = rs.getString("host");
-                String locked = rs.getString("account_locked");
-                String role = rs.getString("assigned_role");
+            return jdbcTemplate.query(sql, (rs, rowNum) -> {
+                String roleName = rs.getString("role_name").toUpperCase();
+                String roleLower = roleName.toLowerCase().replace(' ', '_');
+                String desc = rs.getString("description");
+                String createdAt = rs.getString("created_at_fmt");
+                int privCount = rs.getInt("privilege_count");
+                int staffCount = rs.getInt("active_staff_count");
 
-                String status = "Y".equalsIgnoreCase(locked) ? "disabled" : "active";
-                String assignedRole = (role == null || role.isBlank()) ? "DIRECT_PRIVS" : role;
-                int privCount = resolvePrivilegeCount(user, assignedRole);
+                String lastUsed = staffCount > 0 ? (staffCount + " Staff Assigned") : "Unassigned Policy";
 
                 return new DatabaseAccountDto(
-                        user + "@" + host,
-                        user,
-                        assignedRole,
-                        host,
-                        status,
+                        roleLower + "_role@localhost",
+                        roleName,
+                        roleLower + "_role",
+                        "localhost",
+                        "active",
                         privCount,
-                        "2026-01-15 08:30:00",
-                        "Active connection"
+                        createdAt != null ? createdAt : "2026-10-24 10:43:53",
+                        lastUsed
                 );
-            }));
-
-            // Include any custom roles from role_privilege_rule that don't yet have an active account in MySQL
-            List<String> customRoles = getCustomRolesFromRules();
-            for (String r : customRoles) {
-                String rLower = r.toLowerCase();
-                boolean exists = accounts.stream().anyMatch(a -> a.username().equalsIgnoreCase(rLower) || a.role().equalsIgnoreCase(rLower + "_role") || a.role().equalsIgnoreCase(r));
-                if (!exists) {
-                    accounts.add(new DatabaseAccountDto(
-                            rLower + "@%",
-                            rLower,
-                            rLower + "_role",
-                            "%",
-                            "active",
-                            countPrivilegesForRole(r),
-                            "2026-01-15 08:30:00",
-                            "Role-based account"
-                    ));
-                }
-            }
-
-            return accounts;
+            });
         } catch (Exception ex) {
-            return getDefaultDatabaseAccounts();
-        }
-    }
-
-    private void ensureDefaultDbManager() {
-        try {
-            jdbcTemplate.execute("CREATE ROLE IF NOT EXISTS 'db_manager_role'");
-            jdbcTemplate.execute("CREATE USER IF NOT EXISTS 'db_manager'@'%' IDENTIFIED BY 'DbManagerPass!2026'");
-            jdbcTemplate.execute("GRANT 'db_manager_role' TO 'db_manager'@'%'");
-            jdbcTemplate.execute("SET DEFAULT ROLE 'db_manager_role' TO 'db_manager'@'%'");
-
-            List<String> customRoles = getCustomRolesFromRules();
-            for (String r : customRoles) {
-                String roleLower = r.toLowerCase();
-                jdbcTemplate.execute("CREATE ROLE IF NOT EXISTS '" + roleLower + "_role'");
-                jdbcTemplate.execute("CREATE USER IF NOT EXISTS '" + roleLower + "'@'%' IDENTIFIED BY 'Pass!2026'");
-                jdbcTemplate.execute("GRANT '" + roleLower + "_role' TO '" + roleLower + "'@'%'");
-                jdbcTemplate.execute("SET DEFAULT ROLE '" + roleLower + "_role' TO '" + roleLower + "'@'%'");
-            }
-            jdbcTemplate.execute("FLUSH PRIVILEGES");
-        } catch (Exception ignored) {}
-    }
-
-    private List<String> getCustomRolesFromRules() {
-        try {
-            return jdbcTemplate.queryForList(
-                    "SELECT DISTINCT UPPER(REPLACE(role_name, ' ', '_')) FROM role_privilege_rule WHERE role_name NOT IN ('ADMIN', 'MANAGER', 'CASHIER')",
-                    String.class
-            );
-        } catch (Exception ex) {
+            log.error("Failed to query database role accounts: {}", ex.getMessage());
             return List.of();
-        }
-    }
-
-    private int countPrivilegesForRole(String role) {
-        try {
-            Integer count = jdbcTemplate.queryForObject(
-                    "SELECT COUNT(*) FROM role_privilege_rule WHERE UPPER(REPLACE(role_name, ' ', '_')) = ? AND privileges != 'DENIED'",
-                    Integer.class,
-                    role.toUpperCase().replace(' ', '_')
-            );
-            return count != null && count > 0 ? count : 12;
-        } catch (Exception ex) {
-            return 12;
         }
     }
 
@@ -526,35 +506,19 @@ public class AuditDao {
                 cleanRole,
                 cleanHost,
                 "active",
-                resolvePrivilegeCount(cleanUser, cleanRole),
+                0,
                 new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()),
                 "Just provisioned"
         );
     }
 
-    private int resolvePrivilegeCount(String user, String role) {
-        if ("admin".equals(user) || "admin_user".equals(user) || role.contains("admin")) return 18;
-        if ("db_manager".equals(user) || role.contains("db_manager")) return 14;
-        if ("demo_manager".equals(user) || role.contains("manager")) return 12;
-        if ("demo_cashier".equals(user) || role.contains("cashier")) return 6;
-        if ("hr".equals(user) || role.contains("hr")) return countPrivilegesForRole("HR");
-        if ("app_user".equals(user)) return 9;
-        if ("report_user".equals(user)) return 3;
-        if ("etl_user".equals(user)) return 5;
-        return 8;
-    }
-
-    private List<DatabaseAccountDto> getDefaultDatabaseAccounts() {
-        return List.of(
-            new DatabaseAccountDto("admin@localhost", "admin", "admin_role", "localhost", "active", 18, "2026-01-15 08:30:00", "Active DBA session"),
-            new DatabaseAccountDto("admin_user@localhost", "admin_user", "admin_role", "localhost", "active", 18, "2026-01-15 08:30:00", "Local DBA"),
-            new DatabaseAccountDto("app_user@%", "app_user", "DIRECT_PRIVS", "%", "active", 9, "2026-01-15 08:30:00", "HikariCP pool active"),
-            new DatabaseAccountDto("report_user@%", "report_user", "DIRECT_PRIVS", "%", "active", 3, "2026-01-15 08:30:00", "15 mins ago"),
-            new DatabaseAccountDto("etl_user@%", "etl_user", "DIRECT_PRIVS", "%", "active", 5, "2026-01-15 08:30:00", "Nightly batch runner"),
-            new DatabaseAccountDto("db_manager@%", "db_manager", "db_manager_role", "%", "active", 14, "2026-01-15 08:30:00", "Schema & Privileges"),
-            new DatabaseAccountDto("hr@%", "hr", "hr_role", "%", "active", 4, "2026-01-15 08:30:00", "Personnel & Roles"),
-            new DatabaseAccountDto("demo_manager@%", "demo_manager", "manager_role", "%", "active", 12, "2026-01-15 08:30:00", "5 mins ago"),
-            new DatabaseAccountDto("demo_cashier@%", "demo_cashier", "cashier_role", "%", "active", 6, "2026-01-15 08:30:00", "Just now")
-        );
+    public String getVariableValue(String varName, String defaultVal) {
+        try {
+            List<Map<String, Object>> rows = jdbcTemplate.queryForList("SHOW VARIABLES LIKE ?", varName);
+            if (!rows.isEmpty() && rows.get(0).get("Value") != null) {
+                return String.valueOf(rows.get(0).get("Value"));
+            }
+        } catch (Exception ignored) {}
+        return defaultVal;
     }
 }

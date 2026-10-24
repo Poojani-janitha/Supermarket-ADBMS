@@ -40,7 +40,7 @@ FROM category c
 LEFT JOIN product p ON p.category_id = c.category_id
 GROUP BY c.category_id, c.name, c.description, c.icon, c.parent_id;
 
--- Customer directory with a database-calculated loyalty tier.
+-- Customer directory with a database-calculated loyalty tier and first purchase eligibility.
 CREATE OR REPLACE VIEW v_customer_directory AS
 SELECT
   c.customer_id,
@@ -49,7 +49,8 @@ SELECT
   c.email,
   c.loyalty_points,
   fn_customer_tier(c.customer_id) AS tier,
-  c.registered_date
+  c.registered_date,
+  fn_is_first_purchase(c.customer_id, NULL) AS is_first_purchase
 FROM customer c;
 
 -- Restricted customer directory that hides most phone digits.
@@ -61,7 +62,8 @@ SELECT
   email,
   loyalty_points,
   fn_customer_tier(customer_id) AS tier,
-  registered_date
+  registered_date,
+  fn_is_first_purchase(customer_id, NULL) AS is_first_purchase
 FROM customer;
 
 -- Customer order summary used by the order-history endpoint.

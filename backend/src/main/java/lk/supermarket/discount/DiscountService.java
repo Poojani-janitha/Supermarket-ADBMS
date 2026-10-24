@@ -39,4 +39,12 @@ public class DiscountService {
     public int saveHolidayDiscount(Map<String, ?> request) {
         return discountDao.saveHolidayDiscount(request);
     }
+
+    public void updateCoupon(String originalCode, Map<String, ?> request) {
+        discountDao.updateCoupon(originalCode, request);
+    }
+
+    public void updateHoliday(Map<String, ?> request) {
+        discountDao.updateHoliday(request);
+    }
 }

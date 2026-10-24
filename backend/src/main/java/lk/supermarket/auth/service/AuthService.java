@@ -4,6 +4,7 @@ import lk.supermarket.auth.dao.AuthDao;
 import lk.supermarket.auth.dto.AuthUserDto;
 import lk.supermarket.auth.dto.LoginRequest;
 import lk.supermarket.auth.dto.LoginResponse;
+import lk.supermarket.auth.dto.SupplierSignupRequest;
 import lk.supermarket.common.JwtUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -39,9 +40,9 @@ public class AuthService {
         String storedHash = (String) creds.get("password_hash");
 
         // Validate password using BCrypt (or plain text fallback for initial seeding)
-        boolean matches = passwordEncoder.matches(request.getPassword(), storedHash) 
-                || request.getPassword().equals(storedHash)
-                || (passwordEncoder.matches("Password123!", storedHash) && (
+        boolean matches = (storedHash != null && passwordEncoder.matches(request.getPassword(), storedHash))
+                || (storedHash != null && request.getPassword().equals(storedHash))
+                || (storedHash != null && passwordEncoder.matches("Password123!", storedHash) && (
                     "Admin$KeyPass2026!".equals(request.getPassword()) ||
                     "Manager#Secure9".equals(request.getPassword()) ||
                     "Cashier@2026".equals(request.getPassword()) ||
@@ -71,6 +72,28 @@ public class AuthService {
                 isActive
         );
 
+        if (creds.get("supplier_id") != null) {
+            userDto.setSupplierId(((Number) creds.get("supplier_id")).longValue());
+        }
+
         return new LoginResponse(token, userDto);
+    }
+
+    public Map<String, Object> supplierSignup(SupplierSignupRequest request) {
+        if (request.getPassword() == null || request.getPassword().trim().isEmpty()) {
+            throw new IllegalArgumentException("Password cannot be blank.");
+        }
+        if (request.getName() == null || request.getName().trim().isEmpty()) {
+            request.setName(request.getUsername().trim());
+        }
+        String encodedPass = passwordEncoder.encode(request.getPassword().trim());
+        Long supplierId = authDao.registerSupplier(request, encodedPass);
+
+        return Map.of(
+                "success", true,
+                "message", "Supplier '" + request.getName() + "' registered successfully! You can now log into the Vendor Portal.",
+                "supplierId", supplierId,
+                "username", request.getUsername()
+        );
     }
 }

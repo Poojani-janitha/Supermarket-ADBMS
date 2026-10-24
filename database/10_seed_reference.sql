@@ -86,11 +86,12 @@ ON DUPLICATE KEY UPDATE quantity=VALUES(quantity);
 
 -- 8. Discount Rules
 INSERT INTO discount_rule (rule_id, name, rule_type, kind, value, min_order_amount, max_discount, tier, start_date, end_date, priority, stackable, is_active) VALUES
-(1, 'First Purchase Welcome Discount', 'FIRST_PURCHASE', 'PERCENT', 10.00, 0.00, 15.00, NULL,     '2020-01-01', '2030-12-31', 10, TRUE,  TRUE),
-(2, 'Gold Tier Loyalty Reward',       'LOYALTY',        'PERCENT', 10.00, 25.00, 20.00, 'GOLD',   '2020-01-01', '2030-12-31', 20, TRUE,  TRUE),
-(3, 'Special Holiday Promotion',      'HOLIDAY',        'PERCENT',  5.00, 15.00, 10.00, NULL,     '2020-01-01', '2030-12-31', 30, TRUE,  TRUE),
-(4, 'New Year Festive Coupon Voucher', 'COUPON',         'FIXED',   10.00, 30.00, 10.00, NULL,     '2020-01-01', '2030-12-31',  5, FALSE, TRUE)
-ON DUPLICATE KEY UPDATE name=VALUES(name);
+(1,  'WELCOME 10',                      'FIRST_PURCHASE', 'PERCENT', 10.00, 0.00,    NULL,  NULL,     '2020-01-01', '2030-12-31', 10, TRUE,  TRUE),
+(2,  'Special Holiday Promotion',       'HOLIDAY',        'PERCENT', 10.00, 0.00,    NULL,  NULL,     '2020-01-01', '2030-12-31', 30, TRUE,  TRUE),
+(4,  'New Year Festive Coupon Voucher', 'COUPON',         'FIXED',   10.00, 30.00,   10.00, NULL,     '2020-01-01', '2030-12-31',  5, FALSE, TRUE),
+(20, 'Silver Tier 5% Loyalty Discount', 'LOYALTY',        'PERCENT',  5.00, 500.00,  NULL,  'SILVER', '2020-01-01', '2030-12-31', 20, TRUE,  TRUE),
+(21, 'Gold Tier 7% Loyalty Discount',   'LOYALTY',        'PERCENT',  7.00, 1000.00, NULL,  'GOLD',   '2020-01-01', '2030-12-31', 21, TRUE,  TRUE)
+ON DUPLICATE KEY UPDATE name=VALUES(name), value=VALUES(value), min_order_amount=VALUES(min_order_amount), tier=VALUES(tier);
 
 -- 9. Coupons
 INSERT INTO coupon (code, rule_id, max_uses, used_count, expires_on) VALUES

@@ -4,14 +4,15 @@ import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { AuthService } from '../../../../core/services/auth.service';
 import { CustomerService } from '../../../../core/services/customer.service';
+import { InventoryService } from '../../../../core/services/inventory.service';
 import { Employee, DatabaseAccount } from '../../../../core/models';
-import { DatabaseAccountGridComponent } from '../../components/database-account-grid/database-account-grid.component';
+import { DatabaseAccountCardComponent } from '../../components/database-account-card/database-account-card.component';
 import { useDatabaseAccounts } from '../../services/use-database-accounts.service';
 
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, DatabaseAccountGridComponent],
+  imports: [CommonModule, FormsModule, DatabaseAccountCardComponent],
   template: `
     <div class="page-container">
       <!-- Header -->
@@ -461,14 +462,15 @@ import { useDatabaseAccounts } from '../../services/use-database-accounts.servic
             </table>
           </div>
 
-                    <app-database-account-grid
-            [accounts]="dbAccountsApi.accounts()"
-            [isLoading]="dbAccountsApi.isLoading()"
-            [error]="dbAccountsApi.error()"
-            (onRefresh)="dbAccountsApi.refetch()"
-            (onConfigure)="configureAccountRole($event)"
-            (openProvisionModal)="openAccountProvisionModal()"
-          ></app-database-account-grid>
+          <!-- Role Privilege Cards (Directly in Outer Container) -->
+          <div class="accounts-cards-grid">
+            @for (account of dbAccountsApi.accounts(); track account.id) {
+              <app-database-account-card
+                [account]="account"
+                (onConfigure)="configureAccountRole($event)"
+              ></app-database-account-card>
+            }
+          </div>
         </div>
       }
 
@@ -543,9 +545,9 @@ import { useDatabaseAccounts } from '../../services/use-database-accounts.servic
               <div class="form-group">
                 <label>Assigned Branch:</label>
                 <select [(ngModel)]="newEmpBranchId" class="select-input">
-                  <option [value]="1">Colombo Central Flagship</option>
-                  <option [value]="2">Kandy City Centre Branch</option>
-                  <option [value]="3">Galle Fort Supermarket</option>
+                  @for (b of inventoryService.branches; track b.id) {
+                    <option [value]="b.id">{{ b.name }}</option>
+                  }
                 </select>
               </div>
               <div class="form-group">
@@ -798,7 +800,7 @@ import { useDatabaseAccounts } from '../../services/use-database-accounts.servic
                 <h3 class="security-alert-title">{{ alert.title }}</h3>
                 <span class="security-alert-badge">RBAC SECURITY VIOLATION</span>
               </div>
-              <button class="close-btn" (click)="authService.closeSecurityAlert()">&times;</button>
+              <button class="close-btn" (click)="closeSecurityAlert()">&times;</button>
             </div>
             <div class="modal-body security-alert-body">
               <div class="alert-banner-box">
@@ -828,7 +830,7 @@ import { useDatabaseAccounts } from '../../services/use-database-accounts.servic
               </div>
             </div>
             <div class="modal-footer security-alert-footer">
-              <button class="btn-pill btn-danger" (click)="authService.closeSecurityAlert()">
+              <button class="btn-pill btn-danger" (click)="closeSecurityAlert()">
                 <span class="material-symbols-outlined">close</span> Dismiss Security Warning
               </button>
             </div>
@@ -2319,6 +2321,22 @@ import { useDatabaseAccounts } from '../../services/use-database-accounts.servic
       font-size: 14px;
       color: #9ca3af;
     }
+
+    /* Role Account Cards Grid (Direct in Outer Section Card) */
+    .accounts-cards-grid {
+      display: grid;
+      grid-template-columns: repeat(1, minmax(0, 1fr));
+      gap: 1.25rem;
+      margin-top: 1.5rem;
+
+      @media (min-width: 640px) {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      @media (min-width: 1024px) {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+    }
   `]
 })
 export class AdminDashboardComponent implements OnInit {
@@ -2391,10 +2409,14 @@ export class AdminDashboardComponent implements OnInit {
     this.router.navigate(['/login']);
   }
 
+  closeSecurityAlert(): void {
+    this.authService.securityAlert.set(null);
+  }
+
   @HostListener('document:keydown.escape', ['$event'])
   onKeydownEscape(event: Event) {
     if (this.authService.securityAlert()) {
-      this.authService.closeSecurityAlert();
+      this.closeSecurityAlert();
     }
     if (this.isAddRuleModalOpen()) {
       this.isAddRuleModalOpen.set(false);
@@ -2413,18 +2435,19 @@ export class AdminDashboardComponent implements OnInit {
   configureAccountRole(account: DatabaseAccount): void {
     this.configuringAccount.set(account);
     this.ruleRoleMode = 'EXISTING';
-    const accRoleNorm = account.role.toUpperCase().replace(/ /g, '_');
-    const matchedRole = this.availableRoles().find(r => {
-      const rNorm = r.toUpperCase().replace(/ /g, '_');
-      return accRoleNorm.includes(rNorm) || rNorm.includes(accRoleNorm);
-    });
-    this.selectedRuleRole = matchedRole || (this.availableRoles()[0] || 'CASHIER');
+    const roleClean = (account.username || account.role.replace(/_role$/i, '')).toUpperCase().replace(/ /g, '_');
+    const matchedRole = this.availableRoles().find(r => r.toUpperCase().replace(/ /g, '_') === roleClean) || roleClean;
+    if (!this.availableRoles().includes(matchedRole)) {
+      this.availableRoles.update(prev => [...prev, matchedRole]);
+    }
+    this.selectedRuleRole = matchedRole;
     this.onRuleRoleSelected();
     this.isAddRuleModalOpen.set(true);
   }
 
   readonly authService = inject(AuthService);
   readonly customerService = inject(CustomerService);
+  readonly inventoryService = inject(InventoryService);
 
   activeTab = signal<'EMPLOYEES' | 'MASKING' | 'AUDIT' | 'MATRIX'>('EMPLOYEES');
   actionFeedback = signal<{ success: boolean; message: string } | null>(null);
@@ -2444,141 +2467,7 @@ export class AdminDashboardComponent implements OnInit {
   newCustomRoleName = '';
   ruleBuilderPrivileges = signal<{ [objectName: string]: string[] }>({});
 
-  readonly defaultDbObjects = [
-    { name: 'sales_order', type: 'TABLE', description: 'Order transaction records & checkout receipts' },
-    { name: 'order_item', type: 'TABLE', description: 'Individual line items and scanned quantities' },
-    { name: 'customer', type: 'TABLE', description: 'Shopper directory & accumulated loyalty points' },
-    { name: 'product', type: 'TABLE', description: 'Merchandise catalog, barcodes, and retail pricing' },
-    { name: 'inventory', type: 'TABLE', description: 'Branch stock levels & minimum reorder points' },
-    { name: 'discount_rule', type: 'TABLE', description: 'Promotional rules and active category discounts' },
-    { name: 'purchase_order', type: 'TABLE', description: 'Supplier restock purchase orders & status' },
-    { name: 'employee', type: 'TABLE', description: 'Staff credentials and system role assignments' },
-    { name: 'employee_audit_log', type: 'TABLE', description: 'Trigger-based employee change audit trail' },
-    { name: 'security_event_log', type: 'TABLE', description: 'Administrative security violations & auth logs' },
-    { name: 'v_masked_customer_directory', type: 'VIEW', description: 'PII-masked customer telephone directory' },
-    { name: 'v_active_discounts', type: 'VIEW', description: 'Active promotional discount criteria' },
-    { name: 'v_low_stock', type: 'VIEW', description: 'Products currently below reorder threshold' },
-    { name: 'v_daily_sales', type: 'VIEW', description: 'Daily aggregated revenue & branch sales' },
-    { name: 'sp_place_order', type: 'PROCEDURE', description: 'Transactional multi-item checkout procedure' },
-    { name: 'sp_cancel_order', type: 'PROCEDURE', description: 'Order rollback and stock replenishment' },
-    { name: 'sp_get_login', type: 'PROCEDURE', description: 'Credential verification stored procedure' },
-    { name: 'sp_add_stock', type: 'PROCEDURE', description: 'Inventory replenishment procedure' },
-    { name: 'sp_transfer_stock', type: 'PROCEDURE', description: 'Inter-branch stock transfer procedure' },
-    { name: 'sp_deactivate_employee', type: 'PROCEDURE', description: 'Employee deactivation with self-lockout check' },
-    { name: 'sp_change_user_role', type: 'PROCEDURE', description: 'Role modification procedure firing audit trigger' }
-  ];
-
-  readonly defaultPrivilegesMap: { [role: string]: { [object: string]: string } } = {
-    'CASHIER': {
-      'sales_order': 'SELECT, INSERT',
-      'order_item': 'SELECT, INSERT',
-      'customer': 'SELECT, INSERT',
-      'product': 'SELECT',
-      'v_masked_customer_directory': 'SELECT (Masked)',
-      'v_active_discounts': 'SELECT',
-      'sp_place_order': 'EXECUTE',
-      'sp_cancel_order': 'EXECUTE',
-      'sp_get_login': 'EXECUTE'
-    },
-    'MANAGER': {
-      'sales_order': 'ALL PRIVILEGES',
-      'order_item': 'ALL PRIVILEGES',
-      'customer': 'ALL PRIVILEGES',
-      'product': 'SELECT, INSERT, UPDATE',
-      'inventory': 'SELECT, INSERT, UPDATE',
-      'discount_rule': 'SELECT, INSERT, UPDATE',
-      'purchase_order': 'ALL PRIVILEGES',
-      'employee_audit_log': 'SELECT',
-      'security_event_log': 'SELECT',
-      'v_masked_customer_directory': 'SELECT (Raw)',
-      'v_active_discounts': 'SELECT',
-      'v_low_stock': 'SELECT',
-      'v_daily_sales': 'SELECT',
-      'sp_place_order': 'EXECUTE',
-      'sp_cancel_order': 'EXECUTE',
-      'sp_add_stock': 'EXECUTE',
-      'sp_transfer_stock': 'EXECUTE',
-      'sp_get_login': 'EXECUTE'
-    },
-    'ADMIN': {
-      'sales_order': 'ALL PRIVILEGES',
-      'order_item': 'ALL PRIVILEGES',
-      'customer': 'ALL PRIVILEGES',
-      'product': 'ALL PRIVILEGES',
-      'inventory': 'ALL PRIVILEGES',
-      'discount_rule': 'ALL PRIVILEGES',
-      'purchase_order': 'ALL PRIVILEGES',
-      'employee': 'ALL PRIVILEGES',
-      'employee_audit_log': 'ALL PRIVILEGES',
-      'security_event_log': 'ALL PRIVILEGES',
-      'v_masked_customer_directory': 'ALL PRIVILEGES',
-      'v_active_discounts': 'ALL PRIVILEGES',
-      'v_low_stock': 'ALL PRIVILEGES',
-      'v_daily_sales': 'ALL PRIVILEGES',
-      'sp_place_order': 'EXECUTE',
-      'sp_cancel_order': 'EXECUTE',
-      'sp_add_stock': 'EXECUTE',
-      'sp_transfer_stock': 'EXECUTE',
-      'sp_deactivate_employee': 'EXECUTE',
-      'sp_change_user_role': 'EXECUTE',
-      'sp_get_login': 'EXECUTE'
-    },
-        'DB_MANAGER': {
-      'sales_order': 'SELECT, INSERT',
-      'order_item': 'DENIED',
-      'customer': 'DENIED',
-      'product': 'DENIED',
-      'inventory': 'DENIED',
-      'discount_rule': 'DENIED',
-      'purchase_order': 'DENIED',
-      'employee': 'DENIED',
-      'employee_audit_log': 'DENIED',
-      'security_event_log': 'DENIED',
-      'v_masked_customer_directory': 'DENIED',
-      'v_active_discounts': 'DENIED',
-      'v_low_stock': 'DENIED',
-      'v_daily_sales': 'DENIED',
-      'v_product_ranking': 'DENIED',
-      'sp_place_order': 'DENIED',
-      'sp_cancel_order': 'DENIED',
-      'sp_get_login': 'DENIED',
-      'sp_add_stock': 'DENIED',
-      'sp_transfer_stock': 'DENIED',
-      'sp_receive_purchase': 'DENIED',
-      'sp_deactivate_employee': 'DENIED',
-      'sp_change_user_role': 'DENIED'
-    },
-        'HR': {
-      'sales_order': 'DENIED',
-      'order_item': 'SELECT, INSERT, UPDATE, DELETE',
-      'customer': 'DENIED',
-      'product': 'DENIED',
-      'inventory': 'DENIED',
-      'discount_rule': 'DENIED',
-      'purchase_order': 'DENIED',
-      'employee': 'DENIED',
-      'employee_audit_log': 'DENIED',
-      'security_event_log': 'DENIED',
-      'v_masked_customer_directory': 'DENIED',
-      'v_active_discounts': 'DENIED',
-      'v_low_stock': 'DENIED',
-      'v_daily_sales': 'DENIED',
-      'v_product_ranking': 'DENIED',
-      'sp_place_order': 'DENIED',
-      'sp_cancel_order': 'DENIED',
-      'sp_get_login': 'DENIED',
-      'sp_add_stock': 'DENIED',
-      'sp_transfer_stock': 'DENIED',
-      'sp_receive_purchase': 'DENIED',
-      'sp_deactivate_employee': 'DENIED',
-      'sp_change_user_role': 'DENIED'
-    },
-    'SUPPLIER': {
-      'purchase_order': 'SELECT (Assigned)',
-      'product': 'SELECT',
-      'sp_get_login': 'EXECUTE'
-    }
-  };
+  readonly defaultPrivilegesMap: { [role: string]: { [object: string]: string } } = {};
 
   ngOnInit(): void {
     this.authService.fetchEmployeesHttp().subscribe();
@@ -2654,11 +2543,8 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   confirmRegisterEmployee(): void {
-    const branchNames: { [key: number]: string } = {
-      1: 'Colombo Central Flagship',
-      2: 'Kandy City Centre Branch',
-      3: 'Galle Fort Supermarket'
-    };
+    const branchObj = this.inventoryService.branches.find(b => b.id === Number(this.newEmpBranchId));
+    const branchName = branchObj ? branchObj.name : 'Branch ' + this.newEmpBranchId;
 
     const payload = {
       fullName: this.newEmpName,
@@ -2679,7 +2565,7 @@ export class AdminDashboardComponent implements OnInit {
         // Fallback for standalone demo
         const res = this.authService.registerEmployee({
           ...payload,
-          branchName: branchNames[this.newEmpBranchId] || 'Colombo Central Flagship'
+          branchName: branchName
         });
         this.actionFeedback.set(res);
         if (res.success) {
@@ -2699,7 +2585,7 @@ export class AdminDashboardComponent implements OnInit {
   }
 
   allDbObjects(): any[] {
-    return this.dbObjects().length > 0 ? this.dbObjects() : this.defaultDbObjects;
+    return this.dbObjects();
   }
 
   getPrivilegesForObject(role: string, objectName: string): string {

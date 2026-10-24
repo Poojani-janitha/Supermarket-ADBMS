@@ -32,4 +32,12 @@ public class CouponController {
         discountService.saveCoupon(request);
         return Map.of("code", String.valueOf(request.get("code")).toUpperCase());
     }
+
+    @org.springframework.web.bind.annotation.PutMapping("/{code}")
+    public Map<String, String> updateCoupon(
+            @org.springframework.web.bind.annotation.PathVariable String code,
+            @RequestBody Map<String, Object> request) {
+        discountService.updateCoupon(code, request);
+        return Map.of("code", String.valueOf(request.getOrDefault("code", code)).toUpperCase());
+    }
 }

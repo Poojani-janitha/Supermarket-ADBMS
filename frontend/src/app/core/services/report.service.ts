@@ -25,13 +25,11 @@ export class ReportService {
   private readonly authService = inject(AuthService);
   private readonly apiUrl = '/api/reports';
 
-  // Available Chain Branches
-  readonly branches = [
-    { id: 1, name: 'Colombo Central Flagship' },
-    { id: 2, name: 'Kandy City Center' },
-    { id: 3, name: 'Galle Fort Outlet' },
-    { id: 4, name: 'Negombo Coastal Mart' }
-  ];
+  // Available Chain Branches loaded from MySQL database
+  private readonly _branches = signal<{ id: number; name: string }[]>([]);
+  get branches(): { id: number; name: string }[] {
+    return this._branches();
+  }
 
   // Active Filter Signals: defaults to logged in staff member's branch
   readonly selectedBranchId = signal<number | null>(this.authService.currentUser()?.branchId ?? 1);
@@ -99,7 +97,27 @@ export class ReportService {
   });
 
   constructor() {
+    this.loadBranches();
     this.refreshAll();
+  }
+
+  /**
+   * Loads active supermarket branches dynamically from MySQL.
+   */
+  loadBranches(): void {
+    this.http.get<any[]>('/api/branches').subscribe({
+      next: (rows) => {
+        if (rows && rows.length > 0) {
+          this._branches.set(rows.map(r => ({
+            id: r.id ?? r.branch_id ?? r.branchId,
+            name: r.name ?? r.branch_name ?? r.branchName
+          })));
+        } else {
+          this._branches.set([]);
+        }
+      },
+      error: (err) => console.warn('Failed to load branches from database:', err)
+    });
   }
 
   // =========================================================================

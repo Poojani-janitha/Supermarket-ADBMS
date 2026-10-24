@@ -30,9 +30,10 @@ public class ProductService {
 
     public int saveProduct(Map<String, ?> parameters) {
         Object supplierId = parameters.get("p_supplier_id");
-        if (!(supplierId instanceof Number)
-                || productDao.countActiveSupplier(((Number) supplierId).intValue()) == 0) {
-            throw new IllegalArgumentException("Selected supplier does not exist or is inactive");
+        if (supplierId instanceof Number && ((Number) supplierId).intValue() > 0) {
+            if (productDao.countActiveSupplier(((Number) supplierId).intValue()) == 0) {
+                throw new IllegalArgumentException("Selected supplier does not exist or is inactive");
+            }
         }
         return productDao.saveProduct(parameters);
     }

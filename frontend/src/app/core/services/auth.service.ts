@@ -15,81 +15,10 @@ export class AuthService {
   // Database Backup snapshots (Member 5: PITR & Disaster Recovery)
   readonly backups = signal<BackupInfo[]>([]);
 
-  // Staff directory simulating employee table
-  readonly employees = signal<Employee[]>([
-    {
-      employeeId: 101,
-      branchId: 1,
-      branchName: 'Colombo Central Flagship',
-      fullName: 'Floyd Miles',
-      role: 'CASHIER',
-      username: 'cashier_floyd',
-      hireDate: '2024-03-15',
-      isActive: true
-    },
-    {
-      employeeId: 102,
-      branchId: 1,
-      branchName: 'Colombo Central Flagship',
-      fullName: 'Arlene McCoy',
-      role: 'MANAGER',
-      username: 'manager_arlene',
-      hireDate: '2022-01-10',
-      isActive: true
-    },
-    {
-      employeeId: 100,
-      branchId: 1,
-      branchName: 'Headquarters / All Branches',
-      fullName: 'Kavindu Perera (Admin)',
-      role: 'ADMIN',
-      username: 'admin_kavindu',
-      hireDate: '2021-08-01',
-      isActive: true
-    },
-    {
-      employeeId: 103,
-      branchId: 2,
-      branchName: 'Kandy City Centre Branch',
-      fullName: 'Kamal Gunaratne',
-      role: 'CASHIER',
-      username: 'cashier_kamal',
-      hireDate: '2023-06-20',
-      isActive: true
-    },
-    {
-      employeeId: 104,
-      branchId: 3,
-      branchName: 'Galle Fort Supermarket',
-      fullName: 'Nimal Silva',
-      role: 'MANAGER',
-      username: 'manager_nimal',
-      hireDate: '2022-11-05',
-      isActive: true
-    },
-    {
-      employeeId: 201,
-      branchId: 1,
-      branchName: 'Headquarters Vendor Network',
-      fullName: 'Sunil Bandara (Lanka Fresh Organics)',
-      role: 'SUPPLIER',
-      username: 'supplier_organics',
-      hireDate: '2023-01-15',
-      isActive: true,
-      supplierId: 1
-    },
-    {
-      employeeId: 202,
-      branchId: 1,
-      branchName: 'Headquarters Vendor Network',
-      fullName: 'Anura Jayasuriya (Ceylon Agro Mills)',
-      role: 'SUPPLIER',
-      username: 'supplier_agro',
-      hireDate: '2023-04-10',
-      isActive: true,
-      supplierId: 2
-    }
-  ]);
+  // Live Database Signals (Loaded from MySQL employee, employee_audit_log, security_event_log)
+  readonly employees = signal<Employee[]>([]);
+  readonly employeeAuditLogs = signal<EmployeeAuditLog[]>([]);
+  readonly securityLogs = signal<SecurityEventLog[]>([]);
 
   // Member 5: Security alert modal signal for unauthorized action guard
   readonly securityAlert = signal<{
@@ -115,7 +44,16 @@ export class AuthService {
         }
       }
     }
-    return this.employees()[0];
+    return {
+      employeeId: 1,
+      branchId: 1,
+      branchName: 'Colombo Central Flagship',
+      fullName: 'System Administrator',
+      role: 'ADMIN',
+      username: 'admin',
+      hireDate: '2026-01-01',
+      isActive: true
+    };
   }
 
   // Current active user signal (restored from localStorage if available)
@@ -127,58 +65,6 @@ export class AuthService {
       localStorage.setItem('user', JSON.stringify(user));
     }
   }
-
-  // Member 5: Audit log automatically maintained via trg_employee_audit
-  readonly employeeAuditLogs = signal<EmployeeAuditLog[]>([
-    {
-      logId: 1,
-      employeeId: 101,
-      employeeName: 'Floyd Miles',
-      action: 'ROLE_CHANGE',
-      oldValue: 'TRAINEE',
-      newValue: 'CASHIER',
-      modifiedBy: 'admin_kavindu',
-      modifiedAt: '2026-10-01 09:14:00'
-    },
-    {
-      logId: 2,
-      employeeId: 102,
-      employeeName: 'Arlene McCoy',
-      action: 'BRANCH_TRANSFER',
-      oldValue: 'Branch 2 (Kandy)',
-      newValue: 'Branch 1 (Colombo Central)',
-      modifiedBy: 'admin_kavindu',
-      modifiedAt: '2026-10-03 14:22:15'
-    }
-  ]);
-
-  // Member 5: Security event log
-  readonly securityLogs = signal<SecurityEventLog[]>([
-    {
-      logId: 1,
-      eventType: 'LOGIN_SUCCESS',
-      description: 'Authentication succeeded via sp_get_login',
-      username: 'cashier_floyd',
-      ipAddress: '192.168.1.104',
-      createdAt: '2026-10-10 08:30:12'
-    },
-    {
-      logId: 2,
-      eventType: 'ROLE_ASSIGN',
-      description: 'Activated cashier_role in MySQL session',
-      username: 'cashier_floyd',
-      ipAddress: '192.168.1.104',
-      createdAt: '2026-10-10 08:30:13'
-    },
-    {
-      logId: 3,
-      eventType: 'LOGIN_SUCCESS',
-      description: 'Manager login verified with BCrypt hash',
-      username: 'manager_arlene',
-      ipAddress: '192.168.1.102',
-      createdAt: '2026-10-10 09:15:40'
-    }
-  ]);
 
   // Switch between demo accounts during viva presentation
   switchUser(role: 'CASHIER' | 'MANAGER' | 'ADMIN' | 'SUPPLIER'): void {
@@ -443,13 +329,18 @@ export class AuthService {
               role: res.user.role,
               username: res.user.username,
               hireDate: new Date().toISOString().split('T')[0],
-              isActive: res.user.isActive
+              isActive: res.user.isActive,
+              supplierId: res.user.supplierId
             };
             this.setCurrentUser(userObj);
           }
         }
       })
     );
+  }
+
+  registerSupplierHttp(supplierData: any): Observable<any> {
+    return this.http.post<any>('/api/auth/supplier/signup', supplierData);
   }
 
   // Member 5: Red Warning Style Security Violation Trigger
@@ -509,12 +400,11 @@ export class AuthService {
 
   fetchEmployeesHttp(): Observable<Employee[]> {
     return this.http.get<Employee[]>('/api/admin/employees').pipe(
-      tap(data => {
-        if (data && data.length > 0) {
-          this.employees.set(data);
-        }
-      }),
-      catchError(() => of(this.employees()))
+      tap(data => this.employees.set(data || [])),
+      catchError(() => {
+        this.employees.set([]);
+        return of([]);
+      })
     );
   }
 
@@ -530,12 +420,11 @@ export class AuthService {
         modifiedBy: l.modifiedBy || l.changedBy || 'SYSTEM',
         modifiedAt: l.modifiedAt || l.changedAt || ''
       }))),
-      tap(logs => {
-        if (logs && logs.length > 0) {
-          this.employeeAuditLogs.set(logs);
-        }
-      }),
-      catchError(() => of(this.employeeAuditLogs()))
+      tap(logs => this.employeeAuditLogs.set(logs || [])),
+      catchError(() => {
+        this.employeeAuditLogs.set([]);
+        return of([]);
+      })
     );
   }
 
@@ -549,12 +438,11 @@ export class AuthService {
         ipAddress: s.ipAddress || '127.0.0.1',
         createdAt: s.createdAt || s.loggedAt || ''
       }))),
-      tap(logs => {
-        if (logs && logs.length > 0) {
-          this.securityLogs.set(logs);
-        }
-      }),
-      catchError(() => of(this.securityLogs()))
+      tap(logs => this.securityLogs.set(logs || [])),
+      catchError(() => {
+        this.securityLogs.set([]);
+        return of([]);
+      })
     );
   }
 
