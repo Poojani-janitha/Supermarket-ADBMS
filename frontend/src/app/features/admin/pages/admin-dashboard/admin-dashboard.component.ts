@@ -241,7 +241,7 @@ import { useDatabaseAccounts } from '../../services/use-database-accounts.servic
               type="button"
               class="subtab-pill"
               [class.active]="subAuditTab() === 'SECURITY'"
-              (click)="subAuditTab.set('SECURITY')"
+              (click)="subAuditTab.set('SECURITY'); authService.fetchSecurityLogsHttp().subscribe()"
             >
               <span class="material-symbols-outlined">shield</span>
               <span>System Security Events ({{ authService.securityLogs().length }})</span>
@@ -399,9 +399,9 @@ import { useDatabaseAccounts } from '../../services/use-database-accounts.servic
               </div>
             </div>
             <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button class="btn-pill btn-danger-outline" (click)="testUnauthorizedGuard('inventory', 'EXECUTE')" title="Simulate unauthorized Cashier access on inventory">
+              <!-- <button class="btn-pill btn-danger-outline" (click)="testUnauthorizedGuard('inventory', 'EXECUTE')" title="Simulate unauthorized Cashier access on inventory">
                 <span class="material-symbols-outlined">gpp_bad</span> 🚨 Test Unauthorized Action Guard
-              </button>
+              </button> -->
               <button class="btn-pill btn-primary" (click)="openAddRuleModal()">
                 <span class="material-symbols-outlined">add_moderator</span> + Add New Rule
               </button>
@@ -2507,6 +2507,7 @@ export class AdminDashboardComponent implements OnInit {
         this.actionFeedback.set({ success: true, message: res?.message || 'Employee deactivated via sp_deactivate_employee' });
         this.authService.fetchEmployeesHttp().subscribe();
         this.authService.fetchAuditLogsHttp().subscribe();
+        this.authService.fetchSecurityLogsHttp().subscribe();
       },
       error: (err: any) => {
         if (err?.status === 403) {

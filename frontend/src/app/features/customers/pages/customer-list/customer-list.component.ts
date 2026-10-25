@@ -2,6 +2,7 @@ import { Component, inject, signal, OnInit, OnDestroy, HostListener } from '@ang
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CustomerService } from '../../../../core/services/customer.service';
+import { AuthService } from '../../../../core/services/auth.service';
 import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models';
 
 @Component({
@@ -130,7 +131,7 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
               <tr>
                 <td><span class="code-sku">#{{ c.id }}</span></td>
                 <td><strong>{{ c.fullName }}</strong></td>
-                <td><span class="phone-text">{{ c.phone }}</span></td>
+                <td><span class="phone-text">{{ getDisplayPhone(c.phone, c.maskedPhone) }}</span></td>
                 <td>{{ c.email || 'N/A' }}</td>
                 <td>
                   <div class="loyalty-pts-cell">
@@ -245,7 +246,7 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
             <div class="customer-detail-grid">
               <div><span>Customer ID</span><strong>#{{ selectedCustomer.id }}</strong></div>
               <div><span>Full Name</span><strong>{{ selectedCustomer.fullName }}</strong></div>
-              <div><span>Phone</span><strong>{{ selectedCustomer.phone }}</strong></div>
+              <div><span>Phone</span><strong>{{ getDisplayPhone(selectedCustomer.phone, selectedCustomer.maskedPhone) }}</strong></div>
               <div><span>Email</span><strong>{{ selectedCustomer.email || 'N/A' }}</strong></div>
               <div><span>Loyalty Points</span><strong>{{ selectedCustomer.loyaltyPoints }}</strong></div>
               <div><span>Tier</span><strong>{{ selectedCustomer.tier }}</strong></div>
@@ -936,6 +937,15 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
 })
 export class CustomerListComponent implements OnInit, OnDestroy {
   readonly customerService = inject(CustomerService);
+  readonly authService = inject(AuthService);
+
+  getDisplayPhone(phone?: string, maskedPhone?: string): string {
+    if (!phone) return 'N/A';
+    if (this.authService.isCashier()) {
+      return maskedPhone || this.customerService.maskPhone(phone);
+    }
+    return phone;
+  }
 
   private autoRefreshTimer: any = null;
   private toastTimeout: any = null;

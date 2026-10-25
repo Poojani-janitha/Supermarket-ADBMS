@@ -24,14 +24,10 @@ import { InventoryService } from '../../../core/services/inventory.service';
       <!-- Navigation Menu -->
       <nav class="nav-menu">
         @if (authService.isSupplier()) {
-          <!-- Supplier Dedicated Links -->
+          <!-- Supplier Dedicated Links: My Orders ONLY -->
           <a routerLink="/orders" routerLinkActive="active" class="nav-item">
             <span class="material-symbols-outlined nav-icon">local_shipping</span>
             <span class="nav-label">My Orders</span>
-          </a>
-          <a routerLink="/products" routerLinkActive="active" class="nav-item">
-            <span class="material-symbols-outlined nav-icon">inventory_2</span>
-            <span class="nav-label">Product Catalog</span>
           </a>
         } @else {
           <!-- Internal Supermarket Staff Links -->
@@ -50,19 +46,24 @@ import { InventoryService } from '../../../core/services/inventory.service';
             <span class="nav-label">Product Catalog</span>
           </a>
 
-          <a routerLink="/inventory" routerLinkActive="active" class="nav-item">
+          <a routerLink="/inventory" (click)="onNavClick($event, 'inventory', 'INVENTORY_ACCESS', '/inventory', 'Branch Inventory')" routerLinkActive="active" class="nav-item">
             <span class="material-symbols-outlined nav-icon">warehouse</span>
             <span class="nav-label">Branch Inventory</span>
+            @if (authService.isCashier()) {
+              <span class="lock-indicator" title="Restricted to Managers & Admins">
+                <span class="material-symbols-outlined lock-icon">lock</span>
+              </span>
+            }
           </a>
 
-          <a routerLink="/purchase-orders" routerLinkActive="active" class="nav-item">
+          <a routerLink="/purchase-orders" (click)="onNavClick($event, 'purchase_order', 'PURCHASE_ORDERS_ACCESS', '/purchase-orders', 'Purchase Orders')" routerLinkActive="active" class="nav-item">
             <span class="material-symbols-outlined nav-icon">receipt_long</span>
             <span class="nav-label">Purchase Orders</span>
-          </a>
-
-          <a routerLink="/orders" routerLinkActive="active" class="nav-item">
-            <span class="material-symbols-outlined nav-icon">local_shipping</span>
-            <span class="nav-label">My Orders</span>
+            @if (authService.isCashier()) {
+              <span class="lock-indicator" title="Restricted to Managers & Admins">
+                <span class="material-symbols-outlined lock-icon">lock</span>
+              </span>
+            }
           </a>
 
           <a routerLink="/customers" routerLinkActive="active" class="nav-item">
@@ -75,9 +76,14 @@ import { InventoryService } from '../../../core/services/inventory.service';
             <span class="nav-label">Discount Engine</span>
           </a>
 
-          <a routerLink="/reports" routerLinkActive="active" class="nav-item">
+          <a routerLink="/reports" (click)="onNavClick($event, 'v_daily_sales', 'REPORTS_ANALYTICS_ACCESS', '/reports', 'Reports & Analytics')" routerLinkActive="active" class="nav-item">
             <span class="material-symbols-outlined nav-icon">analytics</span>
             <span class="nav-label">Reports & Analytics</span>
+            @if (authService.isCashier()) {
+              <span class="lock-indicator" title="Restricted to Managers & Admins">
+                <span class="material-symbols-outlined lock-icon">lock</span>
+              </span>
+            }
           </a>
 
           @if (authService.isAdmin()) {
@@ -85,7 +91,7 @@ import { InventoryService } from '../../../core/services/inventory.service';
               <span class="material-symbols-outlined nav-icon">admin_panel_settings</span>
               <span class="nav-label">Security</span>
             </a>
-                        <a routerLink="/admin/backups" routerLinkActive="active" class="nav-item nav-item-backups">
+            <a routerLink="/admin/backups" routerLinkActive="active" class="nav-item nav-item-backups">
               <span class="material-symbols-outlined nav-icon">settings_backup_restore</span>
               <span class="nav-label">Database Backups & DR</span>
             </a>
@@ -95,12 +101,14 @@ import { InventoryService } from '../../../core/services/inventory.service';
 
       <!-- Bottom Staff & Role Switcher -->
       <div class="sidebar-footer">
-        <div class="branch-pill" [title]="currentBranchName()">
-          <span class="material-symbols-outlined branch-icon">store</span>
-          <span class="branch-text">{{ currentBranchName() }}</span>
-        </div>
+        @if (!authService.isSupplier()) {
+          <div class="branch-pill" [title]="currentBranchName()">
+            <span class="material-symbols-outlined branch-icon">store</span>
+            <span class="branch-text">{{ currentBranchName() }}</span>
+          </div>
+        }
 
-        <div class="staff-card active-staff" (click)="signOut()" title="Active Session - Click to Sign Out">
+        <div class="staff-card active-staff" title="Active Session">
           <div class="avatar-circle">
             {{ authService.currentUser().fullName.substring(0, 2).toUpperCase() }}
           </div>
@@ -108,9 +116,6 @@ import { InventoryService } from '../../../core/services/inventory.service';
             <span class="staff-name">{{ authService.currentUser().fullName }}</span>
             <span class="staff-role">{{ authService.currentUser().role }}_ROLE</span>
           </div>
-          <button type="button" class="mini-logout-btn" (click)="signOut(); $event.stopPropagation()" title="Sign Out">
-            <span class="material-symbols-outlined">logout</span>
-          </button>
         </div>
 
         <div class="footer-links-row">
@@ -412,6 +417,27 @@ import { InventoryService } from '../../../core/services/inventory.service';
       }
     }
 
+    .lock-indicator {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      background: #f1f5f9;
+      padding: 2px;
+      border-radius: 4px;
+      transition: all 0.2s ease;
+    }
+
+    .lock-icon {
+      font-size: 14px;
+    }
+
+    .nav-item:hover .lock-indicator {
+      color: #dc2626;
+      background: #fee2e2;
+    }
+
     .logout-icon {
       font-size: 18px;
     }
@@ -434,8 +460,21 @@ export class SidebarComponent {
     return branch ? branch.name : (user.branchName || 'Colombo Central Flagship');
   });
 
+  onNavClick(event: MouseEvent, targetObject: string, action: string, path: string, label: string): void {
+    if ((path === '/inventory' || path === '/purchase-orders' || path === '/reports') && !this.authService.isManager()) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.authService.triggerSecurityAlert(
+        targetObject,
+        'MANAGEMENT_ACCESS',
+        `Restricted Action: Your role '${this.authService.currentUser().role}' is restricted from accessing '${label}'. Store Manager or Administrator role required.`
+      );
+    }
+  }
+
   signOut(): void {
     this.authService.logout();
     this.router.navigate(['/login']);
   }
 }
+

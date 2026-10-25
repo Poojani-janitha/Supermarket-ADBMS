@@ -334,6 +334,8 @@ export class CartService {
         this.lastCompletedOrder.set(savedOrder);
         this.isReceiptOpen.set(true);
         this.cartItems.set([]);
+        this.appliedCoupon.set('');
+        this.cashTendered.set(0);
         // Reload live inventory from MySQL
         this.productService.loadProducts();
         // Reload live customers so loyalty points and directory update immediately
@@ -374,5 +376,8 @@ export class CartService {
 
   closeReceipt(): void {
     this.isReceiptOpen.set(false);
+    this.appliedCoupon.set('');
+    this.selectedCustomer.set(null);
+    this.cashTendered.set(0);
   }
 }

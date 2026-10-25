@@ -26,7 +26,8 @@ public class ProductDao {
                            parent.name AS category_parent_name,
                            p.supplier_id, s.name AS supplier_name,
                            p.unit_price, p.cost_price, p.image_url, p.diet_type,
-                           p.unit_of_measure, p.min_order_qty, p.is_active
+                           p.unit_of_measure, p.min_order_qty, p.is_active,
+                           COALESCE((SELECT SUM(quantity) FROM inventory i WHERE i.product_id = p.product_id), 0) AS stock_qty
                     FROM product p
                     JOIN category c ON c.category_id = p.category_id
                     LEFT JOIN category parent ON parent.category_id = c.parent_id
@@ -45,7 +46,8 @@ public class ProductDao {
                            parent.name AS category_parent_name,
                            p.supplier_id, s.name AS supplier_name,
                            p.unit_price, p.cost_price, p.image_url, p.diet_type,
-                           p.unit_of_measure, p.min_order_qty, p.is_active
+                           p.unit_of_measure, p.min_order_qty, p.is_active,
+                           COALESCE((SELECT SUM(quantity) FROM inventory i WHERE i.product_id = p.product_id), 0) AS stock_qty
                     FROM product p
                     JOIN category c ON c.category_id = p.category_id
                     LEFT JOIN category parent ON parent.category_id = c.parent_id
@@ -124,6 +126,16 @@ public class ProductDao {
                         new SqlParameter("p_is_active", java.sql.Types.BOOLEAN),
                         new SqlOutParameter("p_saved_product_id", java.sql.Types.INTEGER));
         Number id = (Number) call.execute(parameters).get("p_saved_product_id");
-        return id.intValue();
+        int savedProductId = id.intValue();
+
+        // Ensure new/existing product has corresponding inventory rows across active branches
+        jdbcTemplate.update("""
+                INSERT IGNORE INTO inventory (branch_id, product_id, quantity, reorder_level, version)
+                SELECT branch_id, ?, 0, 10, 0
+                FROM branch
+                WHERE is_active = TRUE
+                """, savedProductId);
+
+        return savedProductId;
     }
 }

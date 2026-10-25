@@ -43,29 +43,6 @@ import { InventoryService } from '../../../core/services/inventory.service';
           </button>
         </div>
 
-        <!-- Supplier Portal Sub-Mode Tabs -->
-        @if (portalType() === 'SUPPLIER') {
-          <div class="supplier-submode-tabs">
-            <button
-              type="button"
-              class="submode-tab"
-              [class.active]="!showSupplierSignUp()"
-              (click)="toggleSignUp(false)"
-            >
-              <span class="material-symbols-outlined">login</span>
-              <span>Sign In</span>
-            </button>
-            <button
-              type="button"
-              class="submode-tab"
-              [class.active]="showSupplierSignUp()"
-              (click)="toggleSignUp(true)"
-            >
-              <span class="material-symbols-outlined">person_add</span>
-              <span>New Supplier Self-Registration</span>
-            </button>
-          </div>
-        }
 
         <!-- Error & Success Banners -->
         @if (errorMessage()) {

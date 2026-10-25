@@ -18,7 +18,7 @@ public class CustomerDao {
 
     public List<Map<String, Object>> findCustomers() {
         return jdbcTemplate.queryForList("""
-                SELECT customer_id, full_name, phone, email, loyalty_points, tier, registered_date, is_first_purchase
+                SELECT customer_id, full_name, phone, fn_mask_phone(phone) AS masked_phone, email, loyalty_points, tier, registered_date, is_first_purchase
                 FROM v_customer_directory
                 ORDER BY full_name
                 """);

@@ -21,27 +21,7 @@ import { BackupSnapshotsTableComponent } from '../../components/backup-snapshots
       <!-- Page Header -->
       <div class="page-header">
         <div class="header-titles">
-          <div class="title-with-badge">
-            <h1 class="page-title">Database Backups & DR</h1>
-            <span class="badge-dr">DISASTER RECOVERY ENGINE</span>
-          </div>
-          <p class="page-subtitle">
-            Enterprise database backup orchestration, InnoDB MVCC transactional snapshots, binary log coordinates, and point-in-time recovery (PITR).
-          </p>
-        </div>
-
-        <div class="header-session-actions">
-          <div class="session-box">
-            <span class="session-label">DBA Session:</span>
-            <span class="session-pill">
-              <span class="status-dot-pulse"></span>
-              {{ authService.currentUser().fullName }} ({{ authService.currentUser().role }}_ROLE)
-            </span>
-          </div>
-          <button type="button" class="btn-header-signout" (click)="signOut()" title="Sign Out & Return to Login">
-            <span class="material-symbols-outlined">logout</span>
-            <span>Sign Out</span>
-          </button>
+          <h1 class="page-title">Database Backups & DR</h1>
         </div>
       </div>
 

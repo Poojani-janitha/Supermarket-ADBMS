@@ -43,6 +43,7 @@ export interface Customer {
   id: number;
   fullName: string;
   phone: string;
+  maskedPhone?: string;
   email?: string;
   loyaltyPoints: number;
   tier: 'BRONZE' | 'SILVER' | 'GOLD';

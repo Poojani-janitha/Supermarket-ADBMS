@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InventoryService } from '../../../../core/services/inventory.service';
@@ -30,13 +30,16 @@ import { PurchaseOrder } from '../../../../core/models';
                 class="form-select-supplier"
                 [ngModel]="selectedSupplierId()"
                 (ngModelChange)="selectedSupplierId.set(+$event)"
+                [disabled]="authService.isSupplier()"
               >
-                @for (sup of inventoryService.suppliers(); track sup.supplierId) {
+                @for (sup of availableSuppliers(); track sup.supplierId) {
                   <option [value]="sup.supplierId">
                     {{ sup.name }} (ID: {{ sup.supplierId }})
                   </option>
                 }
-                <option [value]="0">All Suppliers (Overview)</option>
+                @if (!authService.isSupplier()) {
+                  <option [value]="0">All Suppliers (Overview)</option>
+                }
               </select>
             </div>
           </div>
@@ -808,7 +811,7 @@ import { PurchaseOrder } from '../../../../core/models';
     }
   `]
 })
-export class SupplierPortalComponent {
+export class SupplierPortalComponent implements OnInit {
   readonly inventoryService = inject(InventoryService);
   readonly authService = inject(AuthService);
 
@@ -823,6 +826,25 @@ export class SupplierPortalComponent {
 
   // Direct supplier view without login barrier: Defaults to Highland Dairy Farms (#3)
   selectedSupplierId = signal<number>(this.authService.currentUser().supplierId || 3);
+
+  availableSuppliers = computed(() => {
+    if (this.authService.isSupplier()) {
+      const mySupplierId = this.authService.currentUser().supplierId;
+      if (mySupplierId) {
+        return this.inventoryService.suppliers().filter(s => s.supplierId === mySupplierId);
+      }
+    }
+    return this.inventoryService.suppliers();
+  });
+
+  ngOnInit(): void {
+    if (this.authService.isSupplier()) {
+      const mySupplierId = this.authService.currentUser().supplierId;
+      if (mySupplierId) {
+        this.selectedSupplierId.set(mySupplierId);
+      }
+    }
+  }
 
   currentSupplierName = computed(() => {
     const id = this.selectedSupplierId();

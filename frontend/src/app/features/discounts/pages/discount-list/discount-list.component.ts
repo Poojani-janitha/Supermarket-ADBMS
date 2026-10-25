@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Coupon, DiscountRule, Holiday } from '../../../../core/models';
 import { DiscountService } from '../../../../core/services/discount.service';
+import { AuthService } from '../../../../core/services/auth.service';
 
 @Component({
   selector: 'app-discount-list',
@@ -1103,6 +1104,7 @@ import { DiscountService } from '../../../../core/services/discount.service';
 })
 export class DiscountListComponent {
   readonly discountService = inject(DiscountService);
+  readonly authService = inject(AuthService);
 
   // Existing creation modals state
   isCouponModalOpen = false;
@@ -1198,6 +1200,14 @@ export class DiscountListComponent {
   }
 
   openEditRule(rule: DiscountRule): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'discount_rule',
+        'UPDATE',
+        'Restricted Action: Cashiers are not authorized to modify promotion rules. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.selectedRuleForEdit = rule;
     this.editRuleError = '';
     this.editRuleName = rule.name;
@@ -1288,6 +1298,14 @@ export class DiscountListComponent {
   }
 
   openEditCoupon(coupon: Coupon): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'coupon',
+        'UPDATE',
+        'Restricted Action: Cashiers are not authorized to modify coupon vouchers. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.selectedCouponForEdit = coupon;
     this.editCouponError = '';
     this.editCouponCode = coupon.code;
@@ -1376,6 +1394,14 @@ export class DiscountListComponent {
   }
 
   openEditHoliday(holiday: Holiday): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'holiday',
+        'UPDATE',
+        'Restricted Action: Cashiers are not authorized to modify calendar holidays. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.selectedHolidayForEdit = holiday;
     this.editHolidayError = '';
     this.editHolidayDate = holiday.holidayDate;
@@ -1426,6 +1452,14 @@ export class DiscountListComponent {
 
   // --- Create Modals handlers (existing) ---
   openCouponModal(): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'coupon',
+        'INSERT',
+        'Restricted Action: Cashiers are not authorized to create coupon vouchers. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.couponError = '';
     this.couponCode = '';
     this.couponRuleId = this.discountService.rules()[0]?.ruleId ?? null;
@@ -1491,6 +1525,14 @@ export class DiscountListComponent {
   }
 
   openRuleModal(): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'discount_rule',
+        'INSERT',
+        'Restricted Action: Cashiers are not authorized to configure discount rules. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.ruleError = '';
     this.ruleName = '';
     this.ruleType = 'HOLIDAY';
@@ -1540,6 +1582,14 @@ export class DiscountListComponent {
   }
 
   openHolidayModal(): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'holiday',
+        'INSERT',
+        'Restricted Action: Cashiers are not authorized to add holiday promotions. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.holidayError = '';
     this.holidayDate = this.today();
     this.holidayName = '';

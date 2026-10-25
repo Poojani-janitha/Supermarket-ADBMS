@@ -7,6 +7,7 @@ interface CustomerRow {
   customer_id: number;
   full_name: string;
   phone: string;
+  masked_phone?: string;
   email: string | null;
   loyalty_points: number;
   tier: Customer['tier'];
@@ -26,7 +27,7 @@ export class CustomerService {
     const masked = this.isDataMasked();
     return this.customers().map(customer => ({
       ...customer,
-      phone: masked ? this.maskPhone(customer.phone) : customer.phone
+      phone: masked ? (customer.maskedPhone || this.maskPhone(customer.phone)) : customer.phone
     }));
   });
 
@@ -40,6 +41,7 @@ export class CustomerService {
         id: row.customer_id,
         fullName: row.full_name,
         phone: row.phone,
+        maskedPhone: row.masked_phone || this.maskPhone(row.phone),
         email: row.email ?? undefined,
         loyaltyPoints: row.loyalty_points,
         tier: row.tier,

@@ -19,6 +19,7 @@ interface ProductRow {
   unit_of_measure: Product['unitOfMeasure'];
   min_order_qty: number;
   is_active: boolean;
+  stock_qty?: number;
 }
 
 interface CategoryRow {
@@ -243,7 +244,7 @@ export class ProductService {
       dietType: row.diet_type ?? undefined,
       unitOfMeasure: row.unit_of_measure ?? undefined,
       minOrderQty: Number(row.min_order_qty),
-      stockQty: 0
+      stockQty: row.stock_qty != null ? Number(row.stock_qty) : 0
     };
   }
 }

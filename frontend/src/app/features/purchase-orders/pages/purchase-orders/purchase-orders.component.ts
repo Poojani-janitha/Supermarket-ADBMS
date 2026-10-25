@@ -270,7 +270,7 @@ import { Product, PurchaseOrder } from '../../../../core/models';
               </tr>
             </thead>
             <tbody>
-              @for (po of activeOrders(); track po.poId) {
+              @for (po of paginatedActiveOrders(); track po.poId) {
                 <tr>
                   <td><span class="code-sku">#PO-{{ po.poId }}</span></td>
                   <td>
@@ -324,6 +324,43 @@ import { Product, PurchaseOrder } from '../../../../core/models';
               }
             </tbody>
           </table>
+
+          @if (activeOrders().length > receivingPageSize) {
+            <div class="pagination-footer">
+              <div class="pagination-info">
+                Showing Page <strong>{{ receivingPage() }}</strong> of <strong>{{ receivingTotalPages() }}</strong> ({{ activeOrders().length }} shipments)
+              </div>
+              <div class="pagination-controls">
+                <button
+                  class="page-btn"
+                  [disabled]="receivingPage() === 1"
+                  (click)="receivingPage.update(p => p - 1)"
+                >
+                  <span class="material-symbols-outlined">chevron_left</span>
+                  <span>Previous</span>
+                </button>
+                <div class="page-pills">
+                  @for (p of receivingPageNumbers(); track p) {
+                    <button
+                      class="page-num-pill"
+                      [class.active]="p === receivingPage()"
+                      (click)="receivingPage.set(p)"
+                    >
+                      {{ p }}
+                    </button>
+                  }
+                </div>
+                <button
+                  class="page-btn"
+                  [disabled]="receivingPage() === receivingTotalPages()"
+                  (click)="receivingPage.update(p => p + 1)"
+                >
+                  <span>Next</span>
+                  <span class="material-symbols-outlined">chevron_right</span>
+                </button>
+              </div>
+            </div>
+          }
         </div>
       }
 
@@ -346,7 +383,7 @@ import { Product, PurchaseOrder } from '../../../../core/models';
               </tr>
             </thead>
             <tbody>
-              @for (po of inventoryService.purchaseOrders(); track po.poId) {
+              @for (po of paginatedHistoryOrders(); track po.poId) {
                 <tr>
                   <td><span class="code-sku">#PO-{{ po.poId }}</span></td>
                   <td>{{ po.branchName }}</td>
@@ -378,6 +415,43 @@ import { Product, PurchaseOrder } from '../../../../core/models';
               }
             </tbody>
           </table>
+
+          @if (inventoryService.purchaseOrders().length > historyPageSize) {
+            <div class="pagination-footer">
+              <div class="pagination-info">
+                Showing Page <strong>{{ historyPage() }}</strong> of <strong>{{ historyTotalPages() }}</strong> ({{ inventoryService.purchaseOrders().length }} total orders)
+              </div>
+              <div class="pagination-controls">
+                <button
+                  class="page-btn"
+                  [disabled]="historyPage() === 1"
+                  (click)="historyPage.update(p => p - 1)"
+                >
+                  <span class="material-symbols-outlined">chevron_left</span>
+                  <span>Previous</span>
+                </button>
+                <div class="page-pills">
+                  @for (p of historyPageNumbers(); track p) {
+                    <button
+                      class="page-num-pill"
+                      [class.active]="p === historyPage()"
+                      (click)="historyPage.set(p)"
+                    >
+                      {{ p }}
+                    </button>
+                  }
+                </div>
+                <button
+                  class="page-btn"
+                  [disabled]="historyPage() === historyTotalPages()"
+                  (click)="historyPage.update(p => p + 1)"
+                >
+                  <span>Next</span>
+                  <span class="material-symbols-outlined">chevron_right</span>
+                </button>
+              </div>
+            </div>
+          }
         </div>
       }
     </div>
@@ -1368,6 +1442,90 @@ import { Product, PurchaseOrder } from '../../../../core/models';
       justify-content: flex-end;
       gap: 10px;
     }
+
+    /* Table Pagination */
+    .pagination-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-top: 1px solid #f1f5f9;
+      background: #fafafa;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+    }
+
+    .pagination-info {
+      font-size: 0.84rem;
+      color: #64748b;
+      font-weight: 500;
+      strong { color: #1e293b; }
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .page-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #334155;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover:not(:disabled) {
+        border-color: #065f46;
+        color: #065f46;
+        background: #ecfdf5;
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      span.material-symbols-outlined { font-size: 16px; }
+    }
+
+    .page-pills {
+      display: flex;
+      gap: 4px;
+    }
+
+    .page-num-pill {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s;
+
+      &.active {
+        background: #065f46;
+        border-color: #065f46;
+        color: #ffffff;
+      }
+
+      &:hover:not(.active) {
+        border-color: #065f46;
+        color: #065f46;
+        background: #f0fdf4;
+      }
+    }
   `]
 })
 export class PurchaseOrdersComponent {
@@ -1432,6 +1590,32 @@ export class PurchaseOrdersComponent {
   pendingReceivingCount = computed(() => {
     const branchId = this.activeBranchId();
     return this.inventoryService.purchaseOrders().filter(po => po.status === 'CONFIRMED' && po.branchId === branchId).length;
+  });
+
+  // Receiving Tab Pagination
+  receivingPage = signal<number>(1);
+  receivingPageSize = 5;
+  receivingTotalPages = computed(() => Math.max(1, Math.ceil(this.activeOrders().length / this.receivingPageSize)));
+  paginatedActiveOrders = computed(() => {
+    const page = this.receivingPage();
+    const start = (page - 1) * this.receivingPageSize;
+    return this.activeOrders().slice(start, start + this.receivingPageSize);
+  });
+  receivingPageNumbers = computed(() => {
+    return Array.from({ length: this.receivingTotalPages() }, (_, i) => i + 1);
+  });
+
+  // History Tab Pagination
+  historyPage = signal<number>(1);
+  historyPageSize = 8;
+  historyTotalPages = computed(() => Math.max(1, Math.ceil(this.inventoryService.purchaseOrders().length / this.historyPageSize)));
+  paginatedHistoryOrders = computed(() => {
+    const page = this.historyPage();
+    const start = (page - 1) * this.historyPageSize;
+    return this.inventoryService.purchaseOrders().slice(start, start + this.historyPageSize);
+  });
+  historyPageNumbers = computed(() => {
+    return Array.from({ length: this.historyTotalPages() }, (_, i) => i + 1);
   });
 
   onFormProductSelect(productId: any): void {

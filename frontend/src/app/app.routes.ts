@@ -1,6 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
-import { adminRoleGuard } from './core/guards/role.guard';
+import { adminRoleGuard, managerRoleGuard } from './core/guards/role.guard';
 
 export const routes: Routes = [
   {
@@ -15,23 +15,28 @@ export const routes: Routes = [
   },
   {
     path: 'sales-management',
-    loadComponent: () => import('./features/sales-management/sales-management.component').then(m => m.SalesManagementComponent)
+    loadComponent: () => import('./features/sales-management/sales-management.component').then(m => m.SalesManagementComponent),
+    canActivate: [authGuard]
   },
   {
     path: 'products',
-    loadComponent: () => import('./features/products/pages/product-list/product-list.component').then(m => m.ProductListComponent)
+    loadComponent: () => import('./features/products/pages/product-list/product-list.component').then(m => m.ProductListComponent),
+    canActivate: [authGuard]
   },
   {
     path: 'inventory',
-    loadComponent: () => import('./features/inventory/pages/inventory-list/inventory-list.component').then(m => m.InventoryListComponent)
+    loadComponent: () => import('./features/inventory/pages/inventory-list/inventory-list.component').then(m => m.InventoryListComponent),
+    canActivate: [authGuard, managerRoleGuard]
   },
   {
     path: 'purchase-orders',
-    loadComponent: () => import('./features/purchase-orders/pages/purchase-orders/purchase-orders.component').then(m => m.PurchaseOrdersComponent)
+    loadComponent: () => import('./features/purchase-orders/pages/purchase-orders/purchase-orders.component').then(m => m.PurchaseOrdersComponent),
+    canActivate: [authGuard, managerRoleGuard]
   },
   {
     path: 'orders',
-    loadComponent: () => import('./features/supplier-portal/pages/supplier-portal/supplier-portal.component').then(m => m.SupplierPortalComponent)
+    loadComponent: () => import('./features/supplier-portal/pages/supplier-portal/supplier-portal.component').then(m => m.SupplierPortalComponent),
+    canActivate: [authGuard]
   },
   {
     path: 'supplier-portal',
@@ -40,15 +45,18 @@ export const routes: Routes = [
   },
   {
     path: 'customers',
-    loadComponent: () => import('./features/customers/pages/customer-list/customer-list.component').then(m => m.CustomerListComponent)
+    loadComponent: () => import('./features/customers/pages/customer-list/customer-list.component').then(m => m.CustomerListComponent),
+    canActivate: [authGuard]
   },
   {
     path: 'discounts',
-    loadComponent: () => import('./features/discounts/pages/discount-list/discount-list.component').then(m => m.DiscountListComponent)
+    loadComponent: () => import('./features/discounts/pages/discount-list/discount-list.component').then(m => m.DiscountListComponent),
+    canActivate: [authGuard]
   },
   {
     path: 'reports',
-    loadComponent: () => import('./features/reports/pages/reports-dashboard/reports-dashboard.component').then(m => m.ReportsDashboardComponent)
+    loadComponent: () => import('./features/reports/pages/reports-dashboard/reports-dashboard.component').then(m => m.ReportsDashboardComponent),
+    canActivate: [authGuard, managerRoleGuard]
   },
   {
     path: 'admin',

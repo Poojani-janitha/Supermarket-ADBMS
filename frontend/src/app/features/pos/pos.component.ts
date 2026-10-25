@@ -382,7 +382,7 @@ import { Customer, Product, SalesOrder } from '../../core/models';
                           {{ c.tier }}
                         </span>
                       </div>
-                      <p>{{ c.phone }} &bull; {{ c.loyaltyPoints }} Points</p>
+                      <p>{{ authService.isCashier() ? (c.maskedPhone || customerService.maskPhone(c.phone)) : c.phone }} &bull; {{ c.loyaltyPoints }} Points</p>
                     </div>
                   </button>
                 }

@@ -122,13 +122,13 @@ import { InventoryItem } from '../../../../core/models';
       <div class="filter-bar-card">
         <div class="branch-select-group">
           <span class="material-symbols-outlined">warehouse</span>
-          <label>Filter by Branch Outlet:</label>
-          <select [ngModel]="selectedBranchFilter()" (ngModelChange)="selectedBranchFilter.set($event)">
-            <option [value]="0">All Supermarket Branches</option>
+          <label>Assigned Branch:</label>
+          <select [ngModel]="selectedBranchFilter()" disabled title="Branch locked to your assigned branch">
             @for (branch of inventoryService.branches; track branch.id) {
               <option [value]="branch.id">{{ branch.name }}</option>
             }
           </select>
+          <span class="material-symbols-outlined" style="font-size: 18px; color: #64748b;" title="Locked to assigned branch">lock</span>
         </div>
 
         <div class="search-input-box">
@@ -239,8 +239,8 @@ import { InventoryItem } from '../../../../core/models';
 
             <div class="form-grid">
               <div class="form-group">
-                <label>From Source Branch</label>
-                <select [(ngModel)]="transferFromBranchId">
+                <label>From Source Branch (Locked to your branch)</label>
+                <select [(ngModel)]="transferFromBranchId" disabled title="Source branch locked to your assigned branch">
                   @for (branch of inventoryService.branches; track branch.id) {
                     <option [value]="branch.id">{{ branch.name }}</option>
                   }
@@ -1034,6 +1034,10 @@ export class InventoryListComponent {
   });
 
   openTransferModal(): void {
+    const userBranch = this.authService.currentUser()?.branchId || 1;
+    this.transferFromBranchId = userBranch;
+    const otherBranch = this.inventoryService.branches.find(b => b.id !== userBranch);
+    this.transferToBranchId = otherBranch ? otherBranch.id : (userBranch === 1 ? 2 : 1);
     this.transferError.set(null);
     this.showTransferModal.set(true);
   }

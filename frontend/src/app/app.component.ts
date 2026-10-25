@@ -3,11 +3,12 @@ import { CommonModule } from '@angular/common';
 import { Router, RouterOutlet } from '@angular/router';
 import { SidebarComponent } from './shared/components/sidebar/sidebar.component';
 import { ReceiptModalComponent } from './shared/components/receipt-modal/receipt-modal.component';
+import { SecurityAlertModalComponent } from './shared/components/security-alert-modal/security-alert-modal.component';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, RouterOutlet, SidebarComponent, ReceiptModalComponent],
+  imports: [CommonModule, RouterOutlet, SidebarComponent, ReceiptModalComponent, SecurityAlertModalComponent],
   template: `
     <div class="pos-app-wrapper" [class.auth-layout]="isAuthPage">
       @if (!isAuthPage) {
@@ -17,6 +18,7 @@ import { ReceiptModalComponent } from './shared/components/receipt-modal/receipt
         <router-outlet></router-outlet>
       </main>
       <app-receipt-modal></app-receipt-modal>
+      <app-security-alert-modal></app-security-alert-modal>
     </div>
   `,
   styles: [`

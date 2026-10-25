@@ -1,7 +1,8 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { CreateCategoryRequest, CreateProductRequest, CreateUnitRequest, ProductService } from '../../../../core/services/product.service';
+import { AuthService } from '../../../../core/services/auth.service';
 import { Product } from '../../../../core/models';
 
 @Component({
@@ -104,7 +105,7 @@ import { Product } from '../../../../core/models';
             </tr>
           </thead>
           <tbody>
-            @for (p of productService.filteredProducts(); track p.id) {
+            @for (p of paginatedProducts(); track p.id) {
               <tr>
                 <td>
                   <img [src]="p.imageUrl" [alt]="p.name" class="thumb-img" />
@@ -147,6 +148,43 @@ import { Product } from '../../../../core/models';
             }
           </tbody>
         </table>
+
+        @if (productService.filteredProducts().length > catalogPageSize) {
+          <div class="pagination-footer">
+            <div class="pagination-info">
+              Showing Page <strong>{{ catalogPage() }}</strong> of <strong>{{ catalogTotalPages() }}</strong> ({{ productService.filteredProducts().length }} products)
+            </div>
+            <div class="pagination-controls">
+              <button
+                class="page-btn"
+                [disabled]="catalogPage() === 1"
+                (click)="catalogPage.update(p => p - 1)"
+              >
+                <span class="material-symbols-outlined">chevron_left</span>
+                <span>Previous</span>
+              </button>
+              <div class="page-pills">
+                @for (p of catalogPageNumbers(); track p) {
+                  <button
+                    class="page-num-pill"
+                    [class.active]="p === catalogPage()"
+                    (click)="catalogPage.set(p)"
+                  >
+                    {{ p }}
+                  </button>
+                }
+              </div>
+              <button
+                class="page-btn"
+                [disabled]="catalogPage() === catalogTotalPages()"
+                (click)="catalogPage.update(p => p + 1)"
+              >
+                <span>Next</span>
+                <span class="material-symbols-outlined">chevron_right</span>
+              </button>
+            </div>
+          </div>
+        }
       </div>
 
       @if (viewedProduct(); as prod) {
@@ -177,8 +215,8 @@ import { Product } from '../../../../core/models';
               <div><span class="detail-label">Category ID</span><strong>{{ prod.categoryId }}</strong></div>
               <div><span class="detail-label">Supplier</span><strong>{{ prod.supplierName || 'Not specified' }}</strong></div>
               <div><span class="detail-label">Supplier ID</span><strong>{{ prod.supplierId || 'Not specified' }}</strong></div>
-              <div><span class="detail-label">Unit price</span><strong>\${{ prod.unitPrice.toFixed(2) }}</strong></div>
-              <div><span class="detail-label">Cost price</span><strong>\${{ prod.costPrice.toFixed(2) }}</strong></div>
+              <div><span class="detail-label">Unit price</span><strong>Rs. {{ prod.unitPrice.toFixed(2) }}</strong></div>
+              <div><span class="detail-label">Cost price</span><strong>Rs. {{ prod.costPrice.toFixed(2) }}</strong></div>
               <div><span class="detail-label">Unit of measure</span><strong>{{ unitDisplayName(prod.unitOfMeasure) }}</strong></div>
               <div><span class="detail-label">Minimum order quantity</span><strong>{{ prod.minOrderQty }}</strong></div>
               <div><span class="detail-label">Diet type</span><strong>{{ prod.dietType || 'Not specified' }}</strong></div>
@@ -870,10 +908,108 @@ import { Product } from '../../../../core/models';
       gap: 10px;
       margin-top: 8px;
     }
+
+    /* Table Pagination */
+    .pagination-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-top: 1px solid #f1f5f9;
+      background: #fafafa;
+      flex-wrap: wrap;
+      gap: 12px;
+      border-bottom-left-radius: 12px;
+      border-bottom-right-radius: 12px;
+    }
+
+    .pagination-info {
+      font-size: 0.84rem;
+      color: #64748b;
+      font-weight: 500;
+      strong { color: #1e293b; }
+    }
+
+    .pagination-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .page-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 5px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #334155;
+      cursor: pointer;
+      transition: all 0.15s ease;
+
+      &:hover:not(:disabled) {
+        border-color: #065f46;
+        color: #065f46;
+        background: #ecfdf5;
+      }
+
+      &:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+
+      span.material-symbols-outlined { font-size: 16px; }
+    }
+
+    .page-pills {
+      display: flex;
+      gap: 4px;
+    }
+
+    .page-num-pill {
+      background: #ffffff;
+      border: 1px solid #cbd5e1;
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.15s;
+
+      &.active {
+        background: #065f46;
+        border-color: #065f46;
+        color: #ffffff;
+      }
+
+      &:hover:not(.active) {
+        border-color: #065f46;
+        color: #065f46;
+        background: #f0fdf4;
+      }
+    }
   `]
 })
 export class ProductListComponent {
   readonly productService = inject(ProductService);
+  readonly authService = inject(AuthService);
+
+  // Pagination for Product Catalog
+  catalogPage = signal<number>(1);
+  catalogPageSize = 8;
+  catalogTotalPages = computed(() => Math.max(1, Math.ceil(this.productService.filteredProducts().length / this.catalogPageSize)));
+  paginatedProducts = computed(() => {
+    const page = this.catalogPage();
+    const start = (page - 1) * this.catalogPageSize;
+    return this.productService.filteredProducts().slice(start, start + this.catalogPageSize);
+  });
+  catalogPageNumbers = computed(() => {
+    return Array.from({ length: this.catalogTotalPages() }, (_, i) => i + 1);
+  });
 
   readonly selectedProduct = signal<Product | null>(null);
   readonly viewedProduct = signal<Product | null>(null);
@@ -898,6 +1034,14 @@ export class ProductListComponent {
   selectedEditImage: File | null = null;
 
   openEditModal(p: Product): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'product',
+        'UPDATE',
+        'Restricted Action: Cashiers are not authorized to modify product catalog details or pricing. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.selectedProduct.set(p);
     this.editProduct = {
       categoryId: p.categoryId,
@@ -930,6 +1074,14 @@ export class ProductListComponent {
   }
 
   openAddModal(): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'product',
+        'INSERT',
+        'Restricted Action: Cashiers are not authorized to create new products. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.newProduct = this.emptyProduct();
     this.productParentId = null;
     this.selectedImage = null;
@@ -944,6 +1096,14 @@ export class ProductListComponent {
   }
 
   openCategoryModal(): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'category',
+        'INSERT',
+        'Restricted Action: Cashiers are not authorized to create product categories. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.newCategory = this.emptyCategory();
     this.categoryMode = this.parentCategories().length === 0 ? 'parent' : 'subcategory';
     this.categoryError.set(null);
@@ -951,6 +1111,14 @@ export class ProductListComponent {
   }
 
   openParentCategoryModal(): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'category',
+        'INSERT',
+        'Restricted Action: Cashiers are not authorized to create product categories. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.newCategory = this.emptyCategory();
     this.categoryMode = 'parent';
     this.categoryError.set(null);
@@ -958,6 +1126,14 @@ export class ProductListComponent {
   }
 
   openSubcategoryModal(): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'category',
+        'INSERT',
+        'Restricted Action: Cashiers are not authorized to create subcategories. Store Manager or Admin role required.'
+      );
+      return;
+    }
     const parentId = this.newCategory.parentId ?? this.productParentId;
     if (parentId == null) {
       this.categoryError.set('Select a parent category before adding a subcategory.');
@@ -980,6 +1156,14 @@ export class ProductListComponent {
   }
 
   openUnitModal(): void {
+    if (!this.authService.isManager()) {
+      this.authService.triggerSecurityAlert(
+        'unit_of_measure',
+        'INSERT',
+        'Restricted Action: Cashiers are not authorized to register units of measure. Store Manager or Admin role required.'
+      );
+      return;
+    }
     this.newUnit = this.emptyUnit();
     this.unitError.set(null);
     this.unitModalOpen.set(true);
