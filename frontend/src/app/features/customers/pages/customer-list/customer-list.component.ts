@@ -229,7 +229,7 @@ import { Customer, SalesOrder, SalesOrderDetails } from '../../../../core/models
                 (click)="submitRegistration()"
                 [disabled]="isSubmittingCustomer() || phoneError() !== null"
               >
-                {{ isSubmittingCustomer() ? 'Registering...' : 'Register (sp_register_customer)' }}
+                {{ isSubmittingCustomer() ? 'Registering...' : 'Register ' }}
               </button>
             </div>
           </div>

@@ -422,13 +422,11 @@ BEGIN
     IF v_rule_type = 'FIRST_PURCHASE' AND NOT v_first_purchase THEN
       ITERATE rule_loop;
     END IF;
-    IF v_rule_type = 'HOLIDAY' AND NOT fn_is_holiday(v_order_date) THEN
-      ITERATE rule_loop;
-    END IF;
     IF v_rule_type = 'LOYALTY' AND (v_customer_id IS NULL OR v_rule_tier <> v_tier) THEN
       ITERATE rule_loop;
     END IF;
-    IF v_rule_type = 'COUPON' AND v_rule_id <> v_coupon_rule_id THEN
+    IF v_rule_type NOT IN ('FIRST_PURCHASE', 'LOYALTY')
+       AND (v_coupon_rule_id IS NULL OR v_rule_id <> v_coupon_rule_id) THEN
       ITERATE rule_loop;
     END IF;
     IF NOT v_stackable AND v_non_stackable_applied THEN
