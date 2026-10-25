@@ -1,106 +1,139 @@
-import { Injectable, signal } from '@angular/core';
-import { DiscountRule, Coupon, Holiday } from '../models';
+import { Injectable, inject, signal } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Coupon, DiscountRule, Holiday } from '../models';
 
-@Injectable({
-  providedIn: 'root'
-})
+interface DiscountRuleRow {
+  rule_id: number;
+  name: string;
+  rule_type: DiscountRule['ruleType'];
+  kind: DiscountRule['kind'];
+  value: number;
+  min_order_amount: number;
+  max_discount: number | null;
+  tier: string | null;
+  start_date: string;
+  end_date: string;
+  priority: number;
+  stackable: boolean;
+  is_active: boolean;
+}
+
+interface CouponRow {
+  code: string;
+  rule_id: number;
+  rule_name: string;
+  max_uses: number;
+  used_count: number;
+  expires_on: string;
+  kind?: 'PERCENT' | 'FIXED';
+  value?: number;
+  min_order_amount?: number;
+  max_discount?: number | null;
+  is_active?: boolean;
+}
+
+interface HolidayRow {
+  holiday_date: string;
+  name: string;
+  discount_percent: number | null;
+}
+
+@Injectable({ providedIn: 'root' })
 export class DiscountService {
-  readonly rules = signal<DiscountRule[]>([
-    {
-      ruleId: 1,
-      name: 'Welcome First Purchase',
-      ruleType: 'FIRST_PURCHASE',
-      kind: 'PERCENT',
-      value: 10,
-      minOrderAmount: 500,
-      maxDiscount: 1000,
-      startDate: '2026-01-01',
-      endDate: '2027-12-31',
-      priority: 10,
-      stackable: false,
-      isActive: true
-    },
-    {
-      ruleId: 2,
-      name: 'National Holiday Promotion',
-      ruleType: 'HOLIDAY',
-      kind: 'PERCENT',
-      value: 5,
-      minOrderAmount: 0,
-      startDate: '2026-01-01',
-      endDate: '2027-12-31',
-      priority: 20,
-      stackable: true,
-      isActive: true
-    },
-    {
-      ruleId: 3,
-      name: 'Gold Member Privilege',
-      ruleType: 'LOYALTY',
-      kind: 'PERCENT',
-      value: 7,
-      minOrderAmount: 0,
-      tier: 'GOLD',
-      startDate: '2026-01-01',
-      endDate: '2027-12-31',
-      priority: 30,
-      stackable: true,
-      isActive: true
-    },
-    {
-      ruleId: 4,
-      name: 'Silver Member Privilege',
-      ruleType: 'LOYALTY',
-      kind: 'PERCENT',
-      value: 5,
-      minOrderAmount: 0,
-      tier: 'SILVER',
-      startDate: '2026-01-01',
-      endDate: '2027-12-31',
-      priority: 40,
-      stackable: true,
-      isActive: true
-    }
-  ]);
+  private readonly http = inject(HttpClient);
+  private readonly apiUrl = '/api';
 
-  readonly coupons = signal<Coupon[]>([
-    {
-      code: 'NEWYEAR50',
-      ruleId: 2,
-      ruleName: 'Holiday Special $5 Off',
-      maxUses: 100,
-      usedCount: 24,
-      expiresOn: '2026-12-31'
-    },
-    {
-      code: 'WELCOME10',
-      ruleId: 1,
-      ruleName: 'First Order 10% Off',
-      maxUses: 500,
-      usedCount: 142,
-      expiresOn: '2026-12-31'
-    }
-  ]);
+  readonly rules = signal<DiscountRule[]>([]);
+  readonly coupons = signal<Coupon[]>([]);
+  readonly holidays = signal<Holiday[]>([]);
+  readonly loadError = signal<string | null>(null);
 
-  readonly holidays = signal<Holiday[]>([
-    { holidayDate: '2026-01-01', name: 'New Year\'s Day' },
-    { holidayDate: '2026-01-14', name: 'Tamil Thai Pongal Day' },
-    { holidayDate: '2026-02-04', name: 'National Independence Day' },
-    { holidayDate: '2026-04-13', name: 'Sinhala & Tamil New Year' },
-    { holidayDate: '2026-05-23', name: 'Vesak Full Moon Poya Day' },
-    { holidayDate: '2026-12-25', name: 'Christmas Day' }
-  ]);
-
-  addRule(rule: Omit<DiscountRule, 'ruleId'>): void {
-    const newId = Math.max(0, ...this.rules().map(r => r.ruleId)) + 1;
-    this.rules.update(list => [...list, { ...rule, ruleId: newId }]);
+  constructor() {
+    this.loadRules();
+    this.loadCoupons();
+    this.loadHolidays();
   }
 
-  addCoupon(coupon: Coupon): void {
-    this.coupons.update(list => [...list, coupon]);
+  loadRules(): void {
+    this.http.get<DiscountRuleRow[]>(`${this.apiUrl}/discounts/active`).subscribe({
+      next: rows => this.rules.set(rows.map(row => ({
+        ruleId: row.rule_id,
+        name: row.name,
+        ruleType: row.rule_type,
+        kind: row.kind,
+        value: Number(row.value),
+        minOrderAmount: Number(row.min_order_amount),
+        maxDiscount: row.max_discount === null ? undefined : Number(row.max_discount),
+        tier: row.tier ?? undefined,
+        startDate: row.start_date,
+        endDate: row.end_date,
+        priority: row.priority,
+        stackable: row.stackable,
+        isActive: row.is_active
+      }))),
+      error: () => this.loadError.set('Unable to load promotional rules.')
+    });
   }
 
-  addHoliday(holiday: Holiday): void {
-    this.holidays.update(list => [...list, holiday]);
+  loadCoupons(): void {
+    this.http.get<CouponRow[]>(`${this.apiUrl}/discounts/coupons`).subscribe({
+      next: rows => this.coupons.set(rows.map(row => ({
+        code: row.code,
+        ruleId: row.rule_id,
+        ruleName: row.rule_name,
+        maxUses: row.max_uses,
+        usedCount: row.used_count,
+        expiresOn: row.expires_on,
+        kind: row.kind,
+        value: row.value !== undefined && row.value !== null ? Number(row.value) : undefined,
+        minOrderAmount: row.min_order_amount !== undefined && row.min_order_amount !== null ? Number(row.min_order_amount) : undefined,
+        maxDiscount: row.max_discount !== undefined && row.max_discount !== null ? Number(row.max_discount) : undefined,
+        isActive: row.is_active !== undefined ? Boolean(row.is_active) : true
+      }))),
+      error: () => this.loadError.set('Unable to load coupons.')
+    });
+  }
+
+  loadHolidays(): void {
+    this.http.get<HolidayRow[]>(`${this.apiUrl}/discounts/holidays`).subscribe({
+      next: rows => this.holidays.set(rows.map(row => ({
+        holidayDate: row.holiday_date,
+        name: row.name,
+        discountPercent: this.toOptionalNumber(row.discount_percent)
+      }))),
+      error: () => this.loadError.set('Unable to load holidays.')
+    });
+  }
+
+  private toOptionalNumber(value: number | string | null | undefined): number | undefined {
+    if (value === null || value === undefined || value === '') {
+      return undefined;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  }
+
+  addRule(rule: Omit<DiscountRule, 'ruleId'>) {
+    return this.http.post(`${this.apiUrl}/discounts/rules`, rule);
+  }
+
+  updateRule(ruleId: number, rule: Partial<DiscountRule>) {
+    return this.http.put(`${this.apiUrl}/discounts/rules/${ruleId}`, rule);
+  }
+
+  addCoupon(coupon: Coupon) {
+    return this.http.post(`${this.apiUrl}/discounts/coupons`, coupon);
+  }
+
+  updateCoupon(originalCode: string, coupon: Partial<Coupon> & { code?: string }) {
+    return this.http.put(`${this.apiUrl}/discounts/coupons/${originalCode}`, coupon);
+  }
+
+  addHoliday(holiday: Holiday) {
+    return this.http.post(`${this.apiUrl}/discounts/holidays`, holiday);
+  }
+
+  updateHoliday(holiday: Holiday & { originalDate?: string }) {
+    return this.http.put(`${this.apiUrl}/discounts/holidays`, holiday);
   }
 }

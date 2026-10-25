@@ -3,6 +3,7 @@ export interface Category {
   name: string;
   icon: string;
   itemCount: number;
+  parentId: number | null;
 }
 
 export interface Product {
@@ -13,12 +14,14 @@ export interface Product {
   costPrice: number;
   categoryId: number;
   categoryName: string;
+  categoryParentId?: number | null;
+  categoryParentName?: string | null;
   supplierId?: number;
   supplierName?: string;
   isActive: boolean;
   imageUrl: string;
   dietType?: 'VEG' | 'NON_VEG';
-  unitOfMeasure?: 'KG' | 'G' | 'L' | 'ML' | 'PACKET' | 'PIECE' | 'CAN' | 'BOTTLE';
+  unitOfMeasure?: string;
   minOrderQty?: number;
   discountBadge?: string;
   stockQty: number;
@@ -40,10 +43,41 @@ export interface Customer {
   id: number;
   fullName: string;
   phone: string;
+  maskedPhone?: string;
   email?: string;
   loyaltyPoints: number;
   tier: 'BRONZE' | 'SILVER' | 'GOLD';
   registeredDate: string;
+  isFirstPurchase?: boolean;
+}
+
+export interface SalesOrderItem {
+  productId: number;
+  productName: string;
+  sku: string;
+  quantity: number;
+  unitPrice: number;
+  lineTotal: number;
+}
+
+export interface OrderPayment {
+  paymentId: number;
+  method: 'CASH' | 'CARD' | 'QR' | 'ONLINE';
+  amount: number;
+  paidAt: string;
+}
+
+export interface OrderDiscount {
+  ruleId: number;
+  ruleName: string;
+  amount: number;
+}
+
+export interface SalesOrderDetails extends Omit<SalesOrder, 'items' | 'discounts'> {
+  items: SalesOrderItem[];
+  payments: OrderPayment[];
+  discounts: OrderDiscount[];
+  itemCount: number;
 }
 
 export interface DiscountRule {
@@ -69,11 +103,17 @@ export interface Coupon {
   maxUses: number;
   usedCount: number;
   expiresOn: string;
+  kind?: 'PERCENT' | 'FIXED';
+  value?: number;
+  minOrderAmount?: number;
+  maxDiscount?: number;
+  isActive?: boolean;
 }
 
 export interface Holiday {
   holidayDate: string;
   name: string;
+  discountPercent?: number;
 }
 
 export interface InventoryItem {
@@ -165,11 +205,21 @@ export interface EmployeeAuditLog {
 
 export interface SecurityEventLog {
   logId: number;
-  eventType: 'LOGIN_SUCCESS' | 'LOGIN_FAILURE' | 'ROLE_ASSIGN' | 'UNAUTHORIZED_ACCESS' | 'EMPLOYEE_DEACTIVATED' | 'EMPLOYEE_REGISTERED';
+  eventType: 'LOGIN_SUCCESS' | 'LOGIN_FAILURE' | 'ROLE_ASSIGN' | 'UNAUTHORIZED_ACCESS' | 'EMPLOYEE_DEACTIVATED' | 'EMPLOYEE_REGISTERED' | 'DATABASE_BACKUP_CREATED';
   description: string;
   username: string;
   ipAddress: string;
   createdAt: string;
+}
+
+export interface BackupInfo {
+  fileName: string;
+  filePath: string;
+  fileSizeKb: number;
+  createdAt: string;
+  binlogCoordinate: string;
+  status: string;
+  message: string;
 }
 
 export interface MonthlyRollupRow {
@@ -218,6 +268,46 @@ export interface DailySalesItem {
   totalSales: number;
 }
 
+export interface SupplierPerformanceItem {
+  supplierId: number;
+  supplierName: string;
+  contactPerson: string;
+  phone: string;
+  city: string;
+  totalOrders: number;
+  totalRequestedQty: number;
+  totalConfirmedQty: number;
+  totalReceivedQty: number;
+  totalSpend: number;
+  fulfillmentRate: number;
+  ratingTier: 'PREFERRED' | 'RELIABLE' | 'UNDER_REVIEW' | string;
+}
+
+export interface SummaryMetrics {
+  todayRevenue: number;
+  ordersCount: number;
+  discountsGiven: number;
+  lowStockAlerts: number;
+  movingAvg7Days: number;
+  movingAvg30Days: number;
+}
+
+export interface ExplainBenchmarkSide {
+  scanType?: string;
+  cost: string | number;
+  executionTimeMs: number;
+  rowsExamined: number;
+  indexUsed?: string;
+  improvementFactor?: string;
+}
+
+export interface ExplainBenchmark {
+  queryDescription: string;
+  datasetSize: string;
+  beforeOptimization: ExplainBenchmarkSide | Record<string, any>;
+  afterOptimization: ExplainBenchmarkSide | Record<string, any>;
+}
+
 export interface SalesOrder {
   orderId: number;
   branchId: number;
@@ -237,4 +327,45 @@ export interface SalesOrder {
   paymentMethod: 'CASH' | 'CARD' | 'QR';
   items: CartItem[];
   discounts: AppliedDiscount[];
+  itemCount?: number;
+}
+
+export interface PaymentTenderSummary {
+  paymentMethod: string;
+  transactionCount: number;
+  totalCollected: number;
+  sharePercentage: number;
+}
+
+export interface FinancialReconciliation {
+  totalCompletedOrders: number;
+  grossSales: number;
+  totalDiscounts: number;
+  netRevenue: number;
+  totalCollected: number;
+  variance: number;
+  isBalanced: boolean;
+  tenders: PaymentTenderSummary[];
+}
+
+
+export interface DatabaseUserAccount {
+  username: string;
+  host: string;
+  assignedRole: string;
+  status: 'ACTIVE' | 'LOCKED' | string;
+  purpose: string;
+  authPlugin: string;
+  privilegesSummary: string;
+}
+
+export interface DatabaseAccount {
+  id: string | number;
+  username: string;
+  role: string;
+  host: string;
+  status: 'active' | 'disabled';
+  privilegeCount: number;
+  createdAt: string;
+  lastUsedAt: string;
 }

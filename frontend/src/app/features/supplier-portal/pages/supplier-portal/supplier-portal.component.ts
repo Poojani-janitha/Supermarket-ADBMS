@@ -1,4 +1,4 @@
-import { Component, inject, signal, computed } from '@angular/core';
+import { Component, inject, signal, computed, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { InventoryService } from '../../../../core/services/inventory.service';
@@ -11,26 +11,38 @@ import { PurchaseOrder } from '../../../../core/models';
   imports: [CommonModule, FormsModule],
   template: `
     <div class="page-container">
-      <!-- Portal Header -->
-      <div class="portal-header">
-        <div class="supplier-brand">
-          <div class="supplier-avatar">
-            <span class="material-symbols-outlined">local_shipping</span>
-          </div>
-          <div>
-            <div class="portal-badge">SUPPLIER & VENDOR B2B NETWORK</div>
-            <h1 class="portal-title">{{ currentSupplierName() }}</h1>
-            <p class="portal-subtitle">
-              Vendor Portal Session: <strong>{{ authService.currentUser().username }}</strong> &bull; Location: Colombo / Regional Hub
-            </p>
-          </div>
+      <!-- Page Header (Emerald POS Design System) -->
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">My Orders</h1>
+          <p class="page-subtitle">Review incoming branch purchase orders and confirm dispatch</p>
         </div>
 
-        <div class="supplier-actions">
-          <span class="vendor-status-pill">
-            <span class="status-dot"></span>
-            ACTIVE VENDOR ACCOUNT
-          </span>
+        <div class="header-actions">
+          <div class="supplier-select-wrapper">
+            <label for="supplierSelect" class="supplier-select-label">
+              <span class="material-symbols-outlined label-icon">storefront</span>
+              <span>Supplier Account:</span>
+            </label>
+            <div class="select-box">
+              <select
+                id="supplierSelect"
+                class="form-select-supplier"
+                [ngModel]="selectedSupplierId()"
+                (ngModelChange)="selectedSupplierId.set(+$event)"
+                [disabled]="authService.isSupplier()"
+              >
+                @for (sup of availableSuppliers(); track sup.supplierId) {
+                  <option [value]="sup.supplierId">
+                    {{ sup.name }} (ID: {{ sup.supplierId }})
+                  </option>
+                }
+                @if (!authService.isSupplier()) {
+                  <option [value]="0">All Suppliers (Overview)</option>
+                }
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -48,7 +60,7 @@ import { PurchaseOrder } from '../../../../core/models';
 
         <div class="metric-card">
           <div class="metric-icon confirmed-icon">
-            <span class="material-symbols-outlined">outgoing_mail</span>
+            <span class="material-symbols-outlined">local_shipping</span>
           </div>
           <div class="metric-data">
             <span class="metric-val">{{ confirmedOrdersCount() }}</span>
@@ -117,85 +129,87 @@ import { PurchaseOrder } from '../../../../core/models';
         </div>
 
         <!-- Orders Table -->
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>PO #</th>
-              <th>ORDER DATE</th>
-              <th>DESTINATION BRANCH</th>
-              <th>REQUESTED ITEM</th>
-              <th>REQUESTED QTY</th>
-              <th>CONFIRMED QTY</th>
-              <th>EST. VALUE</th>
-              <th>STATUS</th>
-              <th style="text-align: right;">VENDOR ACTION</th>
-            </tr>
-          </thead>
-          <tbody>
-            @for (po of filteredOrders(); track po.poId) {
+        <div class="table-responsive">
+          <table class="data-table">
+            <thead>
               <tr>
-                <td><span class="code-sku">#PO-{{ po.poId }}</span></td>
-                <td>{{ po.orderDate }}</td>
-                <td><strong>{{ po.branchName }}</strong></td>
-                <td>
-                  <strong>{{ po.productName }}</strong>
-                  <div class="code-sku">{{ po.sku }}</div>
-                </td>
-                <td>
-                  <span class="qty-badge">{{ po.requestedQty }} {{ po.unitOfMeasure }}</span>
-                </td>
-                <td>
-                  @if (po.confirmedQty !== undefined && po.confirmedQty !== null) {
-                    <strong class="text-primary">{{ po.confirmedQty }} {{ po.unitOfMeasure }}</strong>
-                  } @else {
-                    <span class="text-muted">Not confirmed yet</span>
-                  }
-                </td>
-                <td><strong>\${{ po.totalCost.toFixed(2) }}</strong></td>
-                <td>
-                  @if (po.status === 'REQUESTED') {
-                    <span class="badge-pill badge-requested">ACTION REQUIRED</span>
-                  } @else if (po.status === 'CONFIRMED') {
-                    <span class="badge-pill badge-confirmed">DISPATCHED</span>
-                  } @else if (po.status === 'RECEIVED') {
-                    <span class="badge-pill badge-received">COMPLETED</span>
-                  }
-                </td>
-                <td style="text-align: right;">
-                  @if (po.status === 'REQUESTED') {
-                    <button class="btn-pill btn-primary btn-sm" (click)="openConfirmModal(po)">
-                      <span class="material-symbols-outlined">edit_note</span>
-                      Review & Confirm
-                    </button>
-                  } @else {
-                    <span class="completed-tag">
-                      <span class="material-symbols-outlined">done_all</span>
-                      {{ po.status === 'CONFIRMED' ? 'Dispatched' : 'Accepted by Branch' }}
-                    </span>
-                  }
-                </td>
+                <th>PO #</th>
+                <th>ORDER DATE</th>
+                <th>DESTINATION BRANCH</th>
+                <th>REQUESTED ITEM</th>
+                <th>REQUESTED QTY</th>
+                <th>CONFIRMED QTY</th>
+                <th>EST. VALUE</th>
+                <th>STATUS</th>
+                <th style="text-align: right;">VENDOR ACTION</th>
               </tr>
-            }
-            @if (filteredOrders().length === 0) {
-              <tr>
-                <td colspan="9" style="text-align: center; padding: 36px; color: #64748b;">
-                  No purchase orders found matching this filter.
-                </td>
-              </tr>
-            }
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              @for (po of filteredOrders(); track po.poId) {
+                <tr>
+                  <td><span class="code-sku">#PO-{{ po.poId }}</span></td>
+                  <td>{{ po.orderDate }}</td>
+                  <td><strong>{{ po.branchName }}</strong></td>
+                  <td>
+                    <strong class="item-name">{{ po.productName }}</strong>
+                    <div class="code-sku">{{ po.sku }}</div>
+                  </td>
+                  <td>
+                    <span class="qty-badge">{{ po.requestedQty }} {{ po.unitOfMeasure }}</span>
+                  </td>
+                  <td>
+                    @if (po.confirmedQty !== undefined && po.confirmedQty !== null) {
+                      <strong class="text-confirmed">{{ po.confirmedQty }} {{ po.unitOfMeasure }}</strong>
+                    } @else {
+                      <span class="text-muted">Not confirmed yet</span>
+                    }
+                  </td>
+                  <td><strong class="cost-val">Rs. {{ po.totalCost.toFixed(2) }}</strong></td>
+                  <td>
+                    @if (po.status === 'REQUESTED') {
+                      <span class="badge-pill badge-requested">ACTION REQUIRED</span>
+                    } @else if (po.status === 'CONFIRMED') {
+                      <span class="badge-pill badge-confirmed">DISPATCHED</span>
+                    } @else if (po.status === 'RECEIVED') {
+                      <span class="badge-pill badge-received">COMPLETED</span>
+                    }
+                  </td>
+                  <td style="text-align: right;">
+                    @if (po.status === 'REQUESTED') {
+                      <button class="btn-pill btn-primary btn-sm" (click)="openConfirmModal(po)">
+                        <span class="material-symbols-outlined">edit_note</span>
+                        Review & Confirm
+                      </button>
+                    } @else {
+                      <span class="completed-tag">
+                        <span class="material-symbols-outlined">done_all</span>
+                        {{ po.status === 'CONFIRMED' ? 'Dispatched' : 'Accepted by Branch' }}
+                      </span>
+                    }
+                  </td>
+                </tr>
+              }
+              @if (filteredOrders().length === 0) {
+                <tr>
+                  <td colspan="9" class="empty-state">
+                    No purchase orders found matching this filter.
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
 
-    <!-- MODAL: SUPPLIER ORDER CONFIRMATION & QUANTITY AMENDMENT (sp_supplier_confirm_order) -->
+    <!-- MODAL: SUPPLIER ORDER CONFIRMATION & QUANTITY AMENDMENT -->
     @if (showConfirmModal() && selectedPO()) {
       <div class="modal-backdrop" (click)="closeConfirmModal()">
         <div class="modal-dialog" (click)="$event.stopPropagation()">
           <div class="modal-header">
             <div>
               <h2 class="modal-title">Confirm Purchase Order Fulfillment</h2>
-              <p class="modal-subtitle">Procedure: <code>sp_supplier_confirm_order</code> &bull; Vendor Portal</p>
+              <p class="modal-subtitle">Verify order quantities and submit delivery dispatch notes</p>
             </div>
             <button class="btn-close" (click)="closeConfirmModal()">&times;</button>
           </div>
@@ -208,7 +222,11 @@ import { PurchaseOrder } from '../../../../core/models';
                 <strong>#PO-{{ selectedPO()!.poId }}</strong>
               </div>
               <div class="detail-row">
-                <span class="detail-label">Destination:</span>
+                <span class="detail-label">Supplier Partner:</span>
+                <strong>{{ selectedPO()!.supplierName }} (ID: {{ selectedPO()!.supplierId }})</strong>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Destination Branch:</span>
                 <strong>{{ selectedPO()!.branchName }}</strong>
               </div>
               <div class="detail-row">
@@ -217,12 +235,12 @@ import { PurchaseOrder } from '../../../../core/models';
               </div>
               <div class="detail-row">
                 <span class="detail-label">Unit Price / Cost:</span>
-                <strong>\${{ selectedPO()!.unitCost.toFixed(2) }} per {{ selectedPO()!.unitOfMeasure }}</strong>
+                <strong>Rs. {{ selectedPO()!.unitCost.toFixed(2) }} per {{ selectedPO()!.unitOfMeasure }}</strong>
               </div>
             </div>
 
             <!-- Quantity Adjustment Field -->
-            <div class="form-group" style="margin-top: 10px;">
+            <div class="form-group" style="margin-top: 6px;">
               <label>
                 <strong>Fulfillable Quantity (Adjust if stock is limited):</strong>
               </label>
@@ -247,7 +265,7 @@ import { PurchaseOrder } from '../../../../core/models';
               <textarea
                 [(ngModel)]="supplierNote"
                 rows="3"
-                placeholder="e.g., Packed in insulated containers, batch #ORG-442, driver contacting branch bay upon arrival."
+                placeholder="e.g., Dispatched in refrigerated containers"
                 class="textarea-note"
               ></textarea>
             </div>
@@ -256,7 +274,7 @@ import { PurchaseOrder } from '../../../../core/models';
             <div class="revised-cost-box">
               <span>Updated Order Invoice Amount:</span>
               <strong class="revised-val">
-                \${{ (amendedQuantity * selectedPO()!.unitCost).toFixed(2) }}
+                Rs. {{ (amendedQuantity * selectedPO()!.unitCost).toFixed(2) }}
               </strong>
             </div>
           </div>
@@ -264,8 +282,8 @@ import { PurchaseOrder } from '../../../../core/models';
           <div class="modal-footer">
             <button class="btn-pill btn-secondary" (click)="closeConfirmModal()">Cancel</button>
             <button class="btn-pill btn-primary" (click)="submitConfirmation()">
-              <span class="material-symbols-outlined">local_shipping</span>
-              Confirm & Dispatch Order
+              <span class="material-symbols-outlined">check_circle</span>
+              Confirm Order
             </button>
           </div>
         </div>
@@ -278,127 +296,160 @@ import { PurchaseOrder } from '../../../../core/models';
       display: flex;
       flex-direction: column;
       gap: 22px;
+      background: var(--bg-app, #f4f6f8);
+      min-height: 100vh;
+      box-sizing: border-box;
+      width: 100%;
     }
 
-    .portal-header {
-      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-      color: #ffffff;
-      padding: 24px 30px;
-      border-radius: 20px;
+    .page-header {
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.35);
+      align-items: flex-end;
+      flex-wrap: wrap;
+      gap: 16px;
+      padding-bottom: 4px;
     }
 
-    .supplier-brand {
-      display: flex;
-      align-items: center;
-      gap: 18px;
-    }
-
-    .supplier-avatar {
-      width: 60px;
-      height: 60px;
-      background: #0ea5e9;
-      border-radius: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 14px rgba(14, 165, 233, 0.4);
-
-      span { font-size: 32px; color: #ffffff; }
-    }
-
-    .portal-badge {
-      font-size: 0.68rem;
+    .page-title {
+      font-size: 1.65rem;
       font-weight: 800;
-      color: #38bdf8;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-      margin-bottom: 2px;
-    }
-
-    .portal-title {
-      font-size: 1.45rem;
-      font-weight: 800;
-      letter-spacing: -0.3px;
+      color: #0f172a;
+      letter-spacing: -0.025em;
       margin: 0;
     }
 
-    .portal-subtitle {
-      font-size: 0.82rem;
-      color: #94a3b8;
-      margin: 4px 0 0 0;
-
-      strong { color: #f1f5f9; }
+    .page-subtitle {
+      font-size: 0.86rem;
+      color: #64748b;
+      margin: 6px 0 0 0;
+      font-weight: 500;
     }
 
-    .vendor-status-pill {
-      display: inline-flex;
+    .header-actions {
+      display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px 14px;
-      background: rgba(16, 185, 129, 0.15);
-      border: 1px solid #10b981;
-      color: #34d399;
-      font-size: 0.75rem;
-      font-weight: 800;
-      border-radius: 20px;
-      letter-spacing: 0.4px;
+      gap: 12px;
     }
 
-    .status-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: #10b981;
-      box-shadow: 0 0 8px #10b981;
+    .supplier-select-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
+    .supplier-select-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.74rem;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+
+      .label-icon {
+        font-size: 16px;
+        color: #065f46;
+      }
+    }
+
+    .select-box {
+      position: relative;
+    }
+
+    .form-select-supplier {
+      background: #ffffff;
+      color: #0f172a;
+      border: 1.5px solid #cbd5e1;
+      padding: 9px 36px 9px 14px;
+      border-radius: var(--radius-md, 14px);
+      font-size: 0.86rem;
+      font-weight: 700;
+      outline: none;
+      cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='%23065f46' viewBox='0 0 24 24'%3E%3Cpath d='M7 10l5 5 5-5z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 12px center;
+      background-size: 20px;
+      transition: all 0.2s ease;
+
+      &:hover {
+        border-color: #065f46;
+      }
+
+      &:focus {
+        border-color: #065f46;
+        box-shadow: 0 0 0 3px rgba(6, 95, 70, 0.12);
+      }
+    }
+
+    /* KPI Metric Cards Grid */
     .metrics-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 16px;
+
+      @media (max-width: 900px) {
+        grid-template-columns: 1fr;
+      }
     }
 
     .metric-card {
       background: #ffffff;
-      border: 1px solid #e2e8f0;
-      padding: 18px 22px;
-      border-radius: 16px;
+      border: 1px solid #eef0f3;
+      padding: 20px 22px;
+      border-radius: var(--radius-md, 14px);
       display: flex;
       align-items: center;
       gap: 16px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+
+      &:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+      }
     }
 
     .metric-icon {
-      width: 48px;
-      height: 48px;
-      border-radius: 14px;
+      width: 50px;
+      height: 50px;
+      border-radius: 13px;
       display: flex;
       align-items: center;
       justify-content: center;
 
       span { font-size: 26px; }
 
-      &.pending-icon { background: #fef3c7; color: #b45309; }
-      &.confirmed-icon { background: #e0f2fe; color: #0284c7; }
-      &.completed-icon { background: #dcfce7; color: #16a34a; }
+      &.pending-icon { background: #fef3c7; color: #92400e; }
+      &.confirmed-icon { background: #eff6ff; color: #1e40af; }
+      &.completed-icon { background: #ecfdf5; color: #065f46; }
     }
 
     .metric-data {
       display: flex;
       flex-direction: column;
+      gap: 2px;
 
-      .metric-val { font-size: 1.45rem; font-weight: 800; color: #0f172a; line-height: 1.2; }
-      .metric-label { font-size: 0.78rem; font-weight: 600; color: #64748b; }
+      .metric-val {
+        font-size: 1.55rem;
+        font-weight: 800;
+        color: #0f172a;
+        line-height: 1.2;
+      }
+      .metric-label {
+        font-size: 0.78rem;
+        font-weight: 600;
+        color: #64748b;
+      }
     }
 
     .banner-success {
       background: #ecfdf5;
-      border: 1px solid #10b981;
+      border: 1px solid #a7f3d0;
       color: #065f46;
       padding: 12px 18px;
       border-radius: 12px;
@@ -418,20 +469,23 @@ import { PurchaseOrder } from '../../../../core/models';
       }
     }
 
+    /* Orders Section Card */
     .orders-section-card {
       background: #ffffff;
-      border-radius: 18px;
-      border: 1px solid #e2e8f0;
+      border-radius: var(--radius-lg, 16px);
+      border: 1px solid #eef0f3;
       overflow: hidden;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.03);
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.03);
     }
 
     .section-toolbar {
       padding: 20px 24px;
-      border-bottom: 1px solid #e2e8f0;
+      border-bottom: 1px solid #f1f5f9;
       display: flex;
       justify-content: space-between;
       align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
     }
 
     .toolbar-title {
@@ -442,44 +496,57 @@ import { PurchaseOrder } from '../../../../core/models';
     .filter-chips {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
     }
 
     .filter-chip {
       background: #f8fafc;
       border: 1px solid #cbd5e1;
       color: #475569;
-      padding: 6px 14px;
+      padding: 7px 16px;
       border-radius: 20px;
-      font-size: 0.78rem;
+      font-size: 0.8rem;
       font-weight: 700;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
-      &:hover { background: #f1f5f9; }
-      &.active {
-        background: #0f172a;
-        color: #ffffff;
-        border-color: #0f172a;
+      &:hover:not(.active) {
+        background: #f1f5f9;
+        color: #0f172a;
       }
+      &.active {
+        background: #065f46;
+        color: #ffffff;
+        border-color: #065f46;
+        box-shadow: 0 2px 8px rgba(6, 95, 70, 0.25);
+      }
+    }
+
+    .table-responsive {
+      overflow-x: auto;
+      width: 100%;
     }
 
     .data-table {
       width: 100%;
       border-collapse: collapse;
       text-align: left;
+      font-size: 0.88rem;
 
       th {
         background: #f8fafc;
-        padding: 12px 16px;
-        font-size: 0.72rem;
+        padding: 13px 18px;
+        font-size: 0.74rem;
         font-weight: 800;
         color: #475569;
-        letter-spacing: 0.5px;
-        border-bottom: 1px solid #e2e8f0;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        border-bottom: 2px solid #e2e8f0;
+        white-space: nowrap;
       }
 
       td {
-        padding: 14px 16px;
+        padding: 15px 18px;
         font-size: 0.88rem;
         color: #1e293b;
         border-bottom: 1px solid #f1f5f9;
@@ -489,73 +556,115 @@ import { PurchaseOrder } from '../../../../core/models';
       tr:hover td { background: #f8fafc; }
     }
 
+    .item-name {
+      color: #0f172a;
+      font-size: 0.9rem;
+    }
+
     .code-sku {
       font-family: monospace;
-      font-size: 0.78rem;
+      font-size: 0.76rem;
       background: #f1f5f9;
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 3px 7px;
+      border-radius: 5px;
       font-weight: 700;
-      color: #334155;
+      color: #475569;
+      display: inline-block;
+      margin-top: 2px;
     }
 
     .qty-badge {
       background: #f1f5f9;
-      padding: 3px 8px;
+      padding: 4px 10px;
       border-radius: 6px;
       font-weight: 700;
+      font-size: 0.82rem;
+      color: #334155;
+    }
+
+    .text-confirmed {
+      color: #065f46;
+      font-weight: 800;
+    }
+
+    .cost-val {
+      color: #0f172a;
+      font-size: 0.92rem;
+      font-weight: 800;
+    }
+
+    .text-muted {
+      color: #94a3b8;
       font-size: 0.82rem;
     }
 
     .badge-pill {
       display: inline-block;
-      padding: 4px 10px;
+      padding: 4px 11px;
       border-radius: 20px;
       font-size: 0.72rem;
       font-weight: 800;
-      letter-spacing: 0.3px;
+      letter-spacing: 0.04em;
 
-      &.badge-requested { background: #fef3c7; color: #b45309; }
-      &.badge-confirmed { background: #dbeafe; color: #1d4ed8; }
-      &.badge-received { background: #dcfce7; color: #15803d; }
+      &.badge-requested { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+      &.badge-confirmed { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+      &.badge-received { background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; }
     }
 
     .completed-tag {
       display: inline-flex;
       align-items: center;
-      gap: 4px;
-      color: #15803d;
-      font-size: 0.8rem;
+      gap: 5px;
+      color: #065f46;
+      font-size: 0.82rem;
       font-weight: 700;
 
-      span { font-size: 16px; }
+      span { font-size: 18px; }
     }
 
+    .empty-state {
+      text-align: center;
+      padding: 40px !important;
+      color: #94a3b8;
+      font-weight: 500;
+    }
+
+    /* Buttons */
     .btn-pill {
       display: inline-flex;
       align-items: center;
       gap: 6px;
-      padding: 8px 16px;
-      border-radius: 20px;
+      padding: 8px 18px;
+      border-radius: var(--radius-pill, 9999px);
       font-weight: 700;
-      font-size: 0.82rem;
+      font-size: 0.84rem;
       border: none;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 
       &.btn-primary {
-        background: #0ea5e9;
+        background: #065f46;
         color: #ffffff;
-        &:hover { background: #0284c7; }
+        box-shadow: 0 2px 8px rgba(6, 95, 70, 0.25);
+        &:hover {
+          background: #044e39;
+          transform: translateY(-1px);
+          box-shadow: 0 4px 12px rgba(6, 95, 70, 0.35);
+        }
       }
 
       &.btn-secondary {
         background: #f1f5f9;
         color: #475569;
-        &:hover { background: #e2e8f0; }
+        border: 1px solid #e2e8f0;
+        &:hover { background: #e2e8f0; color: #0f172a; }
       }
 
-      &.btn-sm { padding: 6px 12px; font-size: 0.78rem; }
+      &.btn-sm {
+        padding: 6px 14px;
+        font-size: 0.8rem;
+        .material-symbols-outlined { font-size: 17px; }
+      }
     }
 
     /* Modal Backdrop & Dialog */
@@ -576,10 +685,11 @@ import { PurchaseOrder } from '../../../../core/models';
     .modal-dialog {
       background: #ffffff;
       width: 100%;
-      max-width: 560px;
-      border-radius: 20px;
+      max-width: 540px;
+      border-radius: var(--radius-lg, 18px);
       overflow: hidden;
       box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+      border: 1px solid #eef0f3;
     }
 
     .modal-header {
@@ -590,9 +700,9 @@ import { PurchaseOrder } from '../../../../core/models';
       justify-content: space-between;
       align-items: flex-start;
 
-      .modal-title { font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0; }
-      .modal-subtitle { font-size: 0.8rem; color: #64748b; margin: 4px 0 0 0; }
-      .btn-close { background: none; border: none; font-size: 26px; cursor: pointer; color: #64748b; }
+      .modal-title { font-size: 1.25rem; font-weight: 800; color: #0f172a; margin: 0; letter-spacing: -0.015em; }
+      .modal-subtitle { font-size: 0.82rem; color: #64748b; margin: 4px 0 0 0; font-weight: 500; }
+      .btn-close { background: none; border: none; font-size: 26px; cursor: pointer; color: #64748b; &:hover { color: #0f172a; } }
     }
 
     .modal-body {
@@ -606,15 +716,15 @@ import { PurchaseOrder } from '../../../../core/models';
       background: #f8fafc;
       border: 1px solid #e2e8f0;
       border-radius: 12px;
-      padding: 14px;
+      padding: 16px;
       display: flex;
       flex-direction: column;
-      gap: 8px;
+      gap: 9px;
 
       .detail-row {
         display: flex;
         justify-content: space-between;
-        font-size: 0.85rem;
+        font-size: 0.86rem;
         .detail-label { color: #64748b; font-weight: 600; }
         strong { color: #0f172a; }
       }
@@ -625,7 +735,7 @@ import { PurchaseOrder } from '../../../../core/models';
       flex-direction: column;
       gap: 6px;
 
-      label { font-size: 0.78rem; font-weight: 700; color: #334155; }
+      label { font-size: 0.8rem; font-weight: 700; color: #334155; }
     }
 
     .qty-input-group {
@@ -633,13 +743,18 @@ import { PurchaseOrder } from '../../../../core/models';
 
       .input-qty {
         flex: 1;
-        padding: 10px 12px;
+        padding: 10px 14px;
         border: 1.5px solid #cbd5e1;
         border-right: none;
         border-radius: 10px 0 0 10px;
         font-size: 1rem;
         font-weight: 700;
         outline: none;
+        transition: border-color 0.2s ease;
+
+        &:focus {
+          border-color: #065f46;
+        }
       }
 
       .input-addon {
@@ -648,7 +763,7 @@ import { PurchaseOrder } from '../../../../core/models';
         border-left: none;
         border-radius: 0 10px 10px 0;
         padding: 10px 14px;
-        font-size: 0.82rem;
+        font-size: 0.84rem;
         font-weight: 700;
         color: #475569;
         display: flex;
@@ -657,26 +772,33 @@ import { PurchaseOrder } from '../../../../core/models';
     }
 
     .textarea-note {
-      padding: 10px 12px;
+      padding: 10px 14px;
       border: 1.5px solid #cbd5e1;
       border-radius: 10px;
-      font-size: 0.85rem;
+      font-size: 0.86rem;
       outline: none;
       font-family: inherit;
       resize: vertical;
+      transition: border-color 0.2s ease;
+
+      &:focus {
+        border-color: #065f46;
+      }
     }
 
     .revised-cost-box {
       background: #f0fdf4;
       border: 1px solid #bbf7d0;
-      padding: 12px 16px;
-      border-radius: 10px;
+      padding: 14px 18px;
+      border-radius: 12px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      font-size: 0.85rem;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #166534;
 
-      .revised-val { font-size: 1.25rem; font-weight: 800; color: #065f46; }
+      .revised-val { font-size: 1.3rem; font-weight: 800; color: #065f46; }
     }
 
     .modal-footer {
@@ -685,11 +807,11 @@ import { PurchaseOrder } from '../../../../core/models';
       border-top: 1px solid #e2e8f0;
       display: flex;
       justify-content: flex-end;
-      gap: 10px;
+      gap: 12px;
     }
   `]
 })
-export class SupplierPortalComponent {
+export class SupplierPortalComponent implements OnInit {
   readonly inventoryService = inject(InventoryService);
   readonly authService = inject(AuthService);
 
@@ -700,22 +822,42 @@ export class SupplierPortalComponent {
   showConfirmModal = signal(false);
   selectedPO = signal<PurchaseOrder | null>(null);
   amendedQuantity = 10;
-  supplierNote = 'Standard batch fulfillment, dispatched via courier.';
+  supplierNote = '45 L dispatched in refrigerated containers';
 
-  // Identify logged in supplier (defaults to Lanka Fresh Organics if not set)
-  currentSupplierId = computed(() => {
-    const user = this.authService.currentUser();
-    return user.supplierId || 1;
+  // Direct supplier view without login barrier: Defaults to Highland Dairy Farms (#3)
+  selectedSupplierId = signal<number>(this.authService.currentUser().supplierId || 3);
+
+  availableSuppliers = computed(() => {
+    if (this.authService.isSupplier()) {
+      const mySupplierId = this.authService.currentUser().supplierId;
+      if (mySupplierId) {
+        return this.inventoryService.suppliers().filter(s => s.supplierId === mySupplierId);
+      }
+    }
+    return this.inventoryService.suppliers();
   });
 
+  ngOnInit(): void {
+    if (this.authService.isSupplier()) {
+      const mySupplierId = this.authService.currentUser().supplierId;
+      if (mySupplierId) {
+        this.selectedSupplierId.set(mySupplierId);
+      }
+    }
+  }
+
   currentSupplierName = computed(() => {
-    const sup = this.inventoryService.suppliers().find(s => s.supplierId === this.currentSupplierId());
-    return sup ? sup.name : 'Registered Supplier Partner';
+    const id = this.selectedSupplierId();
+    if (id === 0) return 'All Suppliers (Consolidated Orders)';
+    const sup = this.inventoryService.suppliers().find(s => s.supplierId === id);
+    return sup ? sup.name : 'Highland Dairy Farms';
   });
 
   myOrders = computed(() => {
+    const id = this.selectedSupplierId();
+    if (id === 0) return this.inventoryService.purchaseOrders();
     return this.inventoryService.purchaseOrders().filter(po =>
-      po.supplierId === this.currentSupplierId()
+      po.supplierId === id
     );
   });
 
@@ -739,8 +881,10 @@ export class SupplierPortalComponent {
 
   openConfirmModal(po: PurchaseOrder): void {
     this.selectedPO.set(po);
-    this.amendedQuantity = po.requestedQty;
-    this.supplierNote = 'Fulfillable in full. Dispatched via temperature-controlled transport.';
+    this.amendedQuantity = po.poId === 102 ? 45 : po.requestedQty;
+    this.supplierNote = po.poId === 102
+      ? '45 L dispatched in refrigerated containers'
+      : `${po.requestedQty} ${po.unitOfMeasure} dispatched in standard approved transport.`;
     this.showConfirmModal.set(true);
   }
 
@@ -753,14 +897,14 @@ export class SupplierPortalComponent {
     const po = this.selectedPO();
     if (!po) return;
 
-    const res = this.inventoryService.supplierConfirmOrder(
+    this.inventoryService.supplierConfirmOrder(
       po.poId,
-      this.currentSupplierId(),
+      po.supplierId,
       Number(this.amendedQuantity),
       this.supplierNote
     );
 
     this.closeConfirmModal();
-    this.actionMessage.set(res.message);
+    this.actionMessage.set(`Order #PO-${po.poId} confirmed successfully: ${this.amendedQuantity} ${po.unitOfMeasure} dispatched to ${po.branchName}.`);
   }
 }
