@@ -52,13 +52,11 @@ BEGIN
     FETCH cur INTO v_rule, v_type, v_kind, v_value, v_min, v_max, v_tier, v_stack;
     IF done THEN LEAVE rule_loop; END IF;
 
-    -- Evaluate qualification criteria per rule type
-    SET v_ok = CASE v_type
-      WHEN 'FIRST_PURCHASE' THEN fn_is_first_purchase(v_customer, p_order_id)
-      WHEN 'HOLIDAY'        THEN fn_is_holiday(v_date)
-      WHEN 'LOYALTY'        THEN v_customer IS NOT NULL AND fn_customer_tier(v_customer) = v_tier
-      WHEN 'COUPON'         THEN fn_coupon_valid(p_coupon, v_rule)
-      ELSE FALSE 
+    -- First-purchase and loyalty rules are automatic. Other rules require an explicit coupon.
+    SET v_ok = CASE
+      WHEN v_type = 'FIRST_PURCHASE' THEN fn_is_first_purchase(v_customer, p_order_id)
+      WHEN v_type = 'LOYALTY' THEN v_customer IS NOT NULL AND fn_customer_tier(v_customer) = v_tier
+      ELSE fn_coupon_valid(p_coupon, v_rule)
     END;
 
     -- Apply discount if qualified and subtotal threshold met
