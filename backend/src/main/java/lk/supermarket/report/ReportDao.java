@@ -263,7 +263,7 @@ public class ReportDao {
                         }
                     }
                 }
-
+                //calculate Share of Revenue (The 100% green bar in your screenshot)
                 final BigDecimal finalTotal = totalCollected;
                 List<FinancialReconciliationDto.PaymentTenderSummaryDto> calculatedTenders = tenders.stream().map(t -> {
                     double pct = (finalTotal.compareTo(BigDecimal.ZERO) > 0)
